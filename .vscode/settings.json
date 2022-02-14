@@ -1,0 +1,12 @@
+{
+	"files.associations": {
+		"entry.h": "c",
+		"window.h": "c",
+		"engine.h": "c",
+		"defines.h": "c",
+		"*.in": "cpp",
+		"string": "cpp",
+		"filesystem": "cpp",
+		"iosfwd": "cpp"
+	}
+}

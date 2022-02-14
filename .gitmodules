@@ -1,0 +1,21 @@
+[submodule "libraries/mpgx"]
+	path = libraries/mpgx
+	url = https://github.com/cfnptr/mpgx
+[submodule "libraries/logy"]
+	path = libraries/logy
+	url = https://github.com/cfnptr/logy
+[submodule "libraries/pack"]
+	path = libraries/pack
+	url = https://github.com/cfnptr/pack
+[submodule "libraries/conf"]
+	path = libraries/conf
+	url = https://github.com/cfnptr/conf
+[submodule "libraries/mpnw"]
+	path = libraries/mpnw
+	url = https://github.com/cfnptr/mpnw
+[submodule "libraries/libwebp"]
+	path = libraries/libwebp
+	url = https://github.com/webmproject/libwebp
+[submodule "libraries/freetype"]
+	path = libraries/freetype
+	url = https://github.com/cfnptr/freetype
