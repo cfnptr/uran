@@ -1,0 +1,53 @@
+// Copyright 2022 Nikita Fediuchin. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#pragma once
+
+#define __URAN__
+
+#define URAN_VERSION_MAJOR @uran_VERSION_MAJOR@
+#define URAN_VERSION_MINOR @mpgx_VERSION_MINOR@
+#define URAN_VERSION_PATCH @mpgx_VERSION_PATCH@
+
+/*
+ * Uran results.
+ */
+typedef enum UranResult_T
+{
+	SUCCESS_URAN_RESULT = 0,
+	URAN_RESULT_COUNT = 23,
+} UranResult_T;
+/*
+ * Uran result type.
+ */
+typedef uint8_t UranResult;
+
+/*
+ * Uran result strings.
+ */
+static const char* const uranResultStrings[URAN_RESULT_COUNT] = {
+	"Success",
+};
+
+/*
+ * Returns Uran result as string.
+ * result - Uran result.
+ */
+inline static const char* uranResultToString(
+	UranResult result)
+{
+	if (result >= URAN_RESULT_COUNT)
+		return "Unknown Uran result";
+	return uranResultStrings[result];
+}
