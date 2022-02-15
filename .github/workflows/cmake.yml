@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        submodules: true
+        submodules: recursive
        
     - if: matrix.os == 'ubuntu-latest' 
       name: Install Ubuntu xorg-dev

@@ -18,10 +18,24 @@ Work in Progress!
 * [CMake 3.10+](https://cmake.org/)
 * [Vulkan SDK 1.2+](https://vulkan.lunarg.com/)
 * [X11](https://www.x.org/) (Linux only)
+* [OpenSSL](https://openssl.org/)
 
 ### X11 installation
 
 * Ubuntu: sudo apt install xorg-dev
+
+### OpenSSL installation
+
+* Ubuntu: sudo apt install libssl-dev
+* MacOS: [brew](https://brew.sh/) install openssl
+* Windows: [choco](https://chocolatey.org/) install openssl
+
+### CMake options
+
+| Name                | Description                   | Default value |
+|---------------------|-------------------------------|---------------|
+| URAN_BUILD_SHARED   | Build Uran shared library     | `ON`          |
+| URAN_BUILD_EDITOR   | Build Uran editor executable  | `ON`          |
 
 ## Cloning
 
@@ -31,4 +45,8 @@ git clone --recursive https://github.com/cfnptr/uran
 
 ## Third-party
 
+* [conf](https://github.com/cfnptr/conf/) (Apache-2.0 License)
+* [logy](https://github.com/cfnptr/logy/) (Apache-2.0 License)
 * [mpgx](https://github.com/cfnptr/mpgx/) (Apache-2.0 License)
+* [mpnw](https://github.com/cfnptr/mpnw/) (Apache-2.0 License)
+* [pack](https://github.com/cfnptr/pack/) (Apache-2.0 License)

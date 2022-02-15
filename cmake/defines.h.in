@@ -1,4 +1,4 @@
-// Copyright 2022 Nikita Fediuchin. All rights reserved.
+// Copyright 2020-2022 Nikita Fediuchin. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,12 +13,18 @@
 // limitations under the License.
 
 #pragma once
+#include <stdint.h>
 
 #define __URAN__
 
 #define URAN_VERSION_MAJOR @uran_VERSION_MAJOR@
-#define URAN_VERSION_MINOR @mpgx_VERSION_MINOR@
-#define URAN_VERSION_PATCH @mpgx_VERSION_PATCH@
+#define URAN_VERSION_MINOR @uran_VERSION_MINOR@
+#define URAN_VERSION_PATCH @uran_VERSION_PATCH@
+
+#define URAN_VERSION_STRING \
+	"@uran_VERSION_MAJOR@." \
+	"@uran_VERSION_MINOR@." \
+	"@uran_VERSION_PATCH@"
 
 /*
  * Uran results.
@@ -26,7 +32,8 @@
 typedef enum UranResult_T
 {
 	SUCCESS_URAN_RESULT = 0,
-	URAN_RESULT_COUNT = 23,
+	FAILED_TO_ALLOCATE_URAN_RESULT = 1,
+	URAN_RESULT_COUNT = 2,
 } UranResult_T;
 /*
  * Uran result type.
@@ -38,6 +45,7 @@ typedef uint8_t UranResult;
  */
 static const char* const uranResultStrings[URAN_RESULT_COUNT] = {
 	"Success",
+	"Failed to allocate",
 };
 
 /*
