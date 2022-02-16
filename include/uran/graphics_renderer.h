@@ -14,18 +14,33 @@
 
 #pragma once
 #include "uran/transformer.h"
+#include "uran/text.h"
 
-#include "mpgx/text.h"
 #include "mpgx/window.h"
 #include "cmmt/camera.h"
 #include "mpmt/thread_pool.h"
 
+/*
+ * Graphics renderer structure.
+ */
 typedef struct GraphicsRenderer_T GraphicsRenderer_T;
+/*
+ * Graphics renderer instance.
+ */
 typedef GraphicsRenderer_T* GraphicsRenderer;
 
+/*
+ * Graphics render structure.
+ */
 typedef struct GraphicsRender_T GraphicsRender_T;
+/*
+ * Graphics render instance.
+ */
 typedef GraphicsRender_T* GraphicsRender;
 
+/*
+ * Graphics render sorting types.
+ */
 typedef enum GraphicsRenderSorting_T
 {
 	NO_GRAPHICS_RENDER_SORTING = 0,
@@ -34,8 +49,14 @@ typedef enum GraphicsRenderSorting_T
 	GRAPHICS_RENDER_SORTING_COUNT = 3,
 } RenderSorting_T;
 
+/*
+ * Graphics render sorting type.
+ */
 typedef uint8_t GraphicsRenderSorting;
 
+/*
+ * Graphics renderer data structure.
+ */
 typedef struct GraphicsRendererData
 {
 	Mat4F view;
@@ -48,15 +69,24 @@ typedef struct GraphicsRendererData
 	Plane3F backPlane;
 	Plane3F frontPlane;
 } GraphicsRendererData;
-typedef struct GraphicsRenderResult
+/*
+ * Graphics renderer data structure.
+ */
+typedef struct GraphicsRendererResult
 {
 	size_t renderCount;
 	size_t indexCount;
 	size_t passCount;
-} GraphicsRenderResult;
+} GraphicsRendererResult;
 
+/*
+ * Graphics render destroy function.
+ */
 typedef void(*OnGraphicsRenderDestroy)(
 	void* handle);
+/*
+ * Graphics render draw function.
+ */
 typedef size_t(*OnGraphicsRenderDraw)(
 	GraphicsRender graphicsRender,
 	GraphicsPipeline graphicsPipeline,
@@ -109,7 +139,7 @@ void createGraphicsRenderData(
 	Camera camera,
 	GraphicsRendererData* graphicsRendererData,
 	bool createPlanes);
-GraphicsRenderResult drawGraphicsRenderer(
+GraphicsRendererResult drawGraphicsRenderer(
 	GraphicsRenderer graphicsRenderer,
 	const GraphicsRendererData* graphicsRendererData);
 
@@ -136,18 +166,18 @@ void setGraphicsRenderBounding(
 void* getGraphicsRenderHandle(
 	GraphicsRender graphicsRender);
 
-inline static GraphicsRenderResult createGraphicsRenderResult()
+inline static GraphicsRendererResult createGraphicsRendererResult()
 {
-	GraphicsRenderResult result;
+	GraphicsRendererResult result;
 	result.renderCount = 0;
 	result.indexCount = 0;
 	result.passCount = 0;
 	return result;
 }
-inline static GraphicsRenderResult addGraphicsRenderResult(
-	GraphicsRenderResult a, GraphicsRenderResult b)
+inline static GraphicsRendererResult addGraphicsRendererResult(
+	GraphicsRendererResult a, GraphicsRendererResult b)
 {
-	GraphicsRenderResult result;
+	GraphicsRendererResult result;
 	result.renderCount = a.renderCount + b.renderCount;
 	result.indexCount = a.indexCount + b.indexCount;
 	result.passCount = a.passCount + b.passCount;

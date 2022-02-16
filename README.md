@@ -32,10 +32,9 @@ Work in Progress!
 
 ### CMake options
 
-| Name                | Description                   | Default value |
-|---------------------|-------------------------------|---------------|
-| URAN_BUILD_SHARED   | Build Uran shared library     | `ON`          |
-| URAN_BUILD_EDITOR   | Build Uran editor executable  | `ON`          |
+| Name                | Description                  | Default value |
+|---------------------|------------------------------|---------------|
+| URAN_BUILD_EDITOR   | Build Uran editor executable | `ON`          |
 
 ## Cloning
 
@@ -46,6 +45,8 @@ git clone --recursive https://github.com/cfnptr/uran
 ## Third-party
 
 * [conf](https://github.com/cfnptr/conf/) (Apache-2.0 License)
+* [FreeType](https://www.freetype.org/) (FreeType License)
+* [WebP](https://developers.google.com/speed/webp) (BSD License)
 * [logy](https://github.com/cfnptr/logy/) (Apache-2.0 License)
 * [mpgx](https://github.com/cfnptr/mpgx/) (Apache-2.0 License)
 * [mpnw](https://github.com/cfnptr/mpnw/) (Apache-2.0 License)

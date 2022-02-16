@@ -18,8 +18,15 @@
 #include "mpgx/window.h"
 #include "cmmt/camera.h"
 
+/*
+ * Free camera structure.
+ */
 typedef struct FreeCamera_T FreeCamera_T;
+/*
+ * Free camera instance.
+ */
 typedef FreeCamera_T* FreeCamera;
+
 
 FreeCamera createFreeCamera(
 	Framebuffer framebuffer,

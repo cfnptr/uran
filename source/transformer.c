@@ -135,14 +135,12 @@ void destroyTransformer(Transformer transformer)
 	free(transformer);
 }
 
-ThreadPool getTransformerThreadPool(
-	Transformer transformer)
+ThreadPool getTransformerThreadPool(Transformer transformer)
 {
 	assert(transformer);
 	return transformer->threadPool;
 }
-size_t getTransformerTransformCount(
-	Transformer transformer)
+size_t getTransformerTransformCount(Transformer transformer)
 {
 	assert(transformer);
 	return transformer->transformCount;
@@ -184,8 +182,7 @@ void enumerateTransformer(
 	transformer->isEnumerating = false;
 #endif
 }
-void destroyAllTransformerTransforms(
-	Transformer transformer)
+void destroyAllTransformerTransforms(Transformer transformer)
 {
 	assert(transformer);
 	assert(!transformer->isEnumerating);
@@ -310,7 +307,6 @@ Transform createTransform(
 {
 	assert(transformer);
 	assert(rotationType < ROTATION_TYPE_COUNT);
-
 	assert(!parent || (parent &&
 		transformer == parent->transformer));
 	assert(!transformer->isEnumerating);
@@ -361,6 +357,20 @@ Transform createTransform(
 	transformer->transformCount = count + 1;
 	return transform;
 }
+Transform createDefaultTransform(Transformer transformer)
+{
+	assert(transformer);
+	assert(!transformer->isEnumerating);
+
+	return createTransform(
+		transformer,
+		zeroVec3F,
+		oneVec3F,
+		oneQuat,
+		SPIN_ROTATION_TYPE,
+		NULL,
+		true);
+}
 void destroyTransform(Transform transform)
 {
 	if (!transform)
@@ -388,8 +398,7 @@ void destroyTransform(Transform transform)
 	abort();
 }
 
-Transformer getTransformTransformer(
-	Transform transform)
+Transformer getTransformTransformer(Transform transform)
 {
 	assert(transform);
 	return transform->transformer;

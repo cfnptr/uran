@@ -16,3 +16,6 @@
 [submodule "libraries/libwebp"]
 	path = libraries/libwebp
 	url = https://github.com/webmproject/libwebp
+[submodule "libraries/freetype"]
+	path = libraries/freetype
+	url = http://github.com/cfnptr/freetype

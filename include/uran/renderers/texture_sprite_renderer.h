@@ -14,7 +14,7 @@
 
 #pragma once
 #include "uran/graphics_renderer.h"
-#include "mpgx/pipelines/texture_sprite_pipeline.h"
+#include "uran/pipelines/texture_sprite_pipeline.h"
 
 GraphicsRenderer createTextureSpriteRenderer(
 	GraphicsPipeline textureSpritePipeline,

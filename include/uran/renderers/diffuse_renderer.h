@@ -14,7 +14,7 @@
 
 #pragma once
 #include "uran/graphics_renderer.h"
-#include "mpgx/pipelines/diffuse_pipeline.h"
+#include "uran/pipelines/diffuse_pipeline.h"
 
 GraphicsRenderer createDiffuseRenderer(
 	GraphicsPipeline diffusePipeline,

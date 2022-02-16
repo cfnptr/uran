@@ -13,30 +13,31 @@
 // limitations under the License.
 
 #pragma once
-#include "uran/graphics_renderer.h"
-#include "uran/pipelines/color_pipeline.h"
+#include "mpgx/window.h"
+#include "cmmt/color.h"
 
-GraphicsRenderer createColorRenderer(
+#define COLOR_PIPELINE_NAME "Color"
+
+MpgxResult createColorPipelineExt(
+	Framebuffer framebuffer,
+	Shader vertexShader,
+	Shader fragmentShader,
+	const GraphicsPipelineState* state,
+	GraphicsPipeline* colorPipeline);
+MpgxResult createColorPipeline(
+	Framebuffer framebuffer,
+	Shader vertexShader,
+	Shader fragmentShader,
+	GraphicsPipeline* colorPipeline);
+
+Mat4F getColorPipelineMvp(
+	GraphicsPipeline colorPipeline);
+void setColorPipelineMvp(
 	GraphicsPipeline colorPipeline,
-	GraphicsRenderSorting sorting,
-	bool useCulling,
-	size_t capacity,
-	ThreadPool threadPool);
-GraphicsRender createColorRender(
-	GraphicsRenderer colorRenderer,
-	Transform transform,
-	Box3F bounding,
-	LinearColor color,
-	GraphicsMesh mesh);
+	Mat4F mvp);
 
-LinearColor getColorRenderColor(
-	GraphicsRender colorRender);
-void setColorRenderColor(
-	GraphicsRender colorRender,
+LinearColor getColorPipelineColor(
+	GraphicsPipeline colorPipeline);
+void setColorPipelineColor(
+	GraphicsPipeline colorPipeline,
 	LinearColor color);
-
-GraphicsMesh getColorRenderMesh(
-	GraphicsRender colorRender);
-void setColorRenderMesh(
-	GraphicsRender colorRender,
-	GraphicsMesh mesh);

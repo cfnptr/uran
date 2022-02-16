@@ -73,17 +73,18 @@ void destroyTransformer(Transformer transformer);
 
 /*
  * Returns transformer thread pool instance.
+ * transformer - transformer instance.
  */
-ThreadPool getTransformerThreadPool(
-	Transformer transformer);
+ThreadPool getTransformerThreadPool(Transformer transformer);
 /*
  * Returns transformer transform count.
+ * transformer - transformer instance.
  */
-size_t getTransformerTransformCount(
-	Transformer transformer);
+size_t getTransformerTransformCount(Transformer transformer);
 
 /*
  * Returns transformer camera transform.
+ * transformer - transformer instance.
  */
 Transform getTransformerCamera(
 	Transformer transformer);
@@ -113,8 +114,7 @@ void enumerateTransformer(
  * Destroys all transformer transforms.
  * transformer - transformer instance.
  */
-void destroyAllTransformerTransforms(
-	Transformer transformer);
+void destroyAllTransformerTransforms(Transformer transformer);
 
 /*
  * Bakes transformer transforms.
@@ -123,8 +123,8 @@ void destroyAllTransformerTransforms(
 void updateTransformer(Transformer transformer);
 
 /*
- * Create a new editor instance.
- * Returns editor instance on success, otherwise NULL.
+ * Create a new transform instance with default values.
+ * Returns transform instance on success, otherwise NULL.
  *
  * transformer - transformer instance.
  * position - transform position.
@@ -143,6 +143,13 @@ Transform createTransform(
 	Transform parent,
 	bool isActive);
 /*
+ * Create a new transform instance.
+ * Returns transform instance on success, otherwise NULL.
+ *
+ * transformer - transformer instance.
+ */
+Transform createDefaultTransform(Transformer transformer);
+/*
  * Destroys transform instance.
  * transform - transform instance or NULL.
  */
@@ -152,8 +159,7 @@ void destroyTransform(Transform transform);
  * Returns transform transformer.
  * transform - transform instance.
  */
-Transformer getTransformTransformer(
-	Transform transform);
+Transformer getTransformTransformer(Transform transform);
 
 /*
  * Returns transform position.

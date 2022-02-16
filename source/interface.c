@@ -91,15 +91,15 @@ Interface createInterface(
 	return interface;
 }
 
-bool isInterfaceEmpty(Interface interface)
-{
-	assert(interface);
-	return interface->elementCount == 0;
-}
 Window getInterfaceWindow(Interface interface)
 {
 	assert(interface);
 	return interface->window;
+}
+size_t getInterfaceElementCount(Interface interface)
+{
+	assert(interface);
+	return interface->elementCount;
 }
 
 float getInterfaceScale(
@@ -117,18 +117,13 @@ void setInterfaceScale(
 	interface->scale = scale;
 }
 
-size_t getInterfaceElementCount(
-	Interface interface)
-{
-	assert(interface);
-	return interface->elementCount;
-}
 void enumerateInterface(
 	Interface interface,
-	void(*onItem)(InterfaceElement))
+	OnInterfaceElement onElement,
+	void* functionArgument)
 {
 	assert(interface);
-	assert(onItem);
+	assert(onElement);
 
 #ifndef NDEBUG
 	interface->isEnumerating = true;
@@ -138,7 +133,7 @@ void enumerateInterface(
 	size_t elementCount = interface->elementCount;
 
 	for (size_t i = 0; i < elementCount; i++)
-		onItem(elements[i]);
+		onElement(elements[i], functionArgument);
 
 #ifndef NDEBUG
 	interface->isEnumerating = false;
@@ -194,6 +189,7 @@ Camera createInterfaceCamera(
 
 void preUpdateInterface(Interface interface)
 {
+	// TODO: parallel this
 	assert(interface);
 
 	size_t elementCount = interface->elementCount;
@@ -502,6 +498,31 @@ InterfaceElement createInterfaceElement(
 	interface->elements[count] = element;
 	interface->elementCount = count + 1;
 	return element;
+}
+InterfaceElement createDefaultInterfaceElement(
+	Interface interface,
+	Transform transform,
+	OnInterfaceElementDestroy onDestroy,
+	const InterfaceElementEvents* events,
+	void* handle)
+{
+	assert(interface);
+	assert(transform);
+	assert(onDestroy);
+	assert(events);
+	assert(handle);
+	assert(!interface->isEnumerating);
+
+	return createInterfaceElement(
+		interface,
+		transform,
+		CENTER_ALIGNMENT_TYPE,
+		zeroVec3F,
+		oneSizeBox2F,
+		true,
+		onDestroy,
+		events,
+		handle);
 }
 void destroyInterfaceElement(
 	InterfaceElement element,

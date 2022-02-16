@@ -14,8 +14,8 @@
 
 #pragma once
 #include "uran/transformer.h"
+#include "uran/text.h"
 
-#include "mpgx/text.h"
 #include "cmmt/camera.h"
 #include "cmmt/bounding.h"
 
@@ -28,14 +28,35 @@ typedef struct Interface_T Interface_T;
  */
 typedef Interface_T* Interface;
 
+/*
+ * Interface element structure.
+ */
 typedef struct InterfaceElement_T InterfaceElement_T;
+/*
+ * Interface element instance.
+ */
 typedef InterfaceElement_T* InterfaceElement;
 
+/*
+ * Interface element destroy function.
+ */
 typedef void(*OnInterfaceElementDestroy)(
 	void* handle);
+/*
+ * Interface element event function.
+ */
 typedef void(*OnInterfaceElementEvent)(
 	InterfaceElement element);
 
+/*
+ * Interface element enumeration function.
+ */
+typedef void(*OnInterfaceElement)(
+	InterfaceElement interfaceElement, void* handle);
+
+/*
+ * Interface elements events structure
+ */
 typedef struct InterfaceElementEvents
 {
 	OnInterfaceElementEvent onUpdate;
@@ -48,36 +69,103 @@ typedef struct InterfaceElementEvents
 	OnInterfaceElementEvent onRelease;
 } InterfaceElementEvents;
 
+/*
+ * Create a new interface instance.
+ * Returns interface instance on success, otherwise NULL.
+ *
+ * window - window instance.
+ * scale - interface scale multiplier.
+ * capacity - initial interface element capacity.
+ */
 Interface createInterface(
 	Window window,
 	float scale,
 	size_t capacity);
+/*
+ * Destroys interface instance.
+ * interface - interface instance or NULL.
+ */
 void destroyInterface(Interface interface);
 
-bool isInterfaceEmpty(Interface interface);
+/*
+ * Returns interface window instance.
+ * interface - interface instance.
+ */
 Window getInterfaceWindow(Interface interface);
+/*
+ * Returns interface element count.
+ * interface - interface instance.
+ */
+size_t getInterfaceElementCount(Interface interface);
 
+/*
+ * Returns interface scale multiplier value.
+ * interface - interface instance.
+ */
 float getInterfaceScale(
 	Interface interface);
+/*
+ * Sets interface scale multiplier value.
+ *
+ * interface - interface instance.
+ * scale - interface scale multiplier value.
+ */
 void setInterfaceScale(
 	Interface interface,
 	float scale);
 
-size_t getInterfaceElementCount(
-	Interface interface);
+/*
+ * Enumerates interface elements.
+ *
+ * interface - interface instance.
+ * onElement - on element function.
+ * functionArgument - function argument or NULL.
+ */
 void enumerateInterface(
 	Interface interface,
-	void(*onItem)(InterfaceElement));
+	OnInterfaceElement onElement,
+	void* functionArgument);
+/*
+ * Destroys all interface elements.
+ *
+ * interface - transformer instance.
+ * destroyTransforms - destroy also transform instances.
+ */
 void destroyAllInterfaceElements(
 	Interface interface,
 	bool destroyTransforms);
 
-Camera createInterfaceCamera(
-	Interface interface);
+/*
+ * Creates interface camera.
+ * interface - interface instance.
+ */
+Camera createInterfaceCamera(Interface interface);
 
+/*
+ * Bakes interface elements.
+ * interface - interface instance.
+ */
 void preUpdateInterface(Interface interface);
+/*
+ * Processes interface events.
+ * interface - interface instance.
+ */
 void updateInterface(Interface interface);
 
+/*
+ * Create a new interface element instance.
+ * Returns interface element instance on success, otherwise NUL.
+ *
+ * interface - interface instance.
+ * transform - transform instance.
+ * alignment - interface element alignment type.
+ * position - interface element position.
+ * bounds - interface element bounds.
+ * isEnabled - is interface element enabled.
+ * onDestroy - on element destroy function.
+ * events - interface element events.
+ * handle - interface element handle.
+ */
 InterfaceElement createInterfaceElement(
 	Interface interface,
 	Transform transform,
@@ -88,41 +176,123 @@ InterfaceElement createInterfaceElement(
 	OnInterfaceElementDestroy onDestroy,
 	const InterfaceElementEvents* events,
 	void* handle);
+/*
+ * Create a new interface element instance with default values.
+ * Returns interface element instance on success, otherwise NUL.
+ *
+ * interface - interface instance.
+ * transform - transform instance.
+ * onDestroy - on element destroy function.
+ * events - interface element events.
+ * handle - interface element handle.
+ */
+InterfaceElement createDefaultInterfaceElement(
+	Interface interface,
+	Transform transform,
+	OnInterfaceElementDestroy onDestroy,
+	const InterfaceElementEvents* events,
+	void* handle);
+/*
+ * Destroy interface element instance.
+ *
+ * element - interface element instance or NULL.
+ * destroyTransform - destroy also transform instance.
+ */
 void destroyInterfaceElement(
 	InterfaceElement element,
 	bool destroyTransform);
 
+/*
+ * Returns interface element interface.
+ * element - interface element instance.
+ */
 Interface getInterfaceElementInterface(
 	InterfaceElement element);
+/*
+ * Returns interface element transform.
+ * element - interface element instance.
+ */
 Transform getInterfaceElementTransform(
 	InterfaceElement element);
+/*
+ * Returns interface element on destroy function.
+ * element - interface element instance.
+ */
 OnInterfaceElementDestroy getInterfaceElementOnDestroy(
 	InterfaceElement element);
+/*
+ * Returns interface element events.
+ * element - interface element instance.
+ */
 const InterfaceElementEvents* getInterfaceElementEvents(
 	InterfaceElement element);
+/*
+ * Returns interface element handel.
+ * element - interface element instance.
+ */
 void* getInterfaceElementHandle(
 	InterfaceElement element);
 
+/*
+ * Returns interface element alignment.
+ * element - interface element instance.
+ */
 AlignmentType getInterfaceElementAlignment(
 	InterfaceElement element);
+/*
+ * Sets interface element alignment.
+ *
+ * element - interface element instance.
+ * alignment - interface element alignment type.
+ */
 void setInterfaceElementAlignment(
 	InterfaceElement element,
 	AlignmentType alignment);
 
+/*
+ * Returns interface element position.
+ * element - interface element instance.
+ */
 Vec3F getInterfaceElementPosition(
 	InterfaceElement element);
+/*
+ * Sets interface element position.
+ *
+ * element - interface element instance.
+ * position - interface element position.
+ */
 void setInterfaceElementPosition(
 	InterfaceElement element,
 	Vec3F position);
 
+/*
+ * Returns interface element bounds.
+ * element - interface element instance.
+ */
 Box2F getInterfaceElementBounds(
 	InterfaceElement element);
+/*
+ * Sets interface element bounds.
+ *
+ * element - interface element instance.
+ * position - interface element bounds.
+ */
 void setInterfaceElementBounds(
 	InterfaceElement element,
 	Box2F bounds);
 
+/*
+ * Returns true if interface element is enabled.
+ * element - interface element instance.
+ */
 bool isInterfaceElementEnabled(
 	InterfaceElement element);
+/*
+ * Sets interface element enabled value.
+ *
+ * element - interface element instance.
+ * isEnabled - is interface element enabled.
+ */
 void setInterfaceElementEnabled(
 	InterfaceElement element,
 	bool isEnabled);

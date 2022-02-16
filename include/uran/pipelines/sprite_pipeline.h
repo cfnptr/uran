@@ -13,30 +13,31 @@
 // limitations under the License.
 
 #pragma once
-#include "uran/graphics_renderer.h"
-#include "uran/pipelines/sprite_pipeline.h"
+#include "mpgx/window.h"
+#include "cmmt/color.h"
 
-GraphicsRenderer createSpriteRenderer(
+#define SPRITE_PIPELINE_NAME "Sprite"
+
+MpgxResult createSpritePipelineExt(
+	Framebuffer framebuffer,
+	Shader vertexShader,
+	Shader fragmentShader,
+	const GraphicsPipelineState* state,
+	GraphicsPipeline* spritePipeline);
+MpgxResult createSpritePipeline(
+	Framebuffer framebuffer,
+	Shader vertexShader,
+	Shader fragmentShader,
+	GraphicsPipeline* spritePipeline);
+
+Mat4F getSpritePipelineMvp(
+	GraphicsPipeline spritePipeline);
+void setSpritePipelineMvp(
 	GraphicsPipeline spritePipeline,
-	GraphicsRenderSorting sorting,
-	bool useCulling,
-	size_t capacity,
-	ThreadPool threadPool);
-GraphicsRender createSpriteRender(
-	GraphicsRenderer spriteRenderer,
-	Transform transform,
-	Box3F bounding,
-	LinearColor color,
-	GraphicsMesh mesh);
+	Mat4F mvp);
 
-LinearColor getSpriteRenderColor(
-	GraphicsRender spriteRender);
-void setSpriteRenderColor(
-	GraphicsRender spriteRender,
+LinearColor getSpritePipelineColor(
+	GraphicsPipeline spritePipeline);
+void setSpritePipelineColor(
+	GraphicsPipeline spritePipeline,
 	LinearColor color);
-
-GraphicsMesh getSpriteRenderMesh(
-	GraphicsRender spriteRender);
-void setSpriteRenderMesh(
-	GraphicsRender spriteRender,
-	GraphicsMesh mesh);

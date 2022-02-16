@@ -53,7 +53,7 @@ ImageData createImageDataFromFile(
 	ImageFormat format,
 	Logger logger);
 /*
- * Create a new image data instance from the WebP data.
+ * Create a new image data instance from the pack WebP data.
  * Returns image data instance on success, otherwise NULL.
  *
  * packReader - pack reader instance.
@@ -127,7 +127,7 @@ Image createImageFromFile(
 	bool isConstant,
 	Logger logger);
 /*
- * Create a new image instance from the WebP data.
+ * Create a new image instance from the pack WebP data.
  * Returns image instance on success, otherwise NULL.
  *
  * packReader - pack reader instance.

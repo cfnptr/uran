@@ -104,7 +104,10 @@ ImageData createImageData(
 		&imageSize);
 
 	if (!result)
+	{
+		destroyImageData(imageData);
 		return NULL;
+	}
 
 	imageData->pixels = pixels;
 	imageData->size = imageSize;
@@ -238,7 +241,10 @@ ImageData createImageDataFromFile(
 		&imageSize);
 
 	if (!result)
+	{
+		destroyImageData(imageData);
 		return NULL;
+	}
 
 	imageData->pixels = pixels;
 	imageData->size = imageSize;
@@ -316,7 +322,10 @@ ImageData createImageDataFromPack(
 		&imageSize);
 
 	if (!result)
+	{
+		destroyImageData(imageData);
 		return NULL;
+	}
 
 	imageData->pixels = pixels;
 	imageData->size = imageSize;
@@ -448,7 +457,7 @@ Image createImageFromFile(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to create image from WebP data. (error %s)",
+				"Failed to create image from WebP file data. (error %s)",
 				mpgxResultToString(mpgxResult));
 		}
 		return NULL;
@@ -504,7 +513,7 @@ Image createImageFromPack(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to create image from WebP data. (error %s)",
+				"Failed to create image from pack WebP data. (error %s)",
 				mpgxResultToString(mpgxResult));
 		}
 		return NULL;

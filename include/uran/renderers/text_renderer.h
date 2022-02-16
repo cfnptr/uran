@@ -14,7 +14,7 @@
 
 #pragma once
 #include "uran/graphics_renderer.h"
-#include "mpgx/text.h"
+#include "uran/text.h"
 
 GraphicsRenderer createTextRenderer(
 	GraphicsPipeline textPipeline,

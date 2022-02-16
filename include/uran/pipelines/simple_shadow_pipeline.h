@@ -13,23 +13,29 @@
 // limitations under the License.
 
 #pragma once
-#include "uran/graphics_renderer.h"
-#include "uran/pipelines/simple_shadow_pipeline.h"
+#include "mpgx/window.h"
 
-GraphicsRenderer createSimpleShadowRenderer(
+#define SIMPLE_SHADOW_PIPELINE_NAME "SimpleShadow"
+
+MpgxResult createSimpleShadowSampler(
+	Window window,
+	Sampler* simpleShadowSampler);
+
+MpgxResult createSimpleShadowPipelineExt(
+	Framebuffer framebuffer,
+	Shader vertexShader,
+	Shader fragmentShader,
+	const GraphicsPipelineState* state,
+	GraphicsPipeline* simpleShadowPipeline);
+MpgxResult createSimpleShadowPipeline(
+	Framebuffer framebuffer,
+	Shader vertexShader,
+	Shader fragmentShader,
+	int32_t shadowMapLength,
+	GraphicsPipeline* simpleShadowPipeline);
+
+Mat4F getSimpleShadowPipelineMvp(
+	GraphicsPipeline simpleShadowPipeline);
+void setSimpleShadowPipelineMvp(
 	GraphicsPipeline simpleShadowPipeline,
-	GraphicsRenderSorting sorting,
-	bool useCulling,
-	size_t capacity,
-	ThreadPool threadPool);
-GraphicsRender createSimpleShadowRender(
-	GraphicsRenderer simpleShadowRenderer,
-	Transform transform,
-	Box3F bounding,
-	GraphicsMesh mesh);
-
-GraphicsMesh getSimpleShadowRenderMesh(
-	GraphicsRender simpleShadowRender);
-void setSimpleShadowRenderMesh(
-	GraphicsRender simpleShadowRender,
-	GraphicsMesh mesh);
+	Mat4F mvp);

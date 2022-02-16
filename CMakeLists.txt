@@ -33,11 +33,13 @@ set(CMAKE_C_STANDARD_REQUIRED TRUE)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
-option(URAN_BUILD_SHARED "Build Uran shared library" ON)
 option(URAN_BUILD_EDITOR "Build Uran editor executable" ON)
 
 set(CONF_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 add_subdirectory(libraries/conf)
+
+set(CMAKE_DISABLE_FIND_PACKAGE_HarfBuzz ON CACHE BOOL "" FORCE)
+add_subdirectory(libraries/freetype)
 
 set(WEBP_BUILD_ANIM_UTILS OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_CWEBP OFF CACHE BOOL "" FORCE)
@@ -61,6 +63,17 @@ set(PACK_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 add_subdirectory(libraries/pack)
 
 set(URAN_SOURCES
+	source/pipelines/bloom_pipeline.c
+	source/pipelines/color_pipeline.c
+	source/pipelines/diffuse_pipeline.c
+	source/pipelines/gaussian_blur_pipeline.c
+	source/pipelines/gradient_sky_pipeline.c
+	source/pipelines/ray_tracing_color_pipeline.c
+	source/pipelines/simple_shadow_pipeline.c
+	source/pipelines/sprite_pipeline.c
+	source/pipelines/texture_color_pipeline.c
+	source/pipelines/texture_sprite_pipeline.c
+
 	source/renderers/color_renderer.c
 	source/renderers/diffuse_renderer.c
 	source/renderers/gradient_sky_renderer.c
@@ -76,10 +89,12 @@ set(URAN_SOURCES
 	source/image_data.c
 	source/interface.c
 	source/shader_data.c
+	source/text.c
 	source/transformer.c)
 
 set(URAN_LINK_LIBRARIES
 	conf-static
+	freetype
 	webp
 	logy-static
 	mpgx-static
@@ -98,19 +113,6 @@ target_link_libraries(uran-static PUBLIC
 target_include_directories(uran-static PUBLIC
 	${PROJECT_BINARY_DIR}
 	${PROJECT_SOURCE_DIR}/include)
-
-if (URAN_BUILD_SHARED)
-	add_library(uran-shared SHARED
-		${URAN_SOURCES})
-	set_target_properties(uran-shared PROPERTIES
-		OUTPUT_NAME "uran"
-		WINDOWS_EXPORT_ALL_SYMBOLS ON)
-	target_link_libraries(uran-shared PUBLIC
-		${URAN_LINK_LIBRARIES})
-	target_include_directories(uran-shared PUBLIC
-		${PROJECT_BINARY_DIR}
-		${PROJECT_SOURCE_DIR}/include)
-endif ()
 
 if (URAN_BUILD_EDITOR)
 	if (${CMAKE_SYSTEM_NAME} MATCHES "Windows" AND

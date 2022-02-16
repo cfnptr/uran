@@ -37,6 +37,18 @@ ShaderData createShaderDataFromFile(
 	const char* filePath,
 	Logger logger);
 /*
+ * Create a new shader data instance from the pack data.
+ * Returns shader data instance on success, otherwise NULL.
+ *
+ * packReader - pack reader instance.
+ * path - shader data item path.
+ * logger - logger instance or NULL.
+ */
+ShaderData createShaderDataFromPack(
+	PackReader packReader,
+	const char* path,
+	Logger logger);
+/*
  * Destroys shader data instance.
  * shaderData - shader data instance or NULL.
  */
@@ -52,3 +64,34 @@ const uint8_t* getShaderDataCode(ShaderData shaderData);
  * shaderData - shader data instance.
  */
 size_t getShaderDataSize(ShaderData shaderData);
+
+/*
+ * Create a new shader instance from the code file.
+ * Returns shader instance on success, otherwise NULL.
+ *
+ * filePath - shader file path.
+ * window - window instance.
+ * type - shader type.
+ * logger - logger instance or NULL.
+ */
+Shader createShaderFromFile(
+	const char* filePath,
+	Window window,
+	ShaderType type,
+	Logger logger);
+/*
+ * Create a new shader instance from the pack code.
+ * Returns shader instance on success, otherwise NULL.
+ *
+ * packReader - pack reader instance.
+ * path - shader data item path.
+ * window - window instance.
+ * type - shader type.
+ * logger - logger instance or NULL.
+ */
+Shader createShaderFromPack(
+	PackReader packReader,
+	const char* path,
+	Window window,
+	ShaderType type,
+	Logger logger);

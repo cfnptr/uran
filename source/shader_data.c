@@ -14,6 +14,7 @@
 
 #include "uran/shader_data.h"
 #include "mpio/file.h"
+#include <string.h>
 
 struct ShaderData_T
 {
@@ -21,17 +22,15 @@ struct ShaderData_T
 	size_t size;
 };
 
-ShaderData createShaderDataFromFile(
+inline static bool getShaderDataFromFile(
 	const char* filePath,
-	Logger logger)
+	Logger logger,
+	uint8_t** code,
+	size_t* size)
 {
 	assert(filePath);
-
-	ShaderData shaderData = calloc(1,
-		sizeof(ShaderData_T));
-
-	if (!shaderData)
-		return NULL;
+	assert(code);
+	assert(size);
 
 	FILE* file = openFile(filePath, "rb");
 
@@ -42,8 +41,7 @@ ShaderData createShaderDataFromFile(
 			logMessage(logger, ERROR_LOG_LEVEL,
 				"Failed to open shader data file.");
 		}
-		destroyShaderData(shaderData);
-		return NULL;
+		return false;
 	}
 
 	int seekResult = seekFile(file, 0, SEEK_END);
@@ -56,8 +54,7 @@ ShaderData createShaderDataFromFile(
 				"Failed to seek shader data file.");
 		}
 		closeFile(file);
-		destroyShaderData(shaderData);
-		return NULL;
+		return false;
 	}
 
 	size_t fileSize = tellFile(file);
@@ -70,11 +67,9 @@ ShaderData createShaderDataFromFile(
 				"Failed to tell shader data file.");
 		}
 		closeFile(file);
-		destroyShaderData(shaderData);
-		return NULL;
+		return false;
 	}
 
-	shaderData->size = fileSize;
 	seekResult = seekFile(file, 0, SEEK_SET);
 
 	if (seekResult != 0)
@@ -85,28 +80,26 @@ ShaderData createShaderDataFromFile(
 				"Failed to seek shader data file.");
 		}
 		closeFile(file);
-		destroyShaderData(shaderData);
-		return NULL;
+		return false;
 	}
 
-	uint8_t* code;
+	uint8_t* shaderCode;
 	size_t readSize;
 
 	GraphicsAPI api = getGraphicsAPI();
 
 	if (api == VULKAN_GRAPHICS_API)
 	{
-		code = malloc(fileSize * sizeof(uint8_t));
+		shaderCode = malloc(fileSize * sizeof(uint8_t));
 
-		if (!code)
+		if (!shaderCode)
 		{
 			closeFile(file);
-			destroyShaderData(shaderData);
-			return NULL;
+			return false;
 		}
 
 		readSize = fread(
-			code,
+			shaderCode,
 			sizeof(uint8_t),
 			fileSize,
 			file);
@@ -114,21 +107,20 @@ ShaderData createShaderDataFromFile(
 	else if (api == OPENGL_GRAPHICS_API ||
 		api == OPENGL_ES_GRAPHICS_API)
 	{
-		code = malloc((fileSize + 1) * sizeof(uint8_t));
+		shaderCode = malloc((fileSize + 1) * sizeof(uint8_t));
 
-		if (!code)
+		if (!shaderCode)
 		{
 			closeFile(file);
-			destroyShaderData(shaderData);
-			return NULL;
+			return false;
 		}
 
 		readSize = fread(
-			code,
+			shaderCode,
 			sizeof(uint8_t),
 			fileSize,
 			file);
-		code[fileSize] = '\0';
+		shaderCode[fileSize] = '\0';
 	}
 	else
 	{
@@ -136,7 +128,6 @@ ShaderData createShaderDataFromFile(
 	}
 
 	closeFile(file);
-	shaderData->code = code;
 
 	if (readSize != fileSize)
 	{
@@ -145,10 +136,114 @@ ShaderData createShaderDataFromFile(
 			logMessage(logger, ERROR_LOG_LEVEL,
 				"Failed to read shader data file.");
 		}
+		return false;
+	}
+
+	*code = shaderCode;
+	*size = fileSize;
+	return true;
+}
+ShaderData createShaderDataFromFile(
+	const char* filePath,
+	Logger logger)
+{
+	assert(filePath);
+
+	ShaderData shaderData = calloc(1,
+		sizeof(ShaderData_T));
+
+	if (!shaderData)
+		return NULL;
+
+	uint8_t* code;
+	size_t size;
+
+	bool result = getShaderDataFromFile(
+		filePath,
+		logger,
+		&code,
+		&size);
+
+	if (!result)
+	{
 		destroyShaderData(shaderData);
 		return NULL;
 	}
 
+	shaderData->code = code;
+	shaderData->size = size;
+	return shaderData;
+}
+ShaderData createShaderDataFromPack(
+	PackReader packReader,
+	const char* path,
+	Logger logger)
+{
+	assert(packReader);
+	assert(path);
+
+	ShaderData shaderData = calloc(1,
+		sizeof(ShaderData_T));
+
+	if (!shaderData)
+		return NULL;
+
+	const uint8_t* data;
+	uint32_t size;
+
+	PackResult packResult = readPackPathItemData(
+		packReader,
+		path,
+		&data,
+		&size);
+
+	if (packResult != SUCCESS_PACK_RESULT)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to read pack shader data. (error: %s)",
+				packResultToString(packResult));
+		}
+		return NULL;
+	}
+
+	uint8_t* code;
+	GraphicsAPI api = getGraphicsAPI();
+
+	if (api == VULKAN_GRAPHICS_API)
+	{
+		code = malloc(size * sizeof(uint8_t));
+
+		if (!code)
+		{
+			destroyShaderData(shaderData);
+			return NULL;
+		}
+
+		memcpy(code, data, size * sizeof(uint8_t));
+	}
+	else if (api == OPENGL_GRAPHICS_API ||
+		api == OPENGL_ES_GRAPHICS_API)
+	{
+		code = malloc((size + 1) * sizeof(uint8_t));
+
+		if (!code)
+		{
+			destroyShaderData(shaderData);
+			return NULL;
+		}
+
+		memcpy(code, data, size * sizeof(uint8_t));
+		code[size] = '\0';
+	}
+	else
+	{
+		abort();
+	}
+
+	shaderData->code = code;
+	shaderData->size = size;
 	return shaderData;
 }
 void destroyShaderData(ShaderData shaderData)
@@ -171,4 +266,103 @@ size_t getShaderDataSize(ShaderData shaderData)
 	return shaderData->size;
 }
 
-// TODO:
+Shader createShaderFromFile(
+	const char* filePath,
+	Window window,
+	ShaderType type,
+	Logger logger)
+{
+	assert(filePath);
+	assert(window);
+	assert(type < SHADER_TYPE_COUNT);
+
+	uint8_t* code;
+	size_t size;
+
+	bool result = getShaderDataFromFile(
+		filePath,
+		logger,
+		&code,
+		&size);
+
+	if (!result)
+		return NULL;
+
+	Shader shader;
+
+	MpgxResult mpgxResult = createShader(
+		window,
+		type,
+		code,
+		size,
+		&shader);
+
+	free(code);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to create shader from file data. (error %s)",
+				mpgxResultToString(mpgxResult));
+		}
+		return NULL;
+	}
+
+	return shader;
+}
+Shader createShaderFromPack(
+	PackReader packReader,
+	const char* path,
+	Window window,
+	ShaderType type,
+	Logger logger)
+{
+	assert(packReader);
+	assert(path);
+	assert(window);
+	assert(type < SHADER_TYPE_COUNT);
+
+	const uint8_t* data;
+	uint32_t size;
+
+	PackResult packResult = readPackPathItemData(
+		packReader,
+		path,
+		&data,
+		&size);
+
+	if (packResult != SUCCESS_PACK_RESULT)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to read pack shader data. (error: %s)",
+				packResultToString(packResult));
+		}
+		return NULL;
+	}
+
+	Shader shader;
+
+	MpgxResult mpgxResult = createShader(
+		window,
+		type,
+		data,
+		size,
+		&shader);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to create shader from pack data. (error %s)",
+				mpgxResultToString(mpgxResult));
+		}
+		return NULL;
+	}
+
+	return shader;
+}

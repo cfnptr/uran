@@ -546,7 +546,7 @@ static void onRenderUpdate(void* argument)
 		renderElements[index] = element;
 	}
 }
-GraphicsRenderResult drawGraphicsRenderer(
+GraphicsRendererResult drawGraphicsRenderer(
 	GraphicsRenderer graphicsRenderer,
 	const GraphicsRendererData* graphicsRendererData)
 {
@@ -554,7 +554,7 @@ GraphicsRenderResult drawGraphicsRenderer(
 	assert(graphicsRendererData);
 	assert(!graphicsRenderer->isEnumerating);
 
-	GraphicsRenderResult result;
+	GraphicsRendererResult result;
 	result.renderCount = 0;
 	result.indexCount = 0;
 	result.passCount = 0;
