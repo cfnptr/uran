@@ -1,0 +1,46 @@
+// Copyright 2020-2022 Nikita Fediuchin. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#version 460
+#extension GL_EXT_ray_tracing : require
+
+layout(location = 0) rayPayloadEXT vec3 hitValue;
+
+layout(push_constant) uniform RayGenPushConstatns
+{
+	mat4 invView;
+	mat4 invProj;
+} rgpc;
+
+layout(binding = 0) uniform accelerationStructureEXT tlas;
+layout(binding = 1, rgba8) uniform image2D image;
+
+void main() 
+{
+	vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+	vec2 inUV = pixelCenter / vec2(gl_LaunchSizeEXT.xy);
+
+	vec2 d = inUV * 2.0 - 1.0;
+
+	vec4 origin = rgpc.invView * vec4(0, 0, 0, 1);
+	vec4 target = rgpc.invProj * vec4(d.x, d.y, 1, 1);
+	vec4 direction = rgpc.invView * vec4(normalize(target.xyz), 0);
+
+	const float tmin = 0.001;
+	const float tmax = 10000.0;
+
+    traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xFF, 0, 0, 0, 
+    	origin.xyz, tmin, direction.xyz, tmax, 0);
+	imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(0.0));
+}
