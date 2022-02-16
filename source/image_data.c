@@ -1,0 +1,519 @@
+// Copyright 2020-2022 Nikita Fediuchin. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "uran/image_data.h"
+#include "mpio/file.h"
+#include "webp/decode.h"
+
+struct ImageData_T
+{
+	uint8_t* pixels;
+	Vec2I size;
+	ImageFormat format;
+};
+
+inline static bool getImageDataFromData(
+	const void* data,
+	size_t size,
+	ImageFormat format,
+	Logger logger,
+	uint8_t** _pixels,
+	Vec2I* _imageSize)
+{
+	assert(data);
+	assert(size);
+	assert(format < IMAGE_FORMAT_COUNT);
+	assert(_pixels);
+	assert(_imageSize);
+
+	uint8_t* pixels;
+	Vec2I imageSize;
+
+	if (format == R8G8B8A8_SRGB_IMAGE_FORMAT)
+	{
+		pixels = WebPDecodeRGBA(
+			(const uint8_t*)data,
+			size,
+			&imageSize.x,
+			&imageSize.y);
+	}
+	else
+	{
+#ifndef NDEBUG
+		if (logger)
+		{
+			logMessage(logger, DEBUG_LOG_LEVEL,
+				"Image data format is not supported.");
+		}
+#endif
+		return false;
+	}
+
+	if (!pixels)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to decode WebP image data.");
+		}
+		return false;
+	}
+
+	*_pixels = pixels;
+	*_imageSize = imageSize;
+	return true;
+}
+ImageData createImageData(
+	const void* data,
+	size_t size,
+	ImageFormat format,
+	Logger logger)
+{
+	assert(data);
+	assert(size > 0);
+	assert(format < IMAGE_FORMAT_COUNT);
+
+	ImageData imageData = calloc(1,
+		sizeof(ImageData_T));
+
+	if (!imageData)
+		return NULL;
+
+	imageData->format = format;
+
+	uint8_t* pixels;
+	Vec2I imageSize;
+
+	bool result = getImageDataFromData(
+		data,
+		size,
+		format,
+		logger,
+		&pixels,
+		&imageSize);
+
+	if (!result)
+		return NULL;
+
+	imageData->pixels = pixels;
+	imageData->size = imageSize;
+	return imageData;
+}
+inline static bool getImageDataFromFile(
+	const char* filePath,
+	ImageFormat format,
+	Logger logger,
+	uint8_t** pixels,
+	Vec2I* imageSize)
+{
+	assert(filePath);
+	assert(format < IMAGE_FORMAT_COUNT);
+	assert(pixels);
+	assert(imageSize);
+
+	FILE* file = openFile(filePath, "rb");
+
+	if (!file)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to open WebP image data file.");
+		}
+		return false;
+	}
+
+	int seekResult = seekFile(file, 0, SEEK_END);
+
+	if (seekResult != 0)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to seek WebP image data file.");
+		}
+		closeFile(file);
+		return false;
+	}
+
+	size_t fileSize = tellFile(file);
+
+	if (fileSize == 0)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to tell WebP image data file.");
+		}
+		closeFile(file);
+		return false;
+	}
+
+	seekResult = seekFile(file, 0, SEEK_SET);
+
+	if (seekResult != 0)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to seek WebP image data file.");
+		}
+		closeFile(file);
+		return false;
+	}
+
+	uint8_t* data = malloc(fileSize * sizeof(uint8_t));
+
+	if (!data)
+	{
+		closeFile(file);
+		return false;
+	}
+
+	size_t readSize = fread(
+		data,
+		sizeof(uint8_t),
+		fileSize,
+		file);
+
+	closeFile(file);
+
+	if (readSize != fileSize)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to read WebP image data file.");
+		}
+		free(data);
+		return false;
+	}
+
+	bool result = getImageDataFromData(
+		data,
+		fileSize,
+		format,
+		logger,
+		pixels,
+		imageSize);
+
+	free(data);
+	return result;
+}
+ImageData createImageDataFromFile(
+	const char* filePath,
+	ImageFormat format,
+	Logger logger)
+{
+	assert(filePath);
+	assert(format < IMAGE_FORMAT_COUNT);
+
+	ImageData imageData = calloc(1,
+		sizeof(ImageData_T));
+
+	if (!imageData)
+		return NULL;
+
+	imageData->format = format;
+
+	uint8_t* pixels;
+	Vec2I imageSize;
+
+	bool result = getImageDataFromFile(
+		filePath,
+		format,
+		logger,
+		&pixels,
+		&imageSize);
+
+	if (!result)
+		return NULL;
+
+	imageData->pixels = pixels;
+	imageData->size = imageSize;
+	return imageData;
+}
+inline static bool getImageDataFromPack(
+	PackReader packReader,
+	const char* path,
+	ImageFormat format,
+	Logger logger,
+	uint8_t** pixels,
+	Vec2I* imageSize)
+{
+	assert(packReader);
+	assert(path);
+	assert(format < IMAGE_FORMAT_COUNT);
+	assert(pixels);
+	assert(imageSize);
+
+	const uint8_t* data;
+	uint32_t size;
+
+	PackResult packResult = readPackPathItemData(
+		packReader,
+		path,
+		&data,
+		&size);
+
+	if (packResult != SUCCESS_PACK_RESULT)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to read pack WebP image data. (error: %s)",
+				packResultToString(packResult));
+		}
+		return NULL;
+	}
+
+	return getImageDataFromData(
+		data,
+		size,
+		format,
+		logger,
+		pixels,
+		imageSize);
+}
+ImageData createImageDataFromPack(
+	PackReader packReader,
+	const char* path,
+	ImageFormat format,
+	Logger logger)
+{
+	assert(packReader);
+	assert(path);
+	assert(format < IMAGE_FORMAT_COUNT);
+
+	ImageData imageData = calloc(1,
+		sizeof(ImageData_T));
+
+	if (!imageData)
+		return NULL;
+
+	imageData->format = format;
+
+	uint8_t* pixels;
+	Vec2I imageSize;
+
+	bool result = getImageDataFromPack(
+		packReader,
+		path,
+		format,
+		logger,
+		&pixels,
+		&imageSize);
+
+	if (!result)
+		return NULL;
+
+	imageData->pixels = pixels;
+	imageData->size = imageSize;
+	return imageData;
+}
+void destroyImageData(ImageData imageData)
+{
+	if (!imageData)
+		return;
+
+	WebPFree(imageData->pixels);
+	free(imageData);
+}
+
+const uint8_t* getImageDataPixels(ImageData imageData)
+{
+	assert(imageData);
+	return imageData->pixels;
+}
+Vec2I getImageDataSize(ImageData imageData)
+{
+	assert(imageData);
+	return imageData->size;
+}
+ImageFormat getImageDataFormat(ImageData imageData)
+{
+	assert(imageData);
+	return imageData->format;
+}
+
+Image createImageFromData(
+	const void* data,
+	size_t size,
+	Window window,
+	ImageType type,
+	ImageFormat format,
+	bool isConstant,
+	Logger logger)
+{
+	assert(data);
+	assert(size > 0);
+	assert(window);
+	assert(format < IMAGE_FORMAT_COUNT);
+
+	uint8_t* pixels;
+	Vec2I imageSize;
+
+	bool result = getImageDataFromData(
+		data,
+		size,
+		format,
+		logger,
+		&pixels,
+		&imageSize);
+
+	if (!result)
+		return NULL;
+
+	Image image;
+
+	MpgxResult mpgxResult = createImage(
+		window,
+		type,
+		IMAGE_2D,
+		format,
+		(const void**)&pixels,
+		vec3I(imageSize.x, imageSize.y, 1),
+		1,
+		isConstant,
+		&image);
+
+	WebPFree(pixels);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to create image from WebP data. (error %s)",
+				mpgxResultToString(mpgxResult));
+		}
+		return NULL;
+	}
+
+	return image;
+}
+Image createImageFromFile(
+	const char* filePath,
+	Window window,
+	ImageType type,
+	ImageFormat format,
+	bool isConstant,
+	Logger logger)
+{
+	assert(filePath);
+	assert(window);
+	assert(format < IMAGE_FORMAT_COUNT);
+
+	uint8_t* pixels;
+	Vec2I imageSize;
+
+	bool result = getImageDataFromFile(
+		filePath,
+		format,
+		logger,
+		&pixels,
+		&imageSize);
+
+	if (!result)
+		return NULL;
+
+	Image image;
+
+	MpgxResult mpgxResult = createImage(
+		window,
+		type,
+		IMAGE_2D,
+		format,
+		(const void**)&pixels,
+		vec3I(imageSize.x, imageSize.y, 1),
+		1,
+		isConstant,
+		&image);
+
+	WebPFree(pixels);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to create image from WebP data. (error %s)",
+				mpgxResultToString(mpgxResult));
+		}
+		return NULL;
+	}
+
+	return image;
+}
+Image createImageFromPack(
+	PackReader packReader,
+	const char* path,
+	Window window,
+	ImageType type,
+	ImageFormat format,
+	bool isConstant,
+	Logger logger)
+{
+	assert(packReader);
+	assert(path);
+	assert(window);
+	assert(format < IMAGE_FORMAT_COUNT);
+
+	uint8_t* pixels;
+	Vec2I imageSize;
+
+	bool result = getImageDataFromPack(
+		packReader,
+		path,
+		format,
+		logger,
+		&pixels,
+		&imageSize);
+
+	if (!result)
+		return NULL;
+
+	Image image;
+
+	MpgxResult mpgxResult = createImage(
+		window,
+		type,
+		IMAGE_2D,
+		format,
+		(const void**)&pixels,
+		vec3I(imageSize.x, imageSize.y, 1),
+		1,
+		isConstant,
+		&image);
+
+	WebPFree(pixels);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to create image from WebP data. (error %s)",
+				mpgxResultToString(mpgxResult));
+		}
+		return NULL;
+	}
+
+	return image;
+}
+
+// TODO: add image array reading, share WebP, file and pack buffers between them
+//  possibly detect largest image in pack and change buffer size accordingly.
+//
+//  Also do the same for the shader data.

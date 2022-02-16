@@ -19,7 +19,13 @@
 #include "cmmt/camera.h"
 #include "cmmt/bounding.h"
 
+/*
+ * Interface structure.
+ */
 typedef struct Interface_T Interface_T;
+/*
+ * Interface instance.
+ */
 typedef Interface_T* Interface;
 
 typedef struct InterfaceElement_T InterfaceElement_T;

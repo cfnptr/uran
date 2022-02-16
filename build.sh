@@ -2,7 +2,7 @@
 
 cd $(dirname "$BASH_SOURCE")
 
-if cmake --version ; then
+if ! cmake --version ; then
     echo "Failed to get CMake version, please check if it's installed."
     exit
 fi

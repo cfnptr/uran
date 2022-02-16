@@ -18,7 +18,7 @@ if (${CMAKE_SOURCE_DIR} MATCHES ${CMAKE_BINARY_DIR})
 	message(FATAL_ERROR "Prevented in-tree build")
 endif ()
 
-if (TARGET ran)
+if (TARGET uran)
 	return()
 endif ()
 
@@ -39,6 +39,18 @@ option(URAN_BUILD_EDITOR "Build Uran editor executable" ON)
 set(CONF_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 add_subdirectory(libraries/conf)
 
+set(WEBP_BUILD_ANIM_UTILS OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_CWEBP OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_DWEBP OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_GIF2WEBP OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_IMG2WEBP OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_VWEBP OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_WEBPINFO OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_LIBWEBPMUX OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_WEBPMUX OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_EXTRAS OFF CACHE BOOL "" FORCE)
+add_subdirectory(libraries/libwebp)
+
 set(LOGY_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 add_subdirectory(libraries/logy)
 
@@ -51,6 +63,7 @@ add_subdirectory(libraries/pack)
 set(URAN_SOURCES
 	source/renderers/color_renderer.c
 	source/renderers/diffuse_renderer.c
+	source/renderers/gradient_sky_renderer.c
 	source/renderers/simple_shadow_renderer.c
 	source/renderers/sprite_renderer.c
 	source/renderers/texture_color_renderer.c
@@ -60,11 +73,17 @@ set(URAN_SOURCES
 	source/editor.c
 	source/free_camera.c
 	source/graphics_renderer.c
+	source/image_data.c
 	source/interface.c
+	source/shader_data.c
 	source/transformer.c)
 
 set(URAN_LINK_LIBRARIES
-	conf-static logy-static mpgx-static pack-static)
+	conf-static
+	webp
+	logy-static
+	mpgx-static
+	pack-static)
 
 configure_file(
 	cmake/defines.h.in

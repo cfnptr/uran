@@ -33,7 +33,12 @@ typedef enum UranResult_T
 {
 	SUCCESS_URAN_RESULT = 0,
 	FAILED_TO_ALLOCATE_URAN_RESULT = 1,
-	URAN_RESULT_COUNT = 2,
+	FAILED_TO_OPEN_FILE_URAN_RESULT = 2,
+	FAILED_TO_SEEK_FILE_URAN_RESULT = 3,
+	FAILED_TO_READ_FILE_URAN_RESULT = 4,
+	BAD_DATA_URAN_RESULT = 5,
+	FORMAT_IS_NOT_SUPPORTED_URAN_RESULT = 6,
+	URAN_RESULT_COUNT = 7,
 } UranResult_T;
 /*
  * Uran result type.
@@ -46,6 +51,11 @@ typedef uint8_t UranResult;
 static const char* const uranResultStrings[URAN_RESULT_COUNT] = {
 	"Success",
 	"Failed to allocate",
+	"Failed to open file",
+	"Failed to seek file",
+	"Failed to read file",
+	"Bad data",
+	"Format is not supported",
 };
 
 /*
