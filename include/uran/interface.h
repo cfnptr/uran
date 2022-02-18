@@ -118,7 +118,7 @@ void setInterfaceScale(
  * Enumerates interface elements.
  *
  * interface - interface instance.
- * onElement - on element function.
+ * onElement - on interface element function.
  * functionArgument - function argument or NULL.
  */
 void enumerateInterface(
@@ -177,7 +177,7 @@ InterfaceElement createInterfaceElement(
 	const InterfaceElementEvents* events,
 	void* handle);
 /*
- * Create a new interface element instance with default values.
+ * Create a new default interface element instance.
  * Returns interface element instance on success, otherwise NUL.
  *
  * interface - interface instance.
@@ -206,32 +206,27 @@ void destroyInterfaceElement(
  * Returns interface element interface.
  * element - interface element instance.
  */
-Interface getInterfaceElementInterface(
-	InterfaceElement element);
+Interface getInterfaceElementInterface(InterfaceElement element);
 /*
  * Returns interface element transform.
  * element - interface element instance.
  */
-Transform getInterfaceElementTransform(
-	InterfaceElement element);
+Transform getInterfaceElementTransform(InterfaceElement element);
 /*
  * Returns interface element on destroy function.
  * element - interface element instance.
  */
-OnInterfaceElementDestroy getInterfaceElementOnDestroy(
-	InterfaceElement element);
+OnInterfaceElementDestroy getInterfaceElementOnDestroy(InterfaceElement element);
 /*
  * Returns interface element events.
  * element - interface element instance.
  */
-const InterfaceElementEvents* getInterfaceElementEvents(
-	InterfaceElement element);
+const InterfaceElementEvents* getInterfaceElementEvents(InterfaceElement element);
 /*
  * Returns interface element handel.
  * element - interface element instance.
  */
-void* getInterfaceElementHandle(
-	InterfaceElement element);
+void* getInterfaceElementHandle(InterfaceElement element);
 
 /*
  * Returns interface element alignment.

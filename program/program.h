@@ -88,7 +88,7 @@ inline static void updateProgram(Program program)
 #ifndef NDEBUG
 	updateEditor(program->editor);
 #else
-#error Add your custom game or application logic
+	abort();
 #endif
 }
 /*
@@ -101,7 +101,7 @@ inline static void renderProgram(Program program)
 #ifndef NDEBUG
 	renderEditor(program->editor);
 #else
-#error Add your custom game or application logic
+	abort();
 #endif
 }
 
@@ -115,7 +115,7 @@ inline static Window getProgramWindow(Program program)
 #ifndef NDEBUG
 	return getEditorWindow(program->editor);
 #else
-#error Add your custom game or application logic
+	abort();
 #endif
 }
 

@@ -252,7 +252,7 @@ void updateFreeCamera(FreeCamera freeCamera)
 		Vec2F rotation = freeCamera->rotation;
 		Vec2F lastCursorPosition = freeCamera->lastCursorPosition;
 		cmmt_float_t moveSpeed = freeCamera->moveSpeed * (cmmt_float_t)2.0;
-		cmmt_float_t viewSpeed = freeCamera->viewSpeed / (cmmt_float_t)200.0;
+		cmmt_float_t viewSpeed = freeCamera->viewSpeed * (cmmt_float_t)(1.0 / 180.0);
 		Vec2F cursorPosition = getWindowCursorPosition(window);
 
 		if (lastCursorPosition.x == 0 && lastCursorPosition.y == 0)
@@ -261,8 +261,7 @@ void updateFreeCamera(FreeCamera freeCamera)
 		rotation.x += (cursorPosition.y - lastCursorPosition.y) * viewSpeed;
 		rotation.y += (cursorPosition.x - lastCursorPosition.x) * viewSpeed;
 
-		rotation.x = clamp(
-			rotation.x,
+		rotation.x = clamp(rotation.x,
 			degToRad((cmmt_float_t)-89.99),
 			degToRad((cmmt_float_t)89.99));
 

@@ -103,7 +103,7 @@ void setTransformerCamera(
  * Enumerates transformer transforms.
  *
  * transformer - transformer instance.
- * onItem - on item function.
+ * onItem - on transformer item function.
  * functionArgument - function argument or NULL.
  */
 void enumerateTransformer(
@@ -123,7 +123,7 @@ void destroyAllTransformerTransforms(Transformer transformer);
 void updateTransformer(Transformer transformer);
 
 /*
- * Create a new transform instance with default values.
+ * Create a new default transform instance.
  * Returns transform instance on success, otherwise NULL.
  *
  * transformer - transformer instance.

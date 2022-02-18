@@ -558,32 +558,27 @@ void destroyInterfaceElement(
 	abort();
 }
 
-Interface getInterfaceElementInterface(
-	InterfaceElement element)
+Interface getInterfaceElementInterface(InterfaceElement element)
 {
 	assert(element);
 	return element->interface;
 }
-Transform getInterfaceElementTransform(
-	InterfaceElement element)
+Transform getInterfaceElementTransform(InterfaceElement element)
 {
 	assert(element);
 	return element->transform;
 }
-OnInterfaceElementDestroy getInterfaceElementOnDestroy(
-	InterfaceElement element)
+OnInterfaceElementDestroy getInterfaceElementOnDestroy(InterfaceElement element)
 {
 	assert(element);
 	return element->onDestroy;
 }
-const InterfaceElementEvents* getInterfaceElementEvents(
-	InterfaceElement element)
+const InterfaceElementEvents* getInterfaceElementEvents(InterfaceElement element)
 {
 	assert(element);
 	return &element->events;
 }
-void* getInterfaceElementHandle(
-	InterfaceElement element)
+void* getInterfaceElementHandle(InterfaceElement element)
 {
 	assert(element);
 	return element->handle;

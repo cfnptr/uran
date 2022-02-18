@@ -22,12 +22,27 @@
 
 // TODO: add enumerator and count getter
 
+/*
+ * Font structure.
+ */
 typedef struct Font_T Font_T;
+/*
+ * Font instance.
+ */
 typedef Font_T* Font;
 
+/*
+ * Text structure.
+ */
 typedef struct Text_T Text_T;
+/*
+ * Text instance.
+ */
 typedef Text_T* Text;
 
+/*
+ * Alignment types.
+ */
 typedef enum AlignmentType_T
 {
 	CENTER_ALIGNMENT_TYPE = 0,
@@ -41,7 +56,9 @@ typedef enum AlignmentType_T
 	RIGHT_TOP_ALIGNMENT_TYPE = 8,
 	ALIGNMENT_TYPE_COUNT = 9,
 } AlignmentType_T;
-
+/*
+ * Alignment type.
+ */
 typedef uint8_t AlignmentType;
 
 /*
@@ -57,6 +74,8 @@ void terminateText();
  * Returns true if text subsystems are initialized.
  */
 bool isTextInitialized();
+
+// TODO: descriptions
 
 bool createStringUTF8(
 	const uint32_t* data,

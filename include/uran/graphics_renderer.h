@@ -92,7 +92,24 @@ typedef size_t(*OnGraphicsRenderDraw)(
 	GraphicsPipeline graphicsPipeline,
 	const Mat4F* model,
 	const Mat4F* viewProj);
+/*
+ * Graphics renderer enumeration function.
+ */
+typedef void(*OnGraphicsRendererItem)(
+	GraphicsRender graphicsRender, void* handle);
 
+/*
+ * Create a new graphics renderer instance.
+ * Returns graphics renderer instance on success, otherwise NULL.
+ *
+ * pipeline - graphics pipeline instance.
+ * sorting - graphics render sorting type.
+ * useCulling - use frustum culling.
+ * onDestroy - on graphics render destroy function.
+ * onDraw - on graphics render draw function.
+ * capacity - initial render array capacity.
+ * threadPool - thread pool instance or NULL.
+ */
 GraphicsRenderer createGraphicsRenderer(
 	GraphicsPipeline pipeline,
 	GraphicsRenderSorting sorting,
@@ -101,71 +118,183 @@ GraphicsRenderer createGraphicsRenderer(
 	OnGraphicsRenderDraw onDraw,
 	size_t capacity,
 	ThreadPool threadPool);
-void destroyGraphicsRenderer(
-	GraphicsRenderer graphicsRenderer);
+/*
+ * Create a new default graphics renderer instance.
+ * Returns graphics renderer instance on success, otherwise NULL.
+ *
+ * pipeline - graphics pipeline instance.
+ * onDestroy - on graphics render destroy function.
+ * onDraw - on graphics render draw function.
+ * capacity - initial render array capacity.
+ * threadPool - thread pool instance or NULL.
+ */
+GraphicsRenderer createDefaultGraphicsRenderer(
+	GraphicsPipeline pipeline,
+	OnGraphicsRenderDestroy onDestroy,
+	OnGraphicsRenderDraw onDraw,
+	size_t capacity,
+	ThreadPool threadPool);
+/*
+ * Destroys graphics renderer instance.
+ * renderer - graphics renderer instance or NULL.
+ */
+void destroyGraphicsRenderer(GraphicsRenderer renderer);
 
-GraphicsPipeline getGraphicsRendererPipeline(
-	GraphicsRenderer graphicsRenderer);
-OnGraphicsRenderDestroy getGraphicsRendererOnDestroy(
-	GraphicsRenderer graphicsRenderer);
-OnGraphicsRenderDraw getGraphicsRendererOnDraw(
-	GraphicsRenderer graphicsRenderer);
-ThreadPool getGraphicsRendererThreadPool(
-	GraphicsRenderer graphicsRenderer);
+/*
+ * Returns graphics renderer pipeline instance.
+ * renderer - graphics renderer instance.
+ */
+GraphicsPipeline getGraphicsRendererPipeline(GraphicsRenderer renderer);
+/*
+ * Returns graphics renderer on render destroy function.
+ * renderer - graphics renderer instance.
+ */
+OnGraphicsRenderDestroy getGraphicsRendererOnDestroy(GraphicsRenderer renderer);
+/*
+ * Returns graphics renderer on render draw function.
+ * renderer - graphics renderer instance.
+ */
+OnGraphicsRenderDraw getGraphicsRendererOnDraw(GraphicsRenderer renderer);
+/*
+ * Returns graphics renderer thread pool instance.
+ * renderer - graphics renderer instance.
+ */
+ThreadPool getGraphicsRendererThreadPool(GraphicsRenderer renderer);
+/*
+ * Returns graphics renderer render count.
+ * renderer - graphics renderer instance.
+ */
+size_t getGraphicsRendererRenderCount(GraphicsRenderer renderer);
 
+/*
+ * Returns graphics renderer sorting type.
+ * renderer - graphics renderer instance.
+ */
 GraphicsRenderSorting getGraphicsRendererSorting(
-	GraphicsRenderer graphicsRenderer);
+	GraphicsRenderer renderer);
+/*
+ * Sets graphics renderer sorting type.
+ * renderer - graphics renderer instance.
+ */
 void setGraphicsRendererSorting(
-	GraphicsRenderer graphicsRenderer,
+	GraphicsRenderer renderer,
 	GraphicsRenderSorting sorting);
 
+/*
+ * Returns graphics renderer use frustum culling.
+ * renderer - graphics renderer instance.
+ */
 bool getGraphicsRendererUseCulling(
 	GraphicsRenderer renderer);
+/*
+ * Sets graphics renderer use frustum culling.
+ * renderer - graphics renderer instance.
+ */
 void setGraphicsRendererUseCulling(
 	GraphicsRenderer renderer,
 	bool useCulling);
 
-size_t getGraphicsRendererRenderCount(
-	GraphicsRenderer graphicsRenderer);
+/*
+ * Enumerates graphics renderer renders.
+ *
+ * renderer - graphics renderer instance.
+ * onItem - on graphics renderer item function.
+ * functionArgument - function argument or NULL.
+ */
 void enumerateGraphicsRenderer(
-	GraphicsRenderer graphicsRenderer,
-	void(*onItem)(GraphicsRender));
+	GraphicsRenderer renderer,
+	OnGraphicsRendererItem onItem,
+	void* functionArgument);
+/*
+ * Destroys all graphics renderer renders.
+ * renderer - graphics renderer instance.
+ */
 void destroyAllGraphicsRendererRenders(
-	GraphicsRenderer graphicsRenderer,
+	GraphicsRenderer renderer,
 	bool destroyTransforms);
 
+/*
+ * Creates graphics renderer data.
+ *
+ * view - camera view matrix.
+ * camera - camera value.
+ * data - pointer to the renderer data.
+ * createPlanes - create planes for frustum culling.
+ */
 void createGraphicsRenderData(
 	Mat4F view,
 	Camera camera,
-	GraphicsRendererData* graphicsRendererData,
+	GraphicsRendererData* data,
 	bool createPlanes);
+/*
+ * Draws graphics renderer renders.
+ *
+ * renderer - graphics renderer instance.
+ * data - graphics renderer data.
+ */
 GraphicsRendererResult drawGraphicsRenderer(
-	GraphicsRenderer graphicsRenderer,
-	const GraphicsRendererData* graphicsRendererData);
+	GraphicsRenderer renderer,
+	const GraphicsRendererData* data);
 
+/*
+ * Create  a new graphics render instance.
+ * Returns graphics render instance on success, otherwise NULL.
+ *
+ * renderer - graphics renderer instance.
+ * transform - transform instance.
+ * bounds - bounds value.
+ * handle - handle or NULL.
+ */
 GraphicsRender createGraphicsRender(
 	GraphicsRenderer renderer,
 	Transform transform,
-	Box3F bounding,
+	Box3F bounds,
 	void* handle);
+/*
+ * Destroys graphics render instance.
+ *
+ * render - graphics render instance or NULL.
+ * destroyTransform - destroy transform instance.
+ */
 void destroyGraphicsRender(
-	GraphicsRender graphicsRender,
+	GraphicsRender render,
 	bool destroyTransform);
 
-GraphicsRenderer getGraphicsRenderRenderer(
-	GraphicsRender graphicsRender);
-Transform getGraphicsRenderTransform(
-	GraphicsRender graphicsRender);
+/*
+ * Returns graphics render handle.
+ * render - graphics render instance.
+ */
+void* getGraphicsRenderHandle(GraphicsRender render);
+/*
+ * Returns graphics render renderer instance.
+ * render - graphics render instance.
+ */
+GraphicsRenderer getGraphicsRenderRenderer(GraphicsRender render);
+/*
+ * Returns graphics render transform instance.
+ * render - graphics render instance.
+ */
+Transform getGraphicsRenderTransform(GraphicsRender render);
 
-Box3F getGraphicsRenderBounding(
-	GraphicsRender graphicsRender);
-void setGraphicsRenderBounding(
-	GraphicsRender graphicsRender,
-	Box3F bounding);
+/*
+ * Returns graphics render bounds.
+ * render - graphics render instance.
+ */
+Box3F getGraphicsRenderBounds(
+	GraphicsRender render);
+/*
+ * Sets graphics render bounds.
+ *
+ * render - graphics render instance.
+ * bounds - bounds value.
+ */
+void setGraphicsRenderBounds(
+	GraphicsRender render,
+	Box3F bounds);
 
-void* getGraphicsRenderHandle(
-	GraphicsRender graphicsRender);
-
+/*
+ * Creates graphics renderer result.
+ */
 inline static GraphicsRendererResult createGraphicsRendererResult()
 {
 	GraphicsRendererResult result;
@@ -174,6 +303,12 @@ inline static GraphicsRendererResult createGraphicsRendererResult()
 	result.passCount = 0;
 	return result;
 }
+/*
+ * Adds graphics renderer result.
+ *
+ * a - first graphics renderer result.
+ * b - second graphics renderer result.
+ */
 inline static GraphicsRendererResult addGraphicsRendererResult(
 	GraphicsRendererResult a, GraphicsRendererResult b)
 {

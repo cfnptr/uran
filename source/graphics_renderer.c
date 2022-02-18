@@ -23,7 +23,7 @@ struct GraphicsRender_T
 	GraphicsRenderer renderer;
 	Transform transform;
 	void* handle;
-	Box3F bounding;
+	Box3F bounds;
 };
 typedef struct GraphicsRenderElement
 {
@@ -110,110 +110,126 @@ GraphicsRenderer createGraphicsRenderer(
 	graphicsRenderer->renderElements = renderElements;
 	return graphicsRenderer;
 }
-void destroyGraphicsRenderer(
-	GraphicsRenderer graphicsRenderer)
+GraphicsRenderer createDefaultGraphicsRenderer(
+	GraphicsPipeline pipeline,
+	OnGraphicsRenderDestroy onDestroy,
+	OnGraphicsRenderDraw onDraw,
+	size_t capacity,
+	ThreadPool threadPool)
 {
-	if (!graphicsRenderer)
+	assert(pipeline);
+	assert(onDestroy);
+	assert(onDraw);
+	assert(capacity > 0);
+
+	return createGraphicsRenderer(
+		pipeline,
+		ASCENDING_GRAPHICS_RENDER_SORTING,
+		true,
+		onDestroy,
+		onDraw,
+		capacity,
+		threadPool);
+}
+void destroyGraphicsRenderer(GraphicsRenderer renderer)
+{
+	if (!renderer)
 		return;
 
-	assert(graphicsRenderer->renderCount == 0);
-	assert(!graphicsRenderer->isEnumerating);
+	assert(renderer->renderCount == 0);
+	assert(!renderer->isEnumerating);
 
-	free(graphicsRenderer->renderElements);
-	free(graphicsRenderer->renders);
-	free(graphicsRenderer);
+	free(renderer->renderElements);
+	free(renderer->renders);
+	free(renderer);
 }
 
-GraphicsPipeline getGraphicsRendererPipeline(
-	GraphicsRenderer graphicsRenderer)
+GraphicsPipeline getGraphicsRendererPipeline(GraphicsRenderer renderer)
 {
-	assert(graphicsRenderer);
-	return graphicsRenderer->pipeline;
+	assert(renderer);
+	return renderer->pipeline;
 }
-OnGraphicsRenderDestroy getGraphicsRendererOnDestroy(
-	GraphicsRenderer graphicsRenderer)
+OnGraphicsRenderDestroy getGraphicsRendererOnDestroy(GraphicsRenderer renderer)
 {
-	assert(graphicsRenderer);
-	return graphicsRenderer->onDestroy;
+	assert(renderer);
+	return renderer->onDestroy;
 }
-OnGraphicsRenderDraw getGraphicsRendererOnDraw(
-	GraphicsRenderer graphicsRenderer)
+OnGraphicsRenderDraw getGraphicsRendererOnDraw(GraphicsRenderer renderer)
 {
-	assert(graphicsRenderer);
-	return graphicsRenderer->onDraw;
+	assert(renderer);
+	return renderer->onDraw;
 }
-ThreadPool getGraphicsRendererThreadPool(
-	GraphicsRenderer graphicsRenderer)
+ThreadPool getGraphicsRendererThreadPool(GraphicsRenderer renderer)
 {
-	assert(graphicsRenderer);
-	return graphicsRenderer->threadPool;
+	assert(renderer);
+	return renderer->threadPool;
+}
+size_t getGraphicsRendererRenderCount(GraphicsRenderer renderer)
+{
+	assert(renderer);
+	return renderer->renderCount;
 }
 
 GraphicsRenderSorting getGraphicsRendererSorting(
-	GraphicsRenderer graphicsRenderer)
+	GraphicsRenderer renderer)
 {
-	assert(graphicsRenderer);
-	return graphicsRenderer->sorting;
+	assert(renderer);
+	return renderer->sorting;
 }
 void setGraphicsRendererSorting(
-	GraphicsRenderer graphicsRenderer,
+	GraphicsRenderer renderer,
 	GraphicsRenderSorting sorting)
 {
-	assert(graphicsRenderer);
+	assert(renderer);
 	assert(sorting < GRAPHICS_RENDER_SORTING_COUNT);
-	graphicsRenderer->sorting = sorting;
+	renderer->sorting = sorting;
 }
 
 bool getGraphicsRendererUseCulling(
-	GraphicsRenderer graphicsRenderer)
+	GraphicsRenderer renderer)
 {
-	assert(graphicsRenderer);
-	return graphicsRenderer->useCulling;
+	assert(renderer);
+	return renderer->useCulling;
 }
 void setGraphicsRendererUseCulling(
-	GraphicsRenderer graphicsRenderer,
+	GraphicsRenderer renderer,
 	bool useCulling)
 {
-	assert(graphicsRenderer);
-	graphicsRenderer->useCulling = useCulling;
+	assert(renderer);
+	renderer->useCulling = useCulling;
 }
 
-size_t getGraphicsRendererRenderCount(
-	GraphicsRenderer graphicsRenderer)
-{
-	assert(graphicsRenderer);
-	return graphicsRenderer->renderCount;
-}
 void enumerateGraphicsRenderer(
-	GraphicsRenderer graphicsRenderer,
-	void(*onItem)(GraphicsRender))
+	GraphicsRenderer renderer,
+	OnGraphicsRendererItem onItem,
+	void* functionArgument)
 {
-	assert(graphicsRenderer);
+	assert(renderer);
 	assert(onItem);
 
 #ifndef NDEBUG
-	graphicsRenderer->isEnumerating = true;
+	renderer->isEnumerating = true;
 #endif
 
-	GraphicsRender* renders = graphicsRenderer->renders;
-	size_t renderCount = graphicsRenderer->renderCount;
+	GraphicsRender* renders = renderer->renders;
+	size_t renderCount = renderer->renderCount;
 
 	for (size_t i = 0; i < renderCount; i++)
-		onItem(renders[i]);
+		onItem(renders[i], functionArgument);
 
 #ifndef NDEBUG
-	graphicsRenderer->isEnumerating = false;
+	renderer->isEnumerating = false;
 #endif
 }
 void destroyAllGraphicsRendererRenders(
-	GraphicsRenderer graphicsRenderer,
+	GraphicsRenderer renderer,
 	bool destroyTransforms)
 {
-	assert(graphicsRenderer);
-	assert(!graphicsRenderer->isEnumerating);
+	assert(renderer);
+	assert(!renderer->isEnumerating);
 
-	GraphicsRender* renders = graphicsRenderer->renders;
-	size_t renderCount = graphicsRenderer->renderCount;
+	GraphicsRender* renders = renderer->renders;
+	size_t renderCount = renderer->renderCount;
 
 	if (renderCount == 0)
 		return;
@@ -221,7 +237,7 @@ void destroyAllGraphicsRendererRenders(
 	for (size_t i = 0; i < renderCount; i++)
 	{
 		GraphicsRender render = renders[i];
-		graphicsRenderer->onDestroy(render->handle);
+		renderer->onDestroy(render->handle);
 
 		if (destroyTransforms)
 			destroyTransform(render->transform);
@@ -229,7 +245,7 @@ void destroyAllGraphicsRendererRenders(
 		free(render);
 	}
 
-	graphicsRenderer->renderCount = 0;
+	renderer->renderCount = 0;
 }
 
 static int ascendingRenderCompare(
@@ -287,10 +303,10 @@ static int descendingRenderCompare(
 void createGraphicsRenderData(
 	Mat4F view,
 	Camera camera,
-	GraphicsRendererData* graphicsRendererData,
+	GraphicsRendererData* data,
 	bool createPlanes)
 {
-	assert(graphicsRendererData);
+	assert(data);
 
 	GraphicsAPI api = getGraphicsAPI();
 
@@ -313,12 +329,12 @@ void createGraphicsRenderData(
 			{
 				frustumZeroOneMat4F(
 					viewProj,
-					&graphicsRendererData->leftPlane,
-					&graphicsRendererData->rightPlane,
-					&graphicsRendererData->bottomPlane,
-					&graphicsRendererData->topPlane,
-					&graphicsRendererData->backPlane,
-					&graphicsRendererData->frontPlane,
+					&data->leftPlane,
+					&data->rightPlane,
+					&data->bottomPlane,
+					&data->topPlane,
+					&data->backPlane,
+					&data->frontPlane,
 					false);
 			}
 		}
@@ -337,12 +353,12 @@ void createGraphicsRenderData(
 			{
 				frustumNegOneMat4F(
 					viewProj,
-					&graphicsRendererData->leftPlane,
-					&graphicsRendererData->rightPlane,
-					&graphicsRendererData->bottomPlane,
-					&graphicsRendererData->topPlane,
-					&graphicsRendererData->backPlane,
-					&graphicsRendererData->frontPlane,
+					&data->leftPlane,
+					&data->rightPlane,
+					&data->bottomPlane,
+					&data->topPlane,
+					&data->backPlane,
+					&data->frontPlane,
 					false);
 			}
 		}
@@ -369,12 +385,12 @@ void createGraphicsRenderData(
 			{
 				frustumZeroOneMat4F(
 					viewProj,
-					&graphicsRendererData->leftPlane,
-					&graphicsRendererData->rightPlane,
-					&graphicsRendererData->bottomPlane,
-					&graphicsRendererData->topPlane,
-					&graphicsRendererData->backPlane,
-					&graphicsRendererData->frontPlane,
+					&data->leftPlane,
+					&data->rightPlane,
+					&data->bottomPlane,
+					&data->topPlane,
+					&data->backPlane,
+					&data->frontPlane,
 					false);
 			}
 		}
@@ -395,12 +411,12 @@ void createGraphicsRenderData(
 			{
 				frustumNegOneMat4F(
 					viewProj,
-					&graphicsRendererData->leftPlane,
-					&graphicsRendererData->rightPlane,
-					&graphicsRendererData->bottomPlane,
-					&graphicsRendererData->topPlane,
-					&graphicsRendererData->backPlane,
-					&graphicsRendererData->frontPlane,
+					&data->leftPlane,
+					&data->rightPlane,
+					&data->bottomPlane,
+					&data->topPlane,
+					&data->backPlane,
+					&data->frontPlane,
 					false);
 			}
 		}
@@ -414,18 +430,18 @@ void createGraphicsRenderData(
 		abort();
 	}
 
-	graphicsRendererData->view = view;
-	graphicsRendererData->proj = proj;
-	graphicsRendererData->viewProj = viewProj;
+	data->view = view;
+	data->proj = proj;
+	data->viewProj = viewProj;
 
 	if (!createPlanes)
 	{
-		graphicsRendererData->leftPlane = plane3F(zeroVec3F, 0.0f);
-		graphicsRendererData->rightPlane = plane3F(zeroVec3F, 0.0f);
-		graphicsRendererData->bottomPlane = plane3F(zeroVec3F, 0.0f);
-		graphicsRendererData->topPlane = plane3F(zeroVec3F, 0.0f);
-		graphicsRendererData->backPlane = plane3F(zeroVec3F, 0.0f);
-		graphicsRendererData->frontPlane = plane3F(zeroVec3F, 0.0f);
+		data->leftPlane = plane3F(zeroVec3F, 0.0f);
+		data->rightPlane = plane3F(zeroVec3F, 0.0f);
+		data->bottomPlane = plane3F(zeroVec3F, 0.0f);
+		data->topPlane = plane3F(zeroVec3F, 0.0f);
+		data->backPlane = plane3F(zeroVec3F, 0.0f);
+		data->frontPlane = plane3F(zeroVec3F, 0.0f);
 	}
 }
 
@@ -461,19 +477,19 @@ inline static bool isShouldDraw(
 	if (useCulling)
 	{
 		Vec3F renderScale = getTransformScale(transform);
-		Box3F renderBounding = getGraphicsRenderBounding(render);
+		Box3F renderBounds = render->bounds;
 
-		renderBounding.minimum = mulVec3F(
-			renderBounding.minimum,
+		renderBounds.minimum = mulVec3F(
+			renderBounds.minimum,
 			renderScale);
-		renderBounding.minimum = addVec3F(
-			renderBounding.minimum,
+		renderBounds.minimum = addVec3F(
+			renderBounds.minimum,
 			renderPosition);
-		renderBounding.maximum = mulVec3F(
-			renderBounding.maximum,
+		renderBounds.maximum = mulVec3F(
+			renderBounds.maximum,
 			renderScale);
-		renderBounding.maximum = addVec3F(
-			renderBounding.maximum,
+		renderBounds.maximum = addVec3F(
+			renderBounds.maximum,
 			renderPosition);
 
 		bool isInFrustum = isBoxInFrustum3F(
@@ -483,7 +499,7 @@ inline static bool isShouldDraw(
 			topPlane,
 			backPlane,
 			frontPlane,
-			renderBounding);
+			renderBounds);
 
 		if (!isInFrustum)
 			return false;
@@ -547,37 +563,37 @@ static void onRenderUpdate(void* argument)
 	}
 }
 GraphicsRendererResult drawGraphicsRenderer(
-	GraphicsRenderer graphicsRenderer,
-	const GraphicsRendererData* graphicsRendererData)
+	GraphicsRenderer renderer,
+	const GraphicsRendererData* data)
 {
-	assert(graphicsRenderer);
-	assert(graphicsRendererData);
-	assert(!graphicsRenderer->isEnumerating);
+	assert(renderer);
+	assert(data);
+	assert(!renderer->isEnumerating);
 
 	GraphicsRendererResult result;
 	result.renderCount = 0;
 	result.indexCount = 0;
 	result.passCount = 0;
 
-	size_t renderCount = graphicsRenderer->renderCount;
+	size_t renderCount = renderer->renderCount;
 
 	if (!renderCount)
 		return result;
 
-	Vec3F rendererPosition = negVec3F(getTranslationMat4F(
-		graphicsRendererData->view));
+	Vec3F rendererPosition = negVec3F(
+		getTranslationMat4F(data->view));
 
-	GraphicsRenderElement* renderElements = graphicsRenderer->renderElements;
-	ThreadPool threadPool = graphicsRenderer->threadPool;
+	GraphicsRenderElement* renderElements = renderer->renderElements;
+	ThreadPool threadPool = renderer->threadPool;
 
 	size_t elementCount = 0;
 
 	if (threadPool && renderCount > getThreadPoolThreadCount(threadPool))
 	{
 		waitThreadPool(threadPool);
-		graphicsRenderer->data = graphicsRendererData;
-		graphicsRenderer->threadIndex = 0;
-		graphicsRenderer->elementIndex = 0;
+		renderer->data = data;
+		renderer->threadIndex = 0;
+		renderer->elementIndex = 0;
 
 		size_t threadCount = getThreadPoolThreadCount(threadPool);
 
@@ -588,25 +604,25 @@ GraphicsRendererResult drawGraphicsRenderer(
 			addResult &= addThreadPoolTask(
 				threadPool,
 				onRenderUpdate,
-				graphicsRenderer);
+				renderer);
 		}
 
 		if (!addResult)
 			abort();
 
 		waitThreadPool(threadPool);
-		elementCount = graphicsRenderer->elementIndex;
+		elementCount = renderer->elementIndex;
 	}
 	else
 	{
-		GraphicsRender* renders = graphicsRenderer->renders;
-		bool useCulling = graphicsRenderer->useCulling;
-		Plane3F leftPlane = graphicsRendererData->leftPlane;
-		Plane3F rightPlane = graphicsRendererData->rightPlane;
-		Plane3F bottomPlane = graphicsRendererData->bottomPlane;
-		Plane3F topPlane = graphicsRendererData->topPlane;
-		Plane3F backPlane = graphicsRendererData->backPlane;
-		Plane3F frontPlane = graphicsRendererData->frontPlane;
+		GraphicsRender* renders = renderer->renders;
+		bool useCulling = renderer->useCulling;
+		Plane3F leftPlane = data->leftPlane;
+		Plane3F rightPlane = data->rightPlane;
+		Plane3F bottomPlane = data->bottomPlane;
+		Plane3F topPlane = data->topPlane;
+		Plane3F backPlane = data->backPlane;
+		Plane3F frontPlane = data->frontPlane;
 
 		for (size_t i = 0; i < renderCount; i++)
 		{
@@ -635,7 +651,7 @@ GraphicsRendererResult drawGraphicsRenderer(
 	if (elementCount == 0)
 		return result;
 
-	GraphicsRenderSorting sorting = graphicsRenderer->sorting;
+	GraphicsRenderSorting sorting = renderer->sorting;
 
 	if (sorting != NO_GRAPHICS_RENDER_SORTING && elementCount > 1)
 	{
@@ -659,9 +675,9 @@ GraphicsRendererResult drawGraphicsRenderer(
 		}
 	}
 
-	Mat4F viewProj = graphicsRendererData->viewProj;
-	GraphicsPipeline pipeline = graphicsRenderer->pipeline;
-	OnGraphicsRenderDraw onDraw = graphicsRenderer->onDraw;
+	Mat4F viewProj = data->viewProj;
+	GraphicsPipeline pipeline = renderer->pipeline;
+	OnGraphicsRenderDraw onDraw = renderer->onDraw;
 
 	// TODO: also multi-thread this code,
 	// this is possible with Vulkan multiple command buffers
@@ -694,7 +710,7 @@ GraphicsRendererResult drawGraphicsRenderer(
 GraphicsRender createGraphicsRender(
 	GraphicsRenderer renderer,
 	Transform transform,
-	Box3F bounding,
+	Box3F bounds,
 	void* handle)
 {
 	assert(renderer);
@@ -711,7 +727,7 @@ GraphicsRender createGraphicsRender(
 	graphicsRender->renderer = renderer;
 	graphicsRender->transform = transform;
 	graphicsRender->handle = handle;
-	graphicsRender->bounding = bounding;
+	graphicsRender->bounds = bounds;
 
 	size_t count = renderer->renderCount;
 
@@ -750,32 +766,32 @@ GraphicsRender createGraphicsRender(
 	return graphicsRender;
 }
 void destroyGraphicsRender(
-	GraphicsRender graphicsRender,
+	GraphicsRender render,
 	bool _destroyTransform)
 {
-	if (!graphicsRender)
+	if (!render)
 		return;
 
-	assert(!graphicsRender->renderer->isEnumerating);
+	assert(!render->renderer->isEnumerating);
 
-	GraphicsRenderer renderer = graphicsRender->renderer;
+	GraphicsRenderer renderer = render->renderer;
 	GraphicsRender* renders = renderer->renders;
 	size_t renderCount = renderer->renderCount;
 
 	for (size_t i = 0; i < renderCount; i++)
 	{
-		if (renders[i] != graphicsRender)
+		if (renders[i] != render)
 			continue;
 
 		for (size_t j = i + 1; j < renderCount; j++)
 			renders[j - 1] = renders[j];
 
-		renderer->onDestroy(graphicsRender->handle);
+		renderer->onDestroy(render->handle);
 
 		if (_destroyTransform)
-			destroyTransform(graphicsRender->transform);
+			destroyTransform(render->transform);
 
-		free(graphicsRender);
+		free(render);
 		renderer->renderCount--;
 		return;
 	}
@@ -783,36 +799,32 @@ void destroyGraphicsRender(
 	abort();
 }
 
-GraphicsRenderer getGraphicsRenderRenderer(
-	GraphicsRender graphicsRender)
+void* getGraphicsRenderHandle(GraphicsRender render)
 {
-	assert(graphicsRender);
-	return graphicsRender->renderer;
+	assert(render);
+	return render->handle;
 }
-Transform getGraphicsRenderTransform(
-	GraphicsRender graphicsRender)
+GraphicsRenderer getGraphicsRenderRenderer(GraphicsRender render)
 {
-	assert(graphicsRender);
-	return graphicsRender->transform;
+	assert(render);
+	return render->renderer;
 }
-
-Box3F getGraphicsRenderBounding(
-	GraphicsRender graphicsRender)
+Transform getGraphicsRenderTransform(GraphicsRender render)
 {
-	assert(graphicsRender);
-	return graphicsRender->bounding;
-}
-void setGraphicsRenderBounding(
-	GraphicsRender graphicsRender,
-	Box3F bounding)
-{
-	assert(graphicsRender);
-	graphicsRender->bounding = bounding;
+	assert(render);
+	return render->transform;
 }
 
-void* getGraphicsRenderHandle(
-	GraphicsRender graphicsRender)
+Box3F getGraphicsRenderBounds(
+	GraphicsRender render)
 {
-	assert(graphicsRender);
-	return graphicsRender->handle;
+	assert(render);
+	return render->bounds;
+}
+void setGraphicsRenderBounds(
+	GraphicsRender render,
+	Box3F bounds)
+{
+	assert(render);
+	render->bounds = bounds;
 }

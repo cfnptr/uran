@@ -27,7 +27,18 @@ typedef struct FreeCamera_T FreeCamera_T;
  */
 typedef FreeCamera_T* FreeCamera;
 
-
+/*
+ * Create a new free camera instance.
+ * Returns free camera instance on success, otherwise NULL.
+ *
+ * framebuffer - framebuffer instance.
+ * transformer - transformer instance.
+ * moveSpeed - move speed multiplier.
+ * viewSpeed - view speed multiplier.
+ * fieldOfView - field of view in radians.
+ * nearClipPlane - near clipping plane.
+ * farClipPlane - far clipping plane.
+ */
 FreeCamera createFreeCamera(
 	Framebuffer framebuffer,
 	Transformer transformer,
@@ -36,57 +47,141 @@ FreeCamera createFreeCamera(
 	cmmt_float_t fieldOfView,
 	cmmt_float_t nearClipPlane,
 	cmmt_float_t farClipPlane);
+/*
+ * Create a new default free camera instance.
+ * Returns free camera instance on success, otherwise NULL.
+ *
+ * framebuffer - framebuffer instance.
+ * transformer - transformer instance.
+ */
 FreeCamera createDefaultFreeCamera(
 	Framebuffer framebuffer,
 	Transformer transformer);
+/*
+ * Destroys free camera instance.
+ * freeCamera - free camera instance or NULL.
+ */
 void destroyFreeCamera(FreeCamera freeCamera);
 
-Framebuffer getFreeCameraFramebuffer(
-	FreeCamera freeCamera);
+/*
+ * Returns free camera view direction.
+ * freeCamera - free camera instance.
+ */
 Vec3F getFreeCameraViewDirection(
 	FreeCamera freeCamera);
 
+/*
+ * Returns free camera framebuffer.
+ * freeCamera - free camera instance.
+ */
+Framebuffer getFreeCameraFramebuffer(
+	FreeCamera freeCamera);
+
+/*
+ * Returns free camera position.
+ * freeCamera - free camera instance.
+ */
 Vec3F getFreeCameraPosition(
 	FreeCamera freeCamera);
+/*
+ * Sets free camera position.
+ * freeCamera - free camera instance.
+ */
 void setFreeCameraPosition(
 	FreeCamera freeCamera,
 	Vec3F position);
 
+/*
+ * Returns free camera rotation.
+ * freeCamera - free camera instance.
+ */
 Vec2F getFreeCameraRotation(
 	FreeCamera freeCamera);
+/*
+ * Sets free camera rotation.
+ * freeCamera - free camera instance.
+ */
 void setFreeCameraRotation(
 	FreeCamera freeCamera,
 	Vec2F rotation);
 
+/*
+ * Returns free camera move speed multiplier.
+ * freeCamera - free camera instance.
+ */
 cmmt_float_t getFreeCameraMoveSpeed(
 	FreeCamera freeCamera);
+/*
+ * Sets free camera move speed multiplier.
+ * freeCamera - free camera instance.
+ */
 void setFreeCameraMoveSpeed(
 	FreeCamera freeCamera,
 	cmmt_float_t moveSpeed);
 
+/*
+ * Returns free camera view speed multiplier.
+ * freeCamera - free camera instance.
+ */
 cmmt_float_t getFreeCameraViewSpeed(
 	FreeCamera freeCamera);
+/*
+ * Sets free camera view speed multiplier.
+ * freeCamera - free camera instance.
+ */
 void setFreeCameraViewSpeed(
 	FreeCamera freeCamera,
 	cmmt_float_t viewSpeed);
 
+/*
+ * Returns free camera field of view in radians.
+ * freeCamera - free camera instance.
+ */
 cmmt_float_t getFreeCameraFieldOfView(
 	FreeCamera freeCamera);
+/*
+ * Sets free camera field of view in radians.
+ * freeCamera - free camera instance.
+ */
 void setFreeCameraFieldOfView(
 	FreeCamera freeCamera,
 	cmmt_float_t fieldOfView);
 
+/*
+ * Returns free camera near clipping plane.
+ * freeCamera - free camera instance.
+ */
 cmmt_float_t getFreeCameraNearClipPlane(
 	FreeCamera freeCamera);
+/*
+ * Sets free camera near clipping plane.
+ * freeCamera - free camera instance.
+ */
 void setFreeCameraNearClipPlane(
 	FreeCamera freeCamera,
 	cmmt_float_t nearClipPlane);
 
+/*
+ * Returns free camera far clipping plane.
+ * freeCamera - free camera instance.
+ */
 cmmt_float_t getFreeCameraFarClipPlane(
 	FreeCamera freeCamera);
+/*
+ * Sets free camera far clipping plane.
+ * freeCamera - free camera instance.
+ */
 void setFreeCameraFarClipPlane(
 	FreeCamera freeCamera,
 	cmmt_float_t farClipPlane);
 
+/*
+ * Updates camera position and rotation.
+ * freeCamera - free camera instance.
+ */
 void updateFreeCamera(FreeCamera freeCamera);
+/*
+ * Returns free camera value.
+ * freeCamera - free camera instance.
+ */
 Camera getFreeCamera(FreeCamera freeCamera);
