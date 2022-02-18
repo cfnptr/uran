@@ -53,7 +53,7 @@ inline static Program createProgram(
 	assert(transformer);
 	assert(editor);
 
-	Program program = calloc(1, sizeof(Program));
+	Program program = calloc(1, sizeof(Program_T));
 
 	if (!program)
 		return NULL;

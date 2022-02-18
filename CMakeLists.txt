@@ -36,6 +36,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 option(URAN_BUILD_EDITOR "Build Uran editor executable" ON)
 
 set(CONF_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(CONF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory(libraries/conf)
 
 set(CMAKE_DISABLE_FIND_PACKAGE_HarfBuzz ON CACHE BOOL "" FORCE)
@@ -56,10 +57,10 @@ add_subdirectory(libraries/libwebp)
 set(LOGY_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 add_subdirectory(libraries/logy)
 
-set(MPGX_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 add_subdirectory(libraries/mpgx)
 
 set(PACK_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(PACK_BUILD_UTILITIES OFF CACHE BOOL "" FORCE)
 add_subdirectory(libraries/pack)
 
 set(URAN_SOURCES
