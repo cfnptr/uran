@@ -134,7 +134,7 @@ MAIN_FUNCTION
 		return EXIT_FAILURE;
 	}
 #else
-	editor = NULL:
+	editor = NULL;
 #endif
 
 	program = createProgram(
