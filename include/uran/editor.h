@@ -70,3 +70,5 @@ void updateEditor(Editor editor);
  * editor - editor instance.
  */
 void renderEditor(Editor editor);
+
+

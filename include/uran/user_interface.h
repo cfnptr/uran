@@ -32,7 +32,26 @@ typedef UserInterface_T* UserInterface;
  * User interface panel instance.
  */
 typedef InterfaceElement UiPanel;
+/*
+ * User interface window instance.
+ */
+typedef InterfaceElement UiWindow;
+/*
+ * User interface button instance.
+ */
+typedef InterfaceElement UiButton;
 
+/*
+ * Create a new user interface instance.
+ * Returns operation MPGX result.
+ *
+ * transformer - transformer instance.
+ * spritePipeline - sprite pipeline instance.
+ * textPipeline - text pipeline instance.
+ * capacity - initial element array capacity or 0.
+ * threadPool - thread pool instance or NULL.
+ * ui - pointer to the user interface instance.
+ */
 MpgxResult createUserInterface(
 	Transformer transformer,
 	GraphicsPipeline spritePipeline,
@@ -40,15 +59,42 @@ MpgxResult createUserInterface(
 	size_t capacity,
 	ThreadPool threadPool,
 	UserInterface* ui);
+/*
+ * Destroys user interface instance.
+ * ui - user interface instance or NULL.
+ */
 void destroyUserInterface(UserInterface ui);
 
+/*
+ * Returns user interface transformer.
+ * ui - user interface instance.
+ */
 Transformer getUserInterfaceTransformer(UserInterface ui);
+/*
+ * Returns user interface instance.
+ * ui - user interface instance.
+ */
 Interface getUserInterface(UserInterface ui);
+/*
+ * Returns user interface sprite pipeline.
+ * ui - user interface instance.
+ */
 GraphicsPipeline getUserInterfaceSpritePipeline(UserInterface ui);
+/*
+ * Returns user interface text pipeline.
+ * ui - user interface instance.
+ */
 GraphicsPipeline getUserInterfaceTextPipeline(UserInterface ui);
 
-void preUpdateUserInterface(UserInterface ui);
+/*
+ * Processes user interface events.
+ * ui - user interface instance.
+ */
 void updateUserInterface(UserInterface ui);
+/*
+ * Draw user interface elements.
+ * ui - user interface instance.
+ */
 GraphicsRendererResult drawUserInterface(UserInterface ui);
 
 UiPanel createUiPanel(
@@ -60,6 +106,28 @@ UiPanel createUiPanel(
 	Transform parent,
 	bool isActive);
 
+UiWindow createUiWindow(
+	UserInterface ui,
+	AlignmentType alignment,
+	Vec3F position,
+	Vec2F scale,
+	float barHeight,
+	LinearColor barColor,
+	LinearColor panelColor,
+	Transform parent,
+	bool isActive);
 
+UiButton createUiButton(
+	UserInterface ui,
+	AlignmentType alignment,
+	Vec3F position,
+	Vec2F scale,
+	LinearColor disabledColor,
+	LinearColor enabledColor,
+	LinearColor hoveredColor,
+	LinearColor pressedColor,
+	Transform parent,
+	bool isEnabled,
+	bool isActive);
 
 

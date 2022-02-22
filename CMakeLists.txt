@@ -60,6 +60,7 @@ add_subdirectory(libraries/logy)
 add_subdirectory(libraries/mpgx)
 
 set(PACK_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(PACK_BUILD_UTILITIES OFF CACHE BOOL "" FORCE)
 add_subdirectory(libraries/pack)
 
 set(URAN_SOURCES
@@ -137,4 +138,6 @@ if (URAN_BUILD_EDITOR)
 			COMMAND strip "$<TARGET_FILE:uran-editor>"
 			VERBATIM)
 	endif ()
+
+	configure_file(resources/resources.pack resources.pack COPYONLY)
 endif ()

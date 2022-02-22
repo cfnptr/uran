@@ -42,6 +42,8 @@ Work in Progress!
 git clone --recursive https://github.com/cfnptr/uran
 ```
 
+TODO: tutorial on how to make pack files.
+
 ## Third-party
 
 * [conf](https://github.com/cfnptr/conf/) (Apache-2.0 License)

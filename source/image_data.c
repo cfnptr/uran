@@ -373,6 +373,7 @@ Image createImageFromData(
 {
 	assert(data);
 	assert(size > 0);
+	assert(type > 0);
 	assert(window);
 	assert(format < IMAGE_FORMAT_COUNT);
 
@@ -428,6 +429,7 @@ Image createImageFromFile(
 {
 	assert(path);
 	assert(window);
+	assert(type > 0);
 	assert(format < IMAGE_FORMAT_COUNT);
 
 	uint8_t* pixels;
@@ -484,6 +486,7 @@ Image createImageFromPack(
 	assert(packReader);
 	assert(path);
 	assert(window);
+	assert(type > 0);
 	assert(format < IMAGE_FORMAT_COUNT);
 
 	uint8_t* pixels;

@@ -21,6 +21,7 @@
 
 struct UserInterface_T
 {
+	Window window;
 	Transformer transformer;
 	Interface interface;
 	GraphicsMesh squareMesh;
@@ -33,8 +34,29 @@ typedef struct UiPanelHandle_T
 	Transform transform;
 	GraphicsRender render;
 } UiPanelHandle_T;
+typedef struct UiWindowHandle_T
+{
+	Window window;
+	Transform barTransform;
+	GraphicsRender barRender;
+	Transform panelTransform;
+	GraphicsRender panelRender;
+	Vec2F lastCursorPosition;
+	bool isDragging;
+} UiWindowHandle_T;
+typedef struct UiButtonHandle_T
+{
+	LinearColor disabledColor;
+	LinearColor enabledColor;
+	LinearColor hoveredColor;
+	LinearColor pressedColor;
+	Transform transform;
+	GraphicsRender render;
+} UiButtonHandle_T;
 
 typedef UiPanelHandle_T* UiPanelHandle;
+typedef UiWindowHandle_T* UiWindowHandle;
+typedef UiButtonHandle_T* UiButtonHandle;
 
 inline static MpgxResult createSquareMesh(
 	Window window,
@@ -118,15 +140,16 @@ MpgxResult createUserInterface(
 	assert(textPipeline);
 	assert(ui);
 
+	Window window = getGraphicsPipelineWindow(spritePipeline);
+
 	UserInterface userInterface = calloc(1,
 		sizeof(UserInterface_T));
 
 	if (!userInterface)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
+	userInterface->window = window;
 	userInterface->transformer = transformer;
-
-	Window window = getGraphicsPipelineWindow(spritePipeline);
 
 	Interface interface = createInterface(
 		window,
@@ -207,11 +230,6 @@ GraphicsPipeline getUserInterfaceTextPipeline(UserInterface ui)
 	return getGraphicsRendererPipeline(ui->textRenderer);
 }
 
-void preUpdateUserInterface(UserInterface ui)
-{
-	assert(ui);
-	preUpdateInterface(ui->interface);
-}
 void updateUserInterface(UserInterface ui)
 {
 	assert(ui);
@@ -229,6 +247,7 @@ GraphicsRendererResult drawUserInterface(UserInterface ui)
 		identMat4F,
 		createInterfaceCamera(ui->interface),
 		false);
+
 	tmpResult = drawGraphicsRenderer(
 		ui->spriteRenderer,
 		&data);
@@ -312,6 +331,320 @@ UiPanel createUiPanel(
 	if (!element)
 	{
 		onUiPanelDestroy(handle);
+		return NULL;
+	}
+
+	return element;
+}
+
+static void onUiWindowClick(InterfaceElement element)
+{
+	assert(element);
+
+	UiWindowHandle handle = (UiWindowHandle)
+		getInterfaceElementHandle(element);
+
+	if (!handle->isDragging)
+	{
+		handle->lastCursorPosition =
+			getWindowCursorPosition(handle->window);
+		handle->isDragging = true;
+	}
+}
+static void onUiWindowUpdate(InterfaceElement element)
+{
+	assert(element);
+
+	UiWindowHandle handle = (UiWindowHandle)
+		getInterfaceElementHandle(element);
+
+	if (handle->isDragging)
+	{
+		Window window = handle->window;
+
+		if (!getWindowMouseButton(window, LEFT_MOUSE_BUTTON))
+		{
+			handle->isDragging = false;
+			return;
+		}
+
+		Vec2F cursorPosition = getWindowCursorPosition(
+			handle->window);
+		Vec2F offset = subVec2F(
+			cursorPosition, handle->lastCursorPosition);
+		Vec3F position = getInterfaceElementPosition(element);
+
+		position.x += offset.x;
+		position.y -= offset.y;
+
+		setInterfaceElementPosition(element, position);
+		handle->lastCursorPosition = cursorPosition;
+	}
+}
+static void onUiWindowDestroy(void* _handle)
+{
+	assert(_handle);
+	UiWindowHandle handle = (UiWindowHandle)_handle;
+	destroyGraphicsRender(handle->panelRender);
+	destroyTransform(handle->panelTransform);
+	destroyGraphicsRender(handle->barRender);
+	destroyTransform(handle->barTransform);
+}
+UiWindow createUiWindow(
+	UserInterface ui,
+	AlignmentType alignment,
+	Vec3F position,
+	Vec2F scale,
+	float barHeight,
+	LinearColor barColor,
+	LinearColor panelColor,
+	Transform parent,
+	bool isActive)
+{
+	assert(ui);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+
+	UiWindowHandle handle = calloc(1,
+		sizeof(UiWindowHandle_T));
+
+	if (!handle)
+		return NULL;
+
+	handle->window = ui->window;
+	handle->lastCursorPosition = zeroVec2F;
+	handle->isDragging = false;
+
+	Transformer transformer = ui->transformer;
+	GraphicsRenderer spriteRenderer = ui->spriteRenderer;
+	GraphicsMesh squareMesh = ui->squareMesh;
+
+	Transform barTransform = createTransform(
+		transformer,
+		zeroVec3F,
+		vec3F(scale.x, barHeight, (cmmt_float_t)1.0),
+		oneQuat,
+		NO_ROTATION_TYPE,
+		parent,
+		isActive);
+
+	if (!barTransform)
+	{
+		onUiWindowDestroy(handle);
+		return NULL;
+	}
+
+	handle->barTransform = barTransform;
+
+	GraphicsRender barRender = createSpriteRender(
+		spriteRenderer,
+		barTransform,
+		oneSizeBox3F,
+		barColor,
+		squareMesh);
+
+	if (!barRender)
+	{
+		onUiWindowDestroy(handle);
+		return NULL;
+	}
+
+	handle->barRender = barRender;
+
+	Vec3F panelPosition = vec3F(
+		position.x,
+		position.y -
+			(scale.y * (cmmt_float_t)0.5 +
+			barHeight * (cmmt_float_t)0.5),
+		(cmmt_float_t)0.0);
+
+	Transform panelTransform = createTransform(
+		transformer,
+		panelPosition,
+		vec3F(scale.x, scale.y, (cmmt_float_t)1.0),
+		oneQuat,
+		NO_ROTATION_TYPE,
+		barTransform,
+		true);
+
+	if (!panelTransform)
+	{
+		onUiWindowDestroy(handle);
+		return NULL;
+	}
+
+	handle->panelTransform = panelTransform;
+
+	GraphicsRender panelRender = createSpriteRender(
+		spriteRenderer,
+		panelTransform,
+		oneSizeBox3F,
+		panelColor,
+		squareMesh);
+
+	if (!panelRender)
+	{
+		onUiWindowDestroy(handle);
+		return NULL;
+	}
+
+	handle->panelRender = panelRender;
+
+	InterfaceElementEvents events = {
+		onUiWindowUpdate,
+		NULL, NULL, NULL, NULL, NULL,
+		onUiWindowClick,
+		NULL,
+	};
+
+	InterfaceElement element = createInterfaceElement(
+		ui->interface,
+		barTransform,
+		alignment,
+		position,
+		oneSizeBox2F,
+		true,
+		onUiWindowDestroy,
+		&events,
+		handle);
+
+	if (!element)
+	{
+		onUiWindowDestroy(handle);
+		return NULL;
+	}
+
+	return element;
+}
+
+static void onUiButtonEnter(InterfaceElement element)
+{
+	assert(element);
+
+	UiButtonHandle handle = (UiButtonHandle)
+		getInterfaceElementHandle(element);
+	setSpriteRenderColor(
+		handle->render,
+		handle->hoveredColor);
+}
+static void onUiButtonExit(InterfaceElement element)
+{
+	assert(element);
+
+	UiButtonHandle handle = (UiButtonHandle)
+		getInterfaceElementHandle(element);
+	setSpriteRenderColor(
+		handle->render,
+		handle->enabledColor);
+}
+static void onUiButtonPress(InterfaceElement element)
+{
+	assert(element);
+
+	UiButtonHandle handle = (UiButtonHandle)
+		getInterfaceElementHandle(element);
+	setSpriteRenderColor(
+		handle->render,
+		handle->pressedColor);
+}
+static void onUiButtonRelease(InterfaceElement element)
+{
+	assert(element);
+
+	UiButtonHandle handle = (UiButtonHandle)
+		getInterfaceElementHandle(element);
+	setSpriteRenderColor(
+		handle->render,
+		handle->hoveredColor);
+}
+static void onUiButtonDestroy(void* _handle)
+{
+	assert(_handle);
+	UiButtonHandle handle = (UiButtonHandle)_handle;
+	destroyGraphicsRender(handle->render);
+	destroyTransform(handle->transform);
+}
+UiButton createUiButton(
+	UserInterface ui,
+	AlignmentType alignment,
+	Vec3F position,
+	Vec2F scale,
+	LinearColor disabledColor,
+	LinearColor enabledColor,
+	LinearColor hoveredColor,
+	LinearColor pressedColor,
+	Transform parent,
+	bool isEnabled,
+	bool isActive)
+{
+	assert(ui);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+
+	UiButtonHandle handle = calloc(1,
+		sizeof(UiButtonHandle_T));
+
+	if (!handle)
+		return NULL;
+
+	handle->disabledColor = disabledColor;
+	handle->enabledColor = enabledColor;
+	handle->hoveredColor = hoveredColor;
+	handle->pressedColor = pressedColor;
+
+	Transform transform = createTransform(
+		ui->transformer,
+		zeroVec3F,
+		vec3F(scale.x, scale.y, (cmmt_float_t)1.0),
+		oneQuat,
+		NO_ROTATION_TYPE,
+		parent,
+		isActive);
+
+	if (!transform)
+	{
+		onUiButtonDestroy(handle);
+		return NULL;
+	}
+
+	handle->transform = transform;
+
+	GraphicsRender render = createSpriteRender(
+		ui->spriteRenderer,
+		transform,
+		oneSizeBox3F,
+		enabledColor,
+		ui->squareMesh);
+
+	if (!render)
+	{
+		onUiButtonDestroy(handle);
+		return NULL;
+	}
+
+	handle->render = render;
+
+	InterfaceElementEvents events = {
+		NULL, NULL, NULL,
+		onUiButtonEnter,
+		onUiButtonExit,
+		NULL,
+		onUiButtonPress,
+		onUiButtonRelease,
+	};
+
+	InterfaceElement element = createInterfaceElement(
+		ui->interface,
+		transform,
+		alignment,
+		position,
+		oneSizeBox2F,
+		isEnabled,
+		onUiButtonDestroy,
+		&events,
+		handle);
+
+	if (!element)
+	{
+		onUiButtonDestroy(handle);
 		return NULL;
 	}
 

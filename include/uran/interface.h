@@ -52,7 +52,7 @@ typedef void(*OnInterfaceElementEvent)(
  * Interface element enumeration function.
  */
 typedef void(*OnInterfaceElement)(
-	InterfaceElement interfaceElement, void* handle);
+	InterfaceElement element, void* handle);
 
 /*
  * Interface elements events structure
@@ -142,12 +142,7 @@ void destroyAllInterfaceElements(
 Camera createInterfaceCamera(Interface interface);
 
 /*
- * Bakes interface elements.
- * interface - interface instance.
- */
-void preUpdateInterface(Interface interface);
-/*
- * Processes interface events.
+ * Processes interface events and bakes data.
  * interface - interface instance.
  */
 void updateInterface(Interface interface);

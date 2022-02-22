@@ -38,6 +38,7 @@ struct Interface_T
 	size_t elementCount;
 	InterfaceElement lastElement;
 	float scale;
+	bool isPressed;
 #ifndef NDEBUG
 	bool isEnumerating;
 #endif
@@ -70,6 +71,8 @@ Interface createInterface(
 
 	interface->window = window;
 	interface->scale = scale;
+	interface->lastElement = NULL;
+	interface->isPressed = false;
 #ifndef NDEBUG
 	interface->isEnumerating = false;
 #endif
@@ -89,7 +92,6 @@ Interface createInterface(
 	interface->elements = elements;
 	interface->elementCapacity = capacity;
 	interface->elementCount = 0;
-	interface->lastElement = NULL;
 	return interface;
 }
 
@@ -189,108 +191,6 @@ Camera createInterfaceCamera(
 		1.0f);
 }
 
-void preUpdateInterface(Interface interface)
-{
-	// TODO: parallel this
-	assert(interface);
-
-	size_t elementCount = interface->elementCount;
-
-	if (elementCount == 0)
-		return;
-
-	InterfaceElement* elements = interface->elements;
-	Vec2I windowSize = getWindowSize(interface->window);
-	float scale = interface->scale;
-
-	Vec2F halfSize = vec2F(
-		((cmmt_float_t)windowSize.x / scale) * (cmmt_float_t)0.5,
-		((cmmt_float_t)windowSize.y / scale) * (cmmt_float_t)0.5);
-
-	for (size_t i = 0; i < elementCount; i++)
-	{
-		InterfaceElement element = elements[i];
-		Transform transform = element->transform;
-
-		if (!isTransformActive(transform))
-			continue;
-
-		Transform parent = getTransformParent(transform);
-
-		while (parent)
-		{
-			if (!isTransformActive(parent))
-				goto CONTINUE;
-			parent = getTransformParent(parent);
-		}
-
-		AlignmentType alignment = element->alignment;
-		Vec3F position = element->position;
-
-		switch (alignment)
-		{
-		default:
-			abort();
-		case CENTER_ALIGNMENT_TYPE:
-			break;
-		case LEFT_ALIGNMENT_TYPE:
-			position = vec3F(
-				position.x - halfSize.x,
-				position.y,
-				position.z);
-			break;
-		case RIGHT_ALIGNMENT_TYPE:
-			position = vec3F(
-				position.x + halfSize.x,
-				position.y,
-				position.z);
-			break;
-		case BOTTOM_ALIGNMENT_TYPE:
-			position = vec3F(
-				position.x,
-				position.y - halfSize.y,
-				position.z);
-			break;
-		case TOP_ALIGNMENT_TYPE:
-			position = vec3F(
-				position.x,
-				position.y + halfSize.y,
-				position.z);
-			break;
-		case LEFT_BOTTOM_ALIGNMENT_TYPE:
-			position = vec3F(
-				position.x - halfSize.x,
-				position.y - halfSize.y,
-				position.z);
-			break;
-		case LEFT_TOP_ALIGNMENT_TYPE:
-			position = vec3F(
-				position.x - halfSize.x,
-				position.y + halfSize.y,
-				position.z);
-			break;
-		case RIGHT_BOTTOM_ALIGNMENT_TYPE:
-			position = vec3F(
-				position.x + halfSize.x,
-				position.y - halfSize.y,
-				position.z);
-			break;
-		case RIGHT_TOP_ALIGNMENT_TYPE:
-			position = vec3F(
-				position.x + halfSize.x,
-				position.y + halfSize.y,
-				position.z);
-			break;
-		}
-
-		setTransformPosition(
-			transform,
-			position);
-
-	CONTINUE:
-		continue;
-	}
-}
 void updateInterface(Interface interface)
 {
 	assert(interface);
@@ -309,14 +209,11 @@ void updateInterface(Interface interface)
 	Vec2F size = vec2F(
 		(cmmt_float_t)windowSize.x / interfaceScale,
 		(cmmt_float_t)windowSize.y / interfaceScale);
-	Vec2F halfSize = divValVec2F(size, (cmmt_float_t)2.0);
+	Vec2F halfSize = mulValVec2F(size, (cmmt_float_t)0.5);
 
 	Vec2F cursorPosition = vec2F(
 		(cursor.x / interfaceScale) - halfSize.x,
 		(size.y - (cursor.y / interfaceScale)) - halfSize.y);
-
-	bool isLeftButtonPressed = getWindowMouseButton(
-		window, LEFT_MOUSE_BUTTON);
 
 	InterfaceElement newElement = NULL;
 	float elementDistance = INFINITY;
@@ -334,7 +231,7 @@ void updateInterface(Interface interface)
 		while (parent)
 		{
 			if (!isTransformActive(parent))
-				goto CONTINUE;
+				goto CONTINUE_1;
 			parent = getTransformParent(parent);
 		}
 
@@ -376,51 +273,78 @@ void updateInterface(Interface interface)
 			newElement = element;
 		}
 
-	CONTINUE:
+	CONTINUE_1:
 		continue;
 	}
 
+	bool isLeftButtonPressed = getWindowMouseButton(
+		window, LEFT_MOUSE_BUTTON);
 	InterfaceElement lastElement = interface->lastElement;
+
+	bool isChanged;
+
+	if (isLeftButtonPressed)
+	{
+		if (!interface->isPressed)
+		{
+			isChanged = true;
+			interface->isPressed = true;
+		}
+		else
+		{
+			isChanged = false;
+		}
+	}
+	else
+	{
+		if (interface->isPressed)
+		{
+			isChanged = true;
+			interface->isPressed = false;
+		}
+		else
+		{
+			isChanged = false;
+		}
+	}
 
 	if (lastElement)
 	{
 		if (lastElement != newElement)
 		{
+			lastElement->isPressed = false;
+			interface->lastElement = newElement;
+
 			if (lastElement->events.onExit)
 				lastElement->events.onExit(lastElement);
-
-			lastElement->isPressed = false;
-
 			if (newElement && newElement->events.onEnter)
-			{
 				newElement->events.onEnter(newElement);
-			}
-
-			interface->lastElement = newElement;
 		}
 		else
 		{
 			if (isLeftButtonPressed)
 			{
-				if (lastElement->isPressed)
+				if (!lastElement->isPressed && isChanged)
+				{
+					lastElement->isPressed = true;
+
+					if (lastElement->events.onPress)
+						lastElement->events.onPress(lastElement);
+				}
+				else
 				{
 					if (lastElement->events.onStay)
 						lastElement->events.onStay(lastElement);
 				}
-				else
-				{
-					if (lastElement->events.onPress)
-						lastElement->events.onPress(lastElement);
-					lastElement->isPressed = true;
-				}
 			}
 			else
 			{
-				if (lastElement->isPressed)
+				if (lastElement->isPressed && isChanged)
 				{
+					lastElement->isPressed = false;
+
 					if (lastElement->events.onRelease)
 						lastElement->events.onRelease(lastElement);
-					lastElement->isPressed = false;
 				}
 				else
 				{
@@ -434,10 +358,107 @@ void updateInterface(Interface interface)
 	{
 		if (newElement)
 		{
+			interface->lastElement = newElement;
+
 			if (newElement->events.onEnter)
 				newElement->events.onEnter(newElement);
-			interface->lastElement = newElement;
 		}
+	}
+
+	for (size_t i = 0; i < elementCount; i++)
+	{
+		InterfaceElement element = elements[i];
+		Transform transform = element->transform;
+
+		if (!isTransformActive(transform))
+			continue;
+
+		Vec2F offset;
+		Transform parent = getTransformParent(transform);
+
+		if (parent)
+		{
+			Vec3F scale = getTransformScale(parent);
+			offset.x = scale.x * (cmmt_float_t)0.5;
+			offset.y = scale.y * (cmmt_float_t)0.5;
+		}
+		else
+		{
+			offset = halfSize;
+		}
+
+		while (parent)
+		{
+			if (!isTransformActive(parent))
+				goto CONTINUE_2;
+			parent = getTransformParent(parent);
+		}
+
+		AlignmentType alignment = element->alignment;
+		Vec3F position = element->position;
+
+		switch (alignment)
+		{
+		default:
+			abort();
+		case CENTER_ALIGNMENT_TYPE:
+			break;
+		case LEFT_ALIGNMENT_TYPE:
+			position = vec3F(
+				position.x - offset.x,
+				position.y,
+				position.z);
+			break;
+		case RIGHT_ALIGNMENT_TYPE:
+			position = vec3F(
+				position.x + offset.x,
+				position.y,
+				position.z);
+			break;
+		case BOTTOM_ALIGNMENT_TYPE:
+			position = vec3F(
+				position.x,
+				position.y - offset.y,
+				position.z);
+			break;
+		case TOP_ALIGNMENT_TYPE:
+			position = vec3F(
+				position.x,
+				position.y + offset.y,
+				position.z);
+			break;
+		case LEFT_BOTTOM_ALIGNMENT_TYPE:
+			position = vec3F(
+				position.x - offset.x,
+				position.y - offset.y,
+				position.z);
+			break;
+		case LEFT_TOP_ALIGNMENT_TYPE:
+			position = vec3F(
+				position.x - offset.x,
+				position.y + offset.y,
+				position.z);
+			break;
+		case RIGHT_BOTTOM_ALIGNMENT_TYPE:
+			position = vec3F(
+				position.x + offset.x,
+				position.y - offset.y,
+				position.z);
+			break;
+		case RIGHT_TOP_ALIGNMENT_TYPE:
+			position = vec3F(
+				position.x + offset.x,
+				position.y + offset.y,
+				position.z);
+			break;
+		}
+
+		setTransformPosition(
+			transform,
+			position);
+
+	CONTINUE_2:
+		continue;
 	}
 }
 
