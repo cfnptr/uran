@@ -15,6 +15,7 @@
 #pragma once
 #include "uran/defines.h"
 #include "uran/transformer.h"
+#include "uran/user_interface.h"
 
 #include "logy/logger.h"
 #include "mpgx/window.h"
@@ -33,13 +34,13 @@ typedef Editor_T* Editor;
  * Returns editor instance on success, otherwise NULL.
  *
  * logger - logger instance.
- * transformer - transformer instance.
+ * threadPool - thread pool instance.
  * onUpdate - on window update function.
  * updateArgument - update function argument.
  */
 Editor createEditor(
 	Logger logger,
-	Transformer transformer,
+	ThreadPool threadPool,
 	OnWindowUpdate onUpdate,
 	void* updateArgument);
 /*
@@ -48,6 +49,11 @@ Editor createEditor(
  */
 void destroyEditor(Editor editor);
 
+/*
+ * Returns editor transformer.
+ * editor - editor instance.
+ */
+Transformer getEditorTransformer(Editor editor);
 /*
  * Returns editor window.
  * editor - editor instance.

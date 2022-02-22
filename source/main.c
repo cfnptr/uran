@@ -23,15 +23,13 @@
 #define MAIN_FUNCTION int APIENTRY WinMain(                          \
 	HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow)
 #else
-#define MAIN_FUNCTION int main()
+#define MAIN_FUNCTION int main(int argc, char *argv[])
 #endif
 #else
-#define MAIN_FUNCTION int main()
+#define MAIN_FUNCTION int main(int argc, char *argv[])
 #endif
 
 #define LOG_FILE_PATH "log.txt"
-
-// TODO: remove from MPGX mpio and stb, and move shader/image reading here
 
 static void onUpdate(void* argument)
 {
@@ -84,32 +82,21 @@ MAIN_FUNCTION
 #error Unknown operating system
 #endif
 
+	logMessage(logger, INFO_LOG_LEVEL,
+		"CPU: %s.", getCpuName());
+
 	int cpuCount = getCpuCount();
 
 	logMessage(logger, INFO_LOG_LEVEL,
 		"CPU count: %d.", cpuCount);
 
 	ThreadPool threadPool = createThreadPool(
-		cpuCount,
-		cpuCount);
+		cpuCount, cpuCount);
 
 	if (!threadPool)
 	{
 		logMessage(logger, FATAL_LOG_LEVEL,
 			"Failed to create thread pool.");
-		destroyLogger(logger);
-		return EXIT_FAILURE;
-	}
-
-	Transformer transformer = createTransformer(
-		MPGX_DEFAULT_CAPACITY,
-		threadPool);
-
-	if (!transformer)
-	{
-		logMessage(logger, FATAL_LOG_LEVEL,
-			"Failed to create transformer.");
-		destroyThreadPool(threadPool);
 		destroyLogger(logger);
 		return EXIT_FAILURE;
 	}
@@ -120,7 +107,7 @@ MAIN_FUNCTION
 #ifndef NDEBUG
 	editor = createEditor(
 		logger,
-		transformer,
+		threadPool,
 		onUpdate,
 		&program);
 
@@ -128,7 +115,6 @@ MAIN_FUNCTION
 	{
 		logMessage(logger, FATAL_LOG_LEVEL,
 			"Failed to create editor.");
-		destroyTransformer(transformer);
 		destroyThreadPool(threadPool);
 		destroyLogger(logger);
 		return EXIT_FAILURE;
@@ -140,7 +126,6 @@ MAIN_FUNCTION
 	program = createProgram(
 		logger,
 		threadPool,
-		transformer,
 		editor);
 
 	if (!program)
@@ -148,7 +133,6 @@ MAIN_FUNCTION
 		logMessage(logger, FATAL_LOG_LEVEL,
 			"Failed to create program.");
 		destroyEditor(editor);
-		destroyTransformer(transformer);
 		destroyThreadPool(threadPool);
 		destroyLogger(logger);
 		return EXIT_FAILURE;
@@ -157,9 +141,11 @@ MAIN_FUNCTION
 	Window window = getProgramWindow(program);
 
 	logMessage(logger, INFO_LOG_LEVEL,
-		"Graphics API: %s.", graphicsApiToString(getGraphicsAPI()));
+		"Graphics API: %s.",
+		graphicsApiToString(getGraphicsAPI()));
 	logMessage(logger, INFO_LOG_LEVEL,
-		"GPU: %s.", getWindowGpuName(window));
+		"GPU: %s.",
+		getWindowGpuName(window));
 
 	showWindow(window);
 	joinWindow(window);
@@ -168,7 +154,6 @@ MAIN_FUNCTION
 #ifndef NDEBUG
 	destroyEditor(editor);
 #endif
-	destroyTransformer(transformer);
 	destroyThreadPool(threadPool);
 	destroyLogger(logger);
 	return EXIT_SUCCESS;

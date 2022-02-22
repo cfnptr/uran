@@ -44,12 +44,12 @@ ImageData createImageData(
  * Create a new image data instance from the WebP file.
  * Returns image data instance on success, otherwise NULL.
  *
- * filePath - WebP image file path.
+ * path - WebP image data file path string.
  * format - image data format.
  * logger - logger instance or NULL.
  */
 ImageData createImageDataFromFile(
-	const char* filePath,
+	const char* path,
 	ImageFormat format,
 	Logger logger);
 /*
@@ -57,7 +57,7 @@ ImageData createImageDataFromFile(
  * Returns image data instance on success, otherwise NULL.
  *
  * packReader - pack reader instance.
- * path - WebP image data item path.
+ * path - WebP image data item path string.
  * format - image data format.
  * logger - logger instance or NULL.
  */
@@ -112,7 +112,7 @@ Image createImageFromData(
  * Create a new image instance from the WebP data file.
  * Returns image instance on success, otherwise NULL.
  *
- * filePath - WebP image file path.
+ * path - WebP image file path string.
  * window - window instance.
  * type - image type.
  * format - image data format.
@@ -120,7 +120,7 @@ Image createImageFromData(
  * logger - logger instance or NULL.
  */
 Image createImageFromFile(
-	const char* filePath,
+	const char* path,
 	Window window,
 	ImageType type,
 	ImageFormat format,
@@ -131,7 +131,7 @@ Image createImageFromFile(
  * Returns image instance on success, otherwise NULL.
  *
  * packReader - pack reader instance.
- * path - WebP image data item path.
+ * path - WebP imag item path string.
  * window - window instance.
  * type - image type.
  * format - image data format.

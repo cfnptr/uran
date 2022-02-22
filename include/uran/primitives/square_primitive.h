@@ -70,13 +70,31 @@ static const float squareVerticesNormalsCoords3D[] = {
 	1.0f, -1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f,
 };
 /*
+ * One size 2D square vertices. (float)
+ */
+static const float oneSquareVertices2D[] = {
+	-0.5f, -0.5f,
+	-0.5f, 0.5f,
+	0.5f, 0.5f,
+	0.5f, -0.5f,
+};
+/*
+ * One size 2D square vertices, texture coordinates. (float)
+ */
+static const float oneSquareVerticesCoords2D[] = {
+	-0.5f, -0.5f, 0.0f, 0.0f,
+	-0.5f, 0.5f, 0.0f, 1.0f,
+	0.5f, 0.5f, 1.0f, 1.0f,
+	0.5f, -0.5f, 1.0f, 0.0f,
+};
+/*
  * Triangle square indices. (uint16)
  */
 static const uint16_t triangleSquareIndices[] = {
 	0, 1, 2, 0, 2, 3,
 };
 /*
- * Triangle square indices. (uint16)
+ * Line square indices. (uint16)
  */
 static const uint16_t lineSquareIndices[] = {
 	0, 1, 1, 2, 2, 3, 3, 0,

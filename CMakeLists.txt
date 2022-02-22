@@ -60,7 +60,6 @@ add_subdirectory(libraries/logy)
 add_subdirectory(libraries/mpgx)
 
 set(PACK_BUILD_SHARED OFF CACHE BOOL "" FORCE)
-set(PACK_BUILD_UTILITIES OFF CACHE BOOL "" FORCE)
 add_subdirectory(libraries/pack)
 
 set(URAN_SOURCES
@@ -91,7 +90,8 @@ set(URAN_SOURCES
 	source/interface.c
 	source/shader_data.c
 	source/text.c
-	source/transformer.c)
+	source/transformer.c
+	source/user_interface.c)
 
 set(URAN_LINK_LIBRARIES
 	conf-static
@@ -101,9 +101,7 @@ set(URAN_LINK_LIBRARIES
 	mpgx-static
 	pack-static)
 
-configure_file(
-	cmake/defines.h.in
-	uran/defines.h)
+configure_file(cmake/defines.h.in uran/defines.h)
 
 add_library(uran-static STATIC
 	${URAN_SOURCES})

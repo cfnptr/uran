@@ -30,18 +30,18 @@ typedef ShaderData_T* ShaderData;
  * Create a new shader data instance from the file.
  * Returns shader data instance on success, otherwise NULL.
  *
- * filePath - shader data file path.
+ * path - shader data file path string.
  * logger - logger instance or NULL.
  */
 ShaderData createShaderDataFromFile(
-	const char* filePath,
+	const char* path,
 	Logger logger);
 /*
  * Create a new shader data instance from the pack data.
  * Returns shader data instance on success, otherwise NULL.
  *
  * packReader - pack reader instance.
- * path - shader data item path.
+ * path - shader data item path string.
  * logger - logger instance or NULL.
  */
 ShaderData createShaderDataFromPack(
@@ -69,13 +69,13 @@ size_t getShaderDataSize(ShaderData shaderData);
  * Create a new shader instance from the code file.
  * Returns shader instance on success, otherwise NULL.
  *
- * filePath - shader file path.
+ * path - shader file path string.
  * window - window instance.
  * type - shader type.
  * logger - logger instance or NULL.
  */
 Shader createShaderFromFile(
-	const char* filePath,
+	const char* path,
 	Window window,
 	ShaderType type,
 	Logger logger);
@@ -84,7 +84,7 @@ Shader createShaderFromFile(
  * Returns shader instance on success, otherwise NULL.
  *
  * packReader - pack reader instance.
- * path - shader data item path.
+ * path - shader item path string.
  * window - window instance.
  * type - shader type.
  * logger - logger instance or NULL.

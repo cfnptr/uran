@@ -656,9 +656,7 @@ inline static MpgxResult createGlPipeline(
 
 	if (!result)
 	{
-		destroyGraphicsPipeline(
-			graphicsPipelineInstance,
-			false);
+		destroyGraphicsPipeline(graphicsPipelineInstance);
 		return BAD_SHADER_CODE_MPGX_RESULT;
 	}
 

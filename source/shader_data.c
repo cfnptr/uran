@@ -23,23 +23,24 @@ struct ShaderData_T
 };
 
 inline static bool getShaderDataFromFile(
-	const char* filePath,
+	const char* path,
 	Logger logger,
 	uint8_t** code,
 	size_t* size)
 {
-	assert(filePath);
+	assert(path);
 	assert(code);
 	assert(size);
 
-	FILE* file = openFile(filePath, "rb");
+	FILE* file = openFile(path, "rb");
 
 	if (!file)
 	{
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to open shader data file.");
+				"Failed to open shader data file. "
+				"(path: %s)", path);
 		}
 		return false;
 	}
@@ -51,7 +52,8 @@ inline static bool getShaderDataFromFile(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to seek shader data file.");
+				"Failed to seek shader data file. "
+				"(path: %s)", path);
 		}
 		closeFile(file);
 		return false;
@@ -64,7 +66,8 @@ inline static bool getShaderDataFromFile(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to tell shader data file.");
+				"Failed to tell shader data file. "
+				"(path: %s)", path);
 		}
 		closeFile(file);
 		return false;
@@ -77,7 +80,8 @@ inline static bool getShaderDataFromFile(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to seek shader data file.");
+				"Failed to seek shader data file."
+				"(path: %s)", path);
 		}
 		closeFile(file);
 		return false;
@@ -134,7 +138,8 @@ inline static bool getShaderDataFromFile(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to read shader data file.");
+				"Failed to read shader data file."
+				"(path: %s)", path);
 		}
 		return false;
 	}
@@ -144,10 +149,10 @@ inline static bool getShaderDataFromFile(
 	return true;
 }
 ShaderData createShaderDataFromFile(
-	const char* filePath,
+	const char* path,
 	Logger logger)
 {
-	assert(filePath);
+	assert(path);
 
 	ShaderData shaderData = calloc(1,
 		sizeof(ShaderData_T));
@@ -159,7 +164,7 @@ ShaderData createShaderDataFromFile(
 	size_t size;
 
 	bool result = getShaderDataFromFile(
-		filePath,
+		path,
 		logger,
 		&code,
 		&size);
@@ -202,8 +207,9 @@ ShaderData createShaderDataFromPack(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to read pack shader data. (error: %s)",
-				packResultToString(packResult));
+				"Failed to read pack shader data. "
+				"(error: %s, path: %s)",
+				packResultToString(packResult), path);
 		}
 		return NULL;
 	}
@@ -267,12 +273,12 @@ size_t getShaderDataSize(ShaderData shaderData)
 }
 
 Shader createShaderFromFile(
-	const char* filePath,
+	const char* path,
 	Window window,
 	ShaderType type,
 	Logger logger)
 {
-	assert(filePath);
+	assert(path);
 	assert(window);
 	assert(type < SHADER_TYPE_COUNT);
 
@@ -280,7 +286,7 @@ Shader createShaderFromFile(
 	size_t size;
 
 	bool result = getShaderDataFromFile(
-		filePath,
+		path,
 		logger,
 		&code,
 		&size);
@@ -304,8 +310,9 @@ Shader createShaderFromFile(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to create shader from file data. (error %s)",
-				mpgxResultToString(mpgxResult));
+				"Failed to create shader from file. "
+				"(error: %s, path: %s)",
+				mpgxResultToString(mpgxResult), path);
 		}
 		return NULL;
 	}
@@ -338,8 +345,9 @@ Shader createShaderFromPack(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to read pack shader data. (error: %s)",
-				packResultToString(packResult));
+				"Failed to read pack shader data. "
+				"(error: %s, path: %s)",
+				packResultToString(packResult), path);
 		}
 		return NULL;
 	}
@@ -358,8 +366,9 @@ Shader createShaderFromPack(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to create shader from pack data. (error %s)",
-				mpgxResultToString(mpgxResult));
+				"Failed to create shader from pack. "
+				"(error: %s, path: %s)",
+				mpgxResultToString(mpgxResult), path);
 		}
 		return NULL;
 	}

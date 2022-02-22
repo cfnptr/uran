@@ -14,30 +14,53 @@
 
 #pragma once
 #include "mpgx/window.h"
+#include "pack/reader.h"
+#include "logy/logger.h"
 #include "cmmt/color.h"
 
 #define SPRITE_PIPELINE_NAME "Sprite"
 
-MpgxResult createSpritePipelineExt(
+/*
+ * Create a new sprite pipeline instance.
+ * Returns operation MPGX result.
+ *
+ * framebuffer - framebuffer instance.
+ * vertexShader - sprite vertex shader instance.
+ * fragmentShader - sprite fragment shader instance.
+ * state - sprite pipeline state or NULL.
+ * spritePipeline - pointer to the sprite pipeline.
+ */
+MpgxResult createSpritePipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
 	const GraphicsPipelineState* state,
 	GraphicsPipeline* spritePipeline);
-MpgxResult createSpritePipeline(
-	Framebuffer framebuffer,
-	Shader vertexShader,
-	Shader fragmentShader,
-	GraphicsPipeline* spritePipeline);
 
+/*
+ * Returns sprite pipeline MVP matrix.
+ * spritePipeline - sprite pipeline instance.
+ */
 Mat4F getSpritePipelineMvp(
 	GraphicsPipeline spritePipeline);
+/*
+ * Sets sprite pipeline MVP matrix.
+ * spritePipeline - sprite pipeline instance.
+ */
 void setSpritePipelineMvp(
 	GraphicsPipeline spritePipeline,
 	Mat4F mvp);
 
+/*
+ * Returns sprite pipeline color.
+ * spritePipeline - sprite pipeline instance.
+ */
 LinearColor getSpritePipelineColor(
 	GraphicsPipeline spritePipeline);
+/*
+ * Sets sprite pipeline color.
+ * spritePipeline - sprite pipeline instance.
+ */
 void setSpritePipelineColor(
 	GraphicsPipeline spritePipeline,
 	LinearColor color);

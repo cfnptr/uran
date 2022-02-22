@@ -64,7 +64,6 @@ GraphicsRenderer createGraphicsRenderer(
 	assert(sorting < GRAPHICS_RENDER_SORTING_COUNT);
 	assert(onDestroy);
 	assert(onDraw);
-	assert(capacity > 0);
 
 	GraphicsRenderer graphicsRenderer = calloc(1,
 		sizeof(GraphicsRenderer_T));
@@ -84,6 +83,9 @@ GraphicsRenderer createGraphicsRenderer(
 #ifndef NDEBUG
 	graphicsRenderer->isEnumerating = false;
 #endif
+
+	if (capacity == 0)
+		capacity = MPGX_DEFAULT_CAPACITY;
 
 	GraphicsRender* renders = malloc(
 		sizeof(GraphicsRender) * capacity);
@@ -120,7 +122,6 @@ GraphicsRenderer createDefaultGraphicsRenderer(
 	assert(pipeline);
 	assert(onDestroy);
 	assert(onDraw);
-	assert(capacity > 0);
 
 	return createGraphicsRenderer(
 		pipeline,
@@ -298,151 +299,6 @@ static int descendingRenderCompare(
 		data->renderPosition);
 
 	return distanceA < distanceB ? 1 : -1;
-}
-
-void createGraphicsRenderData(
-	Mat4F view,
-	Camera camera,
-	GraphicsRendererData* data,
-	bool createPlanes)
-{
-	assert(data);
-
-	GraphicsAPI api = getGraphicsAPI();
-
-	Mat4F proj;
-	Mat4F viewProj;
-
-	if (camera.persp.type == PERSP_CAMERA_TYPE)
-	{
-		if (api == VULKAN_GRAPHICS_API)
-		{
-			proj = perspZeroOneMat4F(
-				camera.persp.fieldOfView,
-				camera.persp.aspectRatio,
-				camera.persp.nearClipPlane,
-				camera.persp.farClipPlane);
-			viewProj = dotMat4F(
-				proj, view);
-
-			if (createPlanes)
-			{
-				frustumZeroOneMat4F(
-					viewProj,
-					&data->leftPlane,
-					&data->rightPlane,
-					&data->bottomPlane,
-					&data->topPlane,
-					&data->backPlane,
-					&data->frontPlane,
-					false);
-			}
-		}
-		else if (api == OPENGL_GRAPHICS_API ||
-			api == OPENGL_ES_GRAPHICS_API)
-		{
-			proj = perspNegOneMat4F(
-				camera.persp.fieldOfView,
-				camera.persp.aspectRatio,
-				camera.persp.nearClipPlane,
-				camera.persp.farClipPlane);
-			viewProj = dotMat4F(
-				proj, view);
-
-			if (createPlanes)
-			{
-				frustumNegOneMat4F(
-					viewProj,
-					&data->leftPlane,
-					&data->rightPlane,
-					&data->bottomPlane,
-					&data->topPlane,
-					&data->backPlane,
-					&data->frontPlane,
-					false);
-			}
-		}
-		else
-		{
-			abort();
-		}
-	}
-	else if (camera.ortho.type == ORTHO_CAMERA_TYPE)
-	{
-		if (api == VULKAN_GRAPHICS_API)
-		{
-			proj = orthoZeroOneMat4F(
-				camera.ortho.leftFrustum,
-				camera.ortho.rightFrustum,
-				camera.ortho.bottomFrustum,
-				camera.ortho.topFrustum,
-				camera.ortho.nearClipPlane,
-				camera.ortho.farClipPlane);
-			viewProj = dotMat4F(
-				proj, view);
-
-			if (createPlanes)
-			{
-				frustumZeroOneMat4F(
-					viewProj,
-					&data->leftPlane,
-					&data->rightPlane,
-					&data->bottomPlane,
-					&data->topPlane,
-					&data->backPlane,
-					&data->frontPlane,
-					false);
-			}
-		}
-		else if (api == OPENGL_GRAPHICS_API ||
-			api == OPENGL_ES_GRAPHICS_API)
-		{
-			proj = orthoNegOneMat4F(
-				camera.ortho.leftFrustum,
-				camera.ortho.rightFrustum,
-				camera.ortho.bottomFrustum,
-				camera.ortho.topFrustum,
-				camera.ortho.nearClipPlane,
-				camera.ortho.farClipPlane);
-			viewProj = dotMat4F(
-				proj, view);
-
-			if (createPlanes)
-			{
-				frustumNegOneMat4F(
-					viewProj,
-					&data->leftPlane,
-					&data->rightPlane,
-					&data->bottomPlane,
-					&data->topPlane,
-					&data->backPlane,
-					&data->frontPlane,
-					false);
-			}
-		}
-		else
-		{
-			abort();
-		}
-	}
-	else
-	{
-		abort();
-	}
-
-	data->view = view;
-	data->proj = proj;
-	data->viewProj = viewProj;
-
-	if (!createPlanes)
-	{
-		data->leftPlane = plane3F(zeroVec3F, 0.0f);
-		data->rightPlane = plane3F(zeroVec3F, 0.0f);
-		data->bottomPlane = plane3F(zeroVec3F, 0.0f);
-		data->topPlane = plane3F(zeroVec3F, 0.0f);
-		data->backPlane = plane3F(zeroVec3F, 0.0f);
-		data->frontPlane = plane3F(zeroVec3F, 0.0f);
-	}
 }
 
 inline static bool isShouldDraw(
@@ -765,9 +621,7 @@ GraphicsRender createGraphicsRender(
 	renderer->renderCount = count + 1;
 	return graphicsRender;
 }
-void destroyGraphicsRender(
-	GraphicsRender render,
-	bool _destroyTransform)
+void destroyGraphicsRender(GraphicsRender render)
 {
 	if (!render)
 		return;
@@ -787,9 +641,6 @@ void destroyGraphicsRender(
 			renders[j - 1] = renders[j];
 
 		renderer->onDestroy(render->handle);
-
-		if (_destroyTransform)
-			destroyTransform(render->transform);
 
 		free(render);
 		renderer->renderCount--;

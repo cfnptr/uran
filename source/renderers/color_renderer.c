@@ -64,7 +64,6 @@ GraphicsRenderer createColorRenderer(
 {
 	assert(colorPipeline);
 	assert(sorting < GRAPHICS_RENDER_SORTING_COUNT);
-	assert(capacity > 0);
 
 	assert(strcmp(getGraphicsPipelineName(
 		colorPipeline),

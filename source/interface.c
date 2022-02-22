@@ -61,7 +61,6 @@ Interface createInterface(
 {
 	assert(window);
 	assert(scale > 0.0f);
-	assert(capacity > 0);
 
 	Interface interface = calloc(1,
 		sizeof(Interface_T));
@@ -74,6 +73,9 @@ Interface createInterface(
 #ifndef NDEBUG
 	interface->isEnumerating = false;
 #endif
+
+	if (capacity == 0)
+		capacity = MPGX_DEFAULT_CAPACITY;
 
 	InterfaceElement* elements = malloc(
 		sizeof(InterfaceElement) * capacity);
@@ -175,15 +177,15 @@ Camera createInterfaceCamera(
 	float scale = interface->scale;
 
 	Vec2F halfSize = vec2F(
-		((float)windowSize.x / scale) * 0.5f,
-		((float)windowSize.y / scale) * 0.5f);
+		((cmmt_float_t)windowSize.x / scale) * (cmmt_float_t)0.5,
+		((cmmt_float_t)windowSize.y / scale) * (cmmt_float_t)0.5);
 
 	return orthoCamera(
 		-halfSize.x,
 		halfSize.x,
 		-halfSize.y,
 		halfSize.y,
-		0.0f,
+		-1.0f,
 		1.0f);
 }
 
@@ -202,8 +204,8 @@ void preUpdateInterface(Interface interface)
 	float scale = interface->scale;
 
 	Vec2F halfSize = vec2F(
-		((float)windowSize.x / scale) * 0.5f,
-		((float)windowSize.y / scale) * 0.5f);
+		((cmmt_float_t)windowSize.x / scale) * (cmmt_float_t)0.5,
+		((cmmt_float_t)windowSize.y / scale) * (cmmt_float_t)0.5);
 
 	for (size_t i = 0; i < elementCount; i++)
 	{
@@ -305,9 +307,9 @@ void updateInterface(Interface interface)
 	Vec2F cursor = getWindowCursorPosition(window);
 
 	Vec2F size = vec2F(
-		(float)windowSize.x / interfaceScale,
-		(float)windowSize.y / interfaceScale);
-	Vec2F halfSize = divValVec2F(size, 2.0f);
+		(cmmt_float_t)windowSize.x / interfaceScale,
+		(cmmt_float_t)windowSize.y / interfaceScale);
+	Vec2F halfSize = divValVec2F(size, (cmmt_float_t)2.0);
 
 	Vec2F cursorPosition = vec2F(
 		(cursor.x / interfaceScale) - halfSize.x,
@@ -324,7 +326,7 @@ void updateInterface(Interface interface)
 		InterfaceElement element = elements[i];
 		Transform transform = element->transform;
 
-		if (!element->isEnabled || !isTransformActive(transform))
+		if (!element->isEnabled | !isTransformActive(transform))
 			continue;
 
 		Transform parent = getTransformParent(transform);
@@ -524,9 +526,7 @@ InterfaceElement createDefaultInterfaceElement(
 		events,
 		handle);
 }
-void destroyInterfaceElement(
-	InterfaceElement element,
-	bool _destroyTransform)
+void destroyInterfaceElement(InterfaceElement element)
 {
 	if (!element)
 		return;
@@ -546,9 +546,6 @@ void destroyInterfaceElement(
 			elements[j - 1] = elements[j];
 
 		element->onDestroy(element->handle);
-
-		if (_destroyTransform)
-			destroyTransform(element->transform);
 
 		free(element);
 		interface->elementCount--;

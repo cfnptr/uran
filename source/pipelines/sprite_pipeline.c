@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "uran/pipelines/sprite_pipeline.h"
+#include "uran/shader_data.h"
+
 #include "mpgx/_source/window.h"
 #include "mpgx/_source/graphics_pipeline.h"
 
@@ -160,6 +162,7 @@ static void onVkDestroy(void* handle)
 }
 inline static MpgxResult createVkPipeline(
 	Framebuffer framebuffer,
+	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
 	Shader* shaders,
@@ -186,7 +189,7 @@ inline static MpgxResult createVkPipeline(
 
 	MpgxResult mpgxResult = createGraphicsPipeline(
 		framebuffer,
-		SPRITE_PIPELINE_NAME,
+		name,
 		state,
 		NULL,
 		onVkUniformsSet,
@@ -268,6 +271,7 @@ static void onGlDestroy(void* handle)
 }
 inline static MpgxResult createGlPipeline(
 	Framebuffer framebuffer,
+	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
 	Shader* shaders,
@@ -285,7 +289,7 @@ inline static MpgxResult createGlPipeline(
 
 	MpgxResult mpgxResult = createGraphicsPipeline(
 		framebuffer,
-		SPRITE_PIPELINE_NAME,
+		name,
 		state,
 		NULL,
 		onGlUniformsSet,
@@ -318,9 +322,7 @@ inline static MpgxResult createGlPipeline(
 
 	if (!result)
 	{
-		destroyGraphicsPipeline(
-			graphicsPipelineInstance,
-			false);
+		destroyGraphicsPipeline(graphicsPipelineInstance);
 		return BAD_SHADER_CODE_MPGX_RESULT;
 	}
 
@@ -334,7 +336,7 @@ inline static MpgxResult createGlPipeline(
 }
 #endif
 
-MpgxResult createSpritePipelineExt(
+MpgxResult createSpritePipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
@@ -344,7 +346,6 @@ MpgxResult createSpritePipelineExt(
 	assert(framebuffer);
 	assert(vertexShader);
 	assert(fragmentShader);
-	assert(state);
 	assert(spritePipeline);
 	assert(vertexShader->base.type == VERTEX_SHADER_TYPE);
 	assert(fragmentShader->base.type == FRAGMENT_SHADER_TYPE);
@@ -361,57 +362,11 @@ MpgxResult createSpritePipelineExt(
 	handle->base.vpc.mvp = identMat4F;
 	handle->base.fpc.color = whiteLinearColor;
 
-	Shader shaders[2] = {
-		vertexShader,
-		fragmentShader,
-	};
-
-	GraphicsAPI api = getGraphicsAPI();
-
-	if (api == VULKAN_GRAPHICS_API)
-	{
-#if MPGX_SUPPORT_VULKAN
-		return createVkPipeline(
-			framebuffer,
-			state,
-			handle,
-			shaders,
-			2,
-			spritePipeline);
+#ifndef NDEBUG
+	const char* name = SPRITE_PIPELINE_NAME;
 #else
-		abort();
+	const char* name = NULL;
 #endif
-	}
-	else if (api == OPENGL_GRAPHICS_API ||
-		api == OPENGL_ES_GRAPHICS_API)
-	{
-#if MPGX_SUPPORT_OPENGL
-		return createGlPipeline(
-			framebuffer,
-			state,
-			handle,
-			shaders,
-			2,
-			spritePipeline);
-#else
-		abort();
-#endif
-	}
-	else
-	{
-		abort();
-	}
-}
-MpgxResult createSpritePipeline(
-	Framebuffer framebuffer,
-	Shader vertexShader,
-	Shader fragmentShader,
-	GraphicsPipeline* spritePipeline)
-{
-	assert(framebuffer);
-	assert(vertexShader);
-	assert(fragmentShader);
-	assert(spritePipeline);
 
 	Vec2I framebufferSize =
 		framebuffer->base.size;
@@ -419,7 +374,7 @@ MpgxResult createSpritePipeline(
 		framebufferSize.x,
 		framebufferSize.y);
 
-	GraphicsPipelineState state = {
+	GraphicsPipelineState defaultState = {
 		TRIANGLE_LIST_DRAW_MODE,
 		FILL_POLYGON_MODE,
 		BACK_CULL_MODE,
@@ -448,12 +403,48 @@ MpgxResult createSpritePipeline(
 		defaultBlendColor,
 	};
 
-	return createSpritePipelineExt(
-		framebuffer,
+	Shader shaders[2] = {
 		vertexShader,
 		fragmentShader,
-		&state,
-		spritePipeline);
+	};
+
+	GraphicsAPI api = getGraphicsAPI();
+
+	if (api == VULKAN_GRAPHICS_API)
+	{
+#if MPGX_SUPPORT_VULKAN
+		return createVkPipeline(
+			framebuffer,
+			name,
+			state ? state : &defaultState,
+			handle,
+			shaders,
+			2,
+			spritePipeline);
+#else
+		abort();
+#endif
+	}
+	else if (api == OPENGL_GRAPHICS_API ||
+		api == OPENGL_ES_GRAPHICS_API)
+	{
+#if MPGX_SUPPORT_OPENGL
+		return createGlPipeline(
+			framebuffer,
+			name,
+			state ? state : &defaultState,
+			handle,
+			shaders,
+			2,
+			spritePipeline);
+#else
+		abort();
+#endif
+	}
+	else
+	{
+		abort();
+	}
 }
 
 Mat4F getSpritePipelineMvp(

@@ -75,7 +75,7 @@ typedef struct InterfaceElementEvents
  *
  * window - window instance.
  * scale - interface scale multiplier.
- * capacity - initial interface element capacity.
+ * capacity - initial interface element capacity or 0.
  */
 Interface createInterface(
 	Window window,
@@ -198,9 +198,7 @@ InterfaceElement createDefaultInterfaceElement(
  * element - interface element instance or NULL.
  * destroyTransform - destroy also transform instance.
  */
-void destroyInterfaceElement(
-	InterfaceElement element,
-	bool destroyTransform);
+void destroyInterfaceElement(InterfaceElement element);
 
 /*
  * Returns interface element interface.

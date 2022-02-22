@@ -114,25 +114,26 @@ ImageData createImageData(
 	return imageData;
 }
 inline static bool getImageDataFromFile(
-	const char* filePath,
+	const char* path,
 	ImageFormat format,
 	Logger logger,
 	uint8_t** pixels,
 	Vec2I* imageSize)
 {
-	assert(filePath);
+	assert(path);
 	assert(format < IMAGE_FORMAT_COUNT);
 	assert(pixels);
 	assert(imageSize);
 
-	FILE* file = openFile(filePath, "rb");
+	FILE* file = openFile(path, "rb");
 
 	if (!file)
 	{
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to open WebP image data file.");
+				"Failed to open WebP image data file."
+				"(path: %s)", path);
 		}
 		return false;
 	}
@@ -144,7 +145,8 @@ inline static bool getImageDataFromFile(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to seek WebP image data file.");
+				"Failed to seek WebP image data file."
+				"(path: %s)", path);
 		}
 		closeFile(file);
 		return false;
@@ -157,7 +159,8 @@ inline static bool getImageDataFromFile(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to tell WebP image data file.");
+				"Failed to tell WebP image data file."
+				"(path: %s)", path);
 		}
 		closeFile(file);
 		return false;
@@ -170,7 +173,8 @@ inline static bool getImageDataFromFile(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to seek WebP image data file.");
+				"Failed to seek WebP image data file."
+				"(path: %s)", path);
 		}
 		closeFile(file);
 		return false;
@@ -197,7 +201,8 @@ inline static bool getImageDataFromFile(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to read WebP image data file.");
+				"Failed to read WebP image data file. "
+				"(path: %s)", path);
 		}
 		free(data);
 		return false;
@@ -215,11 +220,11 @@ inline static bool getImageDataFromFile(
 	return result;
 }
 ImageData createImageDataFromFile(
-	const char* filePath,
+	const char* path,
 	ImageFormat format,
 	Logger logger)
 {
-	assert(filePath);
+	assert(path);
 	assert(format < IMAGE_FORMAT_COUNT);
 
 	ImageData imageData = calloc(1,
@@ -234,7 +239,7 @@ ImageData createImageDataFromFile(
 	Vec2I imageSize;
 
 	bool result = getImageDataFromFile(
-		filePath,
+		path,
 		format,
 		logger,
 		&pixels,
@@ -278,8 +283,9 @@ inline static bool getImageDataFromPack(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to read pack WebP image data. (error: %s)",
-				packResultToString(packResult));
+				"Failed to read pack WebP image data. "
+				"(error: %s, path: %s)",
+				packResultToString(packResult), path);
 		}
 		return NULL;
 	}
@@ -404,7 +410,7 @@ Image createImageFromData(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to create image from WebP data. (error %s)",
+				"Failed to create image from WebP data. (error: %s)",
 				mpgxResultToString(mpgxResult));
 		}
 		return NULL;
@@ -413,14 +419,14 @@ Image createImageFromData(
 	return image;
 }
 Image createImageFromFile(
-	const char* filePath,
+	const char* path,
 	Window window,
 	ImageType type,
 	ImageFormat format,
 	bool isConstant,
 	Logger logger)
 {
-	assert(filePath);
+	assert(path);
 	assert(window);
 	assert(format < IMAGE_FORMAT_COUNT);
 
@@ -428,7 +434,7 @@ Image createImageFromFile(
 	Vec2I imageSize;
 
 	bool result = getImageDataFromFile(
-		filePath,
+		path,
 		format,
 		logger,
 		&pixels,
@@ -457,8 +463,9 @@ Image createImageFromFile(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to create image from WebP file data. (error %s)",
-				mpgxResultToString(mpgxResult));
+				"Failed to create image from WebP file. "
+				"(error: %s, path: %s)",
+				mpgxResultToString(mpgxResult), path);
 		}
 		return NULL;
 	}
@@ -513,8 +520,9 @@ Image createImageFromPack(
 		if (logger)
 		{
 			logMessage(logger, ERROR_LOG_LEVEL,
-				"Failed to create image from pack WebP data. (error %s)",
-				mpgxResultToString(mpgxResult));
+				"Failed to create image from pack WebP. "
+				"(error: %s, path: %s)",
+				mpgxResultToString(mpgxResult), path);
 		}
 		return NULL;
 	}

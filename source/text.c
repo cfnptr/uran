@@ -1405,7 +1405,8 @@ MpgxResult createText32(
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
 		{
-			destroyGraphicsMesh(mesh, true);
+			// TODO: destroy transform, add it to the text handle
+			destroyGraphicsMesh(mesh);
 			destroyImage(texture);
 			free(data);
 			free(text);
@@ -1429,7 +1430,8 @@ MpgxResult createText32(
 				device,
 				descriptorPool,
 				NULL);
-			destroyGraphicsMesh(mesh, true);
+			// TODO: destroy transform, add it to the text handle
+			destroyGraphicsMesh(mesh);
 			destroyImage(texture);
 			free(data);
 			free(text);
@@ -1484,7 +1486,8 @@ MpgxResult createText32(
 					NULL);
 			}
 #endif
-			destroyGraphicsMesh(textInstance->mesh, true);
+			// TODO: destroy transform, add it to the text handle
+			destroyGraphicsMesh(textInstance->mesh);
 			destroyImage(textInstance->texture);
 			free(textInstance->data);
 			free(textInstance);
@@ -1586,7 +1589,8 @@ void destroyText(Text text)
 				NULL);
 		}
 #endif
-		destroyGraphicsMesh(text->mesh, true);
+		// TODO: destroy transform, add it to the text handle
+		destroyGraphicsMesh(text->mesh);
 		destroyImage(text->texture);
 
 		free(text->data);
@@ -2397,7 +2401,8 @@ MpgxResult bakeText(
 
 			if (mpgxResult != SUCCESS_MPGX_RESULT)
 			{
-				destroyGraphicsMesh(mesh, true);
+				// TODO: destroy transform, add it to the text handle
+				destroyGraphicsMesh(mesh);
 				destroyImage(texture);
 				return mpgxResult;
 			}
@@ -2409,9 +2414,8 @@ MpgxResult bakeText(
 		}
 #endif
 
-		destroyGraphicsMesh(
-			text->mesh,
-			true);
+		// TODO: destroy transform, add it to the text handle
+		destroyGraphicsMesh(text->mesh);
 		destroyImage(text->texture);
 
 		text->texture = texture;
@@ -2943,9 +2947,7 @@ inline static MpgxResult createGlPipeline(
 
 	if (!result)
 	{
-		destroyGraphicsPipeline(
-			graphicsPipelineInstance,
-			false);
+		destroyGraphicsPipeline(graphicsPipelineInstance);
 		return BAD_SHADER_CODE_MPGX_RESULT;
 	}
 

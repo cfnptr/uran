@@ -16,12 +16,32 @@
 #include "uran/graphics_renderer.h"
 #include "uran/pipelines/sprite_pipeline.h"
 
+/*
+ * Create a new sprite renderer instance.
+ * Returns sprite renderer instance in success, otherwise NULL.
+ *
+ * spritePipeline - sprite pipeline instance.
+ * sorting - sprite render sorting type.
+ * useCulling - use frustum culling.
+ * capacity - initial render array capacity or 0.
+ * threadPool - thread pool instance or NULL.
+ */
 GraphicsRenderer createSpriteRenderer(
 	GraphicsPipeline spritePipeline,
 	GraphicsRenderSorting sorting,
 	bool useCulling,
 	size_t capacity,
 	ThreadPool threadPool);
+/*
+ * Create a new sprite render instance.
+ * Returns sprite render instance on success, otherwise NULL.
+ *
+ * spriteRenderer - sprite renderer instance.
+ * transform - transform instance.
+ * bounds - sprite render bounds.
+ * color - sprite render color.
+ * mesh - sprite render mesh.
+ */
 GraphicsRender createSpriteRender(
 	GraphicsRenderer spriteRenderer,
 	Transform transform,
@@ -29,14 +49,30 @@ GraphicsRender createSpriteRender(
 	LinearColor color,
 	GraphicsMesh mesh);
 
+/*
+ * Returns sprite render color.
+ * spriteRender - sprite render instance.
+ */
 LinearColor getSpriteRenderColor(
 	GraphicsRender spriteRender);
+/*
+ * Sets sprite render color.
+ * spriteRender - sprite render instance.
+ */
 void setSpriteRenderColor(
 	GraphicsRender spriteRender,
 	LinearColor color);
 
+/*
+ * Returns sprite render mesh.
+ * spriteRender - sprite render instance.
+ */
 GraphicsMesh getSpriteRenderMesh(
 	GraphicsRender spriteRender);
+/*
+ * Sets sprite render mesh.
+ * spriteRender - sprite render instance.
+ */
 void setSpriteRenderMesh(
 	GraphicsRender spriteRender,
 	GraphicsMesh mesh);

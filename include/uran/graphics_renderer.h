@@ -107,7 +107,7 @@ typedef void(*OnGraphicsRendererItem)(
  * useCulling - use frustum culling.
  * onDestroy - on graphics render destroy function.
  * onDraw - on graphics render draw function.
- * capacity - initial render array capacity.
+ * capacity - initial render array capacity or 0.
  * threadPool - thread pool instance or NULL.
  */
 GraphicsRenderer createGraphicsRenderer(
@@ -125,7 +125,7 @@ GraphicsRenderer createGraphicsRenderer(
  * pipeline - graphics pipeline instance.
  * onDestroy - on graphics render destroy function.
  * onDraw - on graphics render draw function.
- * capacity - initial render array capacity.
+ * capacity - initial render array capacity or 0.
  * threadPool - thread pool instance or NULL.
  */
 GraphicsRenderer createDefaultGraphicsRenderer(
@@ -214,19 +214,6 @@ void destroyAllGraphicsRendererRenders(
 	bool destroyTransforms);
 
 /*
- * Creates graphics renderer data.
- *
- * view - camera view matrix.
- * camera - camera value.
- * data - pointer to the renderer data.
- * createPlanes - create planes for frustum culling.
- */
-void createGraphicsRenderData(
-	Mat4F view,
-	Camera camera,
-	GraphicsRendererData* data,
-	bool createPlanes);
-/*
  * Draws graphics renderer renders.
  *
  * renderer - graphics renderer instance.
@@ -237,13 +224,13 @@ GraphicsRendererResult drawGraphicsRenderer(
 	const GraphicsRendererData* data);
 
 /*
- * Create  a new graphics render instance.
+ * Create a new graphics render instance.
  * Returns graphics render instance on success, otherwise NULL.
  *
  * renderer - graphics renderer instance.
  * transform - transform instance.
- * bounds - bounds value.
- * handle - handle or NULL.
+ * bounds - graphics render bounds.
+ * handle - graphics render handle.
  */
 GraphicsRender createGraphicsRender(
 	GraphicsRenderer renderer,
@@ -252,13 +239,9 @@ GraphicsRender createGraphicsRender(
 	void* handle);
 /*
  * Destroys graphics render instance.
- *
  * render - graphics render instance or NULL.
- * destroyTransform - destroy transform instance.
  */
-void destroyGraphicsRender(
-	GraphicsRender render,
-	bool destroyTransform);
+void destroyGraphicsRender(GraphicsRender render);
 
 /*
  * Returns graphics render handle.
@@ -291,6 +274,179 @@ Box3F getGraphicsRenderBounds(
 void setGraphicsRenderBounds(
 	GraphicsRender render,
 	Box3F bounds);
+
+/*
+ * Creates graphics renderer data.
+ *
+ * view - camera view matrix.
+ * camera - camera value.
+ * createPlanes - create planes for frustum culling.
+ */
+inline static GraphicsRendererData createGraphicsRenderData(
+	Mat4F view,
+	Camera camera,
+	bool createPlanes)
+{
+	GraphicsRendererData data;
+	GraphicsAPI api = getGraphicsAPI();
+
+	Mat4F proj;
+	Mat4F viewProj;
+
+	if (camera.persp.type == PERSP_CAMERA_TYPE)
+	{
+		if (api == VULKAN_GRAPHICS_API)
+		{
+			proj = perspZeroOneMat4F(
+				camera.persp.fieldOfView,
+				camera.persp.aspectRatio,
+				camera.persp.nearClipPlane,
+				camera.persp.farClipPlane);
+			viewProj = dotMat4F(proj, view);
+
+			if (createPlanes)
+			{
+				frustumZeroOneMat4F(
+					viewProj,
+					&data.leftPlane,
+					&data.rightPlane,
+					&data.bottomPlane,
+					&data.topPlane,
+					&data.backPlane,
+					&data.frontPlane,
+					false);
+			}
+			else
+			{
+				data.leftPlane = plane3F(zeroVec3F, 0.0f);
+				data.rightPlane = plane3F(zeroVec3F, 0.0f);
+				data.bottomPlane = plane3F(zeroVec3F, 0.0f);
+				data.topPlane = plane3F(zeroVec3F, 0.0f);
+				data.backPlane = plane3F(zeroVec3F, 0.0f);
+				data.frontPlane = plane3F(zeroVec3F, 0.0f);
+			}
+		}
+		else if (api == OPENGL_GRAPHICS_API ||
+			api == OPENGL_ES_GRAPHICS_API)
+		{
+			proj = perspNegOneMat4F(
+				camera.persp.fieldOfView,
+				camera.persp.aspectRatio,
+				camera.persp.nearClipPlane,
+				camera.persp.farClipPlane);
+			viewProj = dotMat4F(proj, view);
+
+			if (createPlanes)
+			{
+				frustumNegOneMat4F(
+					viewProj,
+					&data.leftPlane,
+					&data.rightPlane,
+					&data.bottomPlane,
+					&data.topPlane,
+					&data.backPlane,
+					&data.frontPlane,
+					false);
+			}
+			else
+			{
+				data.leftPlane = plane3F(zeroVec3F, 0.0f);
+				data.rightPlane = plane3F(zeroVec3F, 0.0f);
+				data.bottomPlane = plane3F(zeroVec3F, 0.0f);
+				data.topPlane = plane3F(zeroVec3F, 0.0f);
+				data.backPlane = plane3F(zeroVec3F, 0.0f);
+				data.frontPlane = plane3F(zeroVec3F, 0.0f);
+			}
+		}
+		else
+		{
+			abort();
+		}
+	}
+	else if (camera.ortho.type == ORTHO_CAMERA_TYPE)
+	{
+		if (api == VULKAN_GRAPHICS_API)
+		{
+			proj = orthoZeroOneMat4F(
+				camera.ortho.leftFrustum,
+				camera.ortho.rightFrustum,
+				camera.ortho.bottomFrustum,
+				camera.ortho.topFrustum,
+				camera.ortho.nearClipPlane,
+				camera.ortho.farClipPlane);
+			viewProj = dotMat4F(proj, view);
+
+			if (createPlanes)
+			{
+				frustumZeroOneMat4F(
+					viewProj,
+					&data.leftPlane,
+					&data.rightPlane,
+					&data.bottomPlane,
+					&data.topPlane,
+					&data.backPlane,
+					&data.frontPlane,
+					false);
+			}
+			else
+			{
+				data.leftPlane = plane3F(zeroVec3F, 0.0f);
+				data.rightPlane = plane3F(zeroVec3F, 0.0f);
+				data.bottomPlane = plane3F(zeroVec3F, 0.0f);
+				data.topPlane = plane3F(zeroVec3F, 0.0f);
+				data.backPlane = plane3F(zeroVec3F, 0.0f);
+				data.frontPlane = plane3F(zeroVec3F, 0.0f);
+			}
+		}
+		else if (api == OPENGL_GRAPHICS_API ||
+			api == OPENGL_ES_GRAPHICS_API)
+		{
+			proj = orthoNegOneMat4F(
+				camera.ortho.leftFrustum,
+				camera.ortho.rightFrustum,
+				camera.ortho.bottomFrustum,
+				camera.ortho.topFrustum,
+				camera.ortho.nearClipPlane,
+				camera.ortho.farClipPlane);
+			viewProj = dotMat4F(proj, view);
+
+			if (createPlanes)
+			{
+				frustumNegOneMat4F(
+					viewProj,
+					&data.leftPlane,
+					&data.rightPlane,
+					&data.bottomPlane,
+					&data.topPlane,
+					&data.backPlane,
+					&data.frontPlane,
+					false);
+			}
+			else
+			{
+				data.leftPlane = plane3F(zeroVec3F, 0.0f);
+				data.rightPlane = plane3F(zeroVec3F, 0.0f);
+				data.bottomPlane = plane3F(zeroVec3F, 0.0f);
+				data.topPlane = plane3F(zeroVec3F, 0.0f);
+				data.backPlane = plane3F(zeroVec3F, 0.0f);
+				data.frontPlane = plane3F(zeroVec3F, 0.0f);
+			}
+		}
+		else
+		{
+			abort();
+		}
+	}
+	else
+	{
+		abort();
+	}
+
+	data.view = view;
+	data.proj = proj;
+	data.viewProj = viewProj;
+	return data;
+}
 
 /*
  * Creates graphics renderer result.

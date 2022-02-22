@@ -26,7 +26,6 @@ typedef struct Program_T
 {
 	Logger logger;
 	ThreadPool threadPool;
-	Transformer transformer;
 #ifndef NDEBUG
 	Editor editor;
 #endif
@@ -40,17 +39,17 @@ typedef Program_T* Program;
  * Create a new program instance.
  * Return program instance on success, otherwise NULL.
  *
- * editor - editor instance. (or NULL in Release)
+ * logger - logger instance.
+ * threadPool - thread pool instance.
+ * editor - editor instance. (or NULL in release)
  */
 inline static Program createProgram(
 	Logger logger,
 	ThreadPool threadPool,
-	Transformer transformer,
 	Editor editor)
 {
 	assert(logger);
 	assert(threadPool);
-	assert(transformer);
 	assert(editor);
 
 	Program program = calloc(1, sizeof(Program_T));
@@ -60,7 +59,6 @@ inline static Program createProgram(
 
 	program->logger = logger;
 	program->threadPool = threadPool;
-	program->transformer = transformer;
 #ifndef NDEBUG
 	program->editor = editor;
 #endif
