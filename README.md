@@ -18,7 +18,7 @@ Work in Progress!
 * [CMake 3.10+](https://cmake.org/)
 * [Vulkan SDK 1.2+](https://vulkan.lunarg.com/)
 * [X11](https://www.x.org/) (Linux only)
-* [OpenSSL](https://openssl.org/)
+* [OpenSSL 1.1.1+](https://openssl.org/)
 
 ### X11 installation
 

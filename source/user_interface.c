@@ -15,14 +15,22 @@
 #include "uran/user_interface.h"
 #include "uran/primitives/square_primitive.h"
 
+#include <string.h>
+
 #if _WIN32
 #undef interface
 #endif
+
+#define UI_PANEL_NAME "Panel"
+#define UI_LABEL_NAME "Label"
+#define UI_WINDOW_NAME "Window"
+#define UI_BUTTON_NAME "Button"
 
 struct UserInterface_T
 {
 	Window window;
 	Transformer transformer;
+	FontAtlas fontAtlas;
 	Interface interface;
 	GraphicsMesh squareMesh;
 	GraphicsRenderer spriteRenderer;
@@ -31,30 +39,45 @@ struct UserInterface_T
 
 typedef struct UiPanelHandle_T
 {
-	Transform transform;
+	void* handle;
 	GraphicsRender render;
 } UiPanelHandle_T;
+typedef struct UiLabelHandle_T
+{
+	void* handle;
+	GraphicsRender render;
+} UiLabelHandle_T;
 typedef struct UiWindowHandle_T
 {
 	Window window;
-	Transform barTransform;
+	void* handle;
+	OnInterfaceElementEvent onUpdate;
+	OnInterfaceElementEvent onPress;
 	GraphicsRender barRender;
-	Transform panelTransform;
 	GraphicsRender panelRender;
+	GraphicsRender titleRender;
 	Vec2F lastCursorPosition;
 	bool isDragging;
 } UiWindowHandle_T;
 typedef struct UiButtonHandle_T
 {
+	void* handle;
+	OnInterfaceElementEvent onEnable;
+	OnInterfaceElementEvent onDisable;
+	OnInterfaceElementEvent onEnter;
+	OnInterfaceElementEvent onExit;
+	OnInterfaceElementEvent onPress;
+	OnInterfaceElementEvent onRelease;
 	LinearColor disabledColor;
 	LinearColor enabledColor;
 	LinearColor hoveredColor;
 	LinearColor pressedColor;
-	Transform transform;
-	GraphicsRender render;
+	GraphicsRender panelRender;
+	GraphicsRender textRender;
 } UiButtonHandle_T;
 
 typedef UiPanelHandle_T* UiPanelHandle;
+typedef UiLabelHandle_T* UiLabelHandle;
 typedef UiWindowHandle_T* UiWindowHandle;
 typedef UiButtonHandle_T* UiButtonHandle;
 
@@ -131,6 +154,8 @@ MpgxResult createUserInterface(
 	Transformer transformer,
 	GraphicsPipeline spritePipeline,
 	GraphicsPipeline textPipeline,
+	FontAtlas fontAtlas,
+	cmmt_float_t scale,
 	size_t capacity,
 	ThreadPool threadPool,
 	UserInterface* ui)
@@ -138,6 +163,8 @@ MpgxResult createUserInterface(
 	assert(transformer);
 	assert(spritePipeline);
 	assert(textPipeline);
+	assert(fontAtlas);
+	assert(scale > 0.0f);
 	assert(ui);
 
 	Window window = getGraphicsPipelineWindow(spritePipeline);
@@ -150,10 +177,11 @@ MpgxResult createUserInterface(
 
 	userInterface->window = window;
 	userInterface->transformer = transformer;
+	userInterface->fontAtlas = fontAtlas;
 
 	Interface interface = createInterface(
 		window,
-		1.0f,
+		scale,
 		capacity);
 
 	if (!interface)
@@ -178,7 +206,21 @@ MpgxResult createUserInterface(
 	}
 
 	userInterface->spriteRenderer = spriteRenderer;
-	userInterface->textRenderer = NULL; // TODO:
+
+	GraphicsRenderer textRenderer = createTextRenderer(
+		textPipeline,
+		DESCENDING_GRAPHICS_RENDER_SORTING,
+		false,
+		0,
+		threadPool);
+
+	if (!textRenderer)
+	{
+		destroyUserInterface(userInterface);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	userInterface->textRenderer = textRenderer;
 
 	GraphicsMesh squareMesh;
 
@@ -214,11 +256,6 @@ Transformer getUserInterfaceTransformer(UserInterface ui)
 	assert(ui);
 	return ui->transformer;
 }
-Interface getUserInterface(UserInterface ui)
-{
-	assert(ui);
-	return ui->interface;
-}
 GraphicsPipeline getUserInterfaceSpritePipeline(UserInterface ui)
 {
 	assert(ui);
@@ -228,6 +265,16 @@ GraphicsPipeline getUserInterfaceTextPipeline(UserInterface ui)
 {
 	assert(ui);
 	return getGraphicsRendererPipeline(ui->textRenderer);
+}
+FontAtlas getUserInterfaceFontAtlas(UserInterface ui)
+{
+	assert(ui);
+	return ui->fontAtlas;
+}
+Interface getUserInterface(UserInterface ui)
+{
+	assert(ui);
+	return ui->interface;
 }
 
 void updateUserInterface(UserInterface ui)
@@ -243,43 +290,72 @@ GraphicsRendererResult drawUserInterface(UserInterface ui)
 		createGraphicsRendererResult();
 	GraphicsRendererResult tmpResult;
 
+	Mat4F view = translateMat4F(identMat4F, vec3F(
+		(cmmt_float_t)0.0, (cmmt_float_t)0.0, (cmmt_float_t)0.5));
+	Camera camera = createInterfaceCamera(ui->interface);
+
 	GraphicsRendererData data = createGraphicsRenderData(
-		identMat4F,
-		createInterfaceCamera(ui->interface),
-		false);
+		view, camera, false);
 
 	tmpResult = drawGraphicsRenderer(
 		ui->spriteRenderer,
 		&data);
 	result = addGraphicsRendererResult(result, tmpResult);
-	// TODO: text pipeline
+
+	// TODO: only bind vertex/index buffer once, and then just send draw commands
+
+	tmpResult = drawGraphicsRenderer(
+		ui->textRenderer,
+		&data);
+	result = addGraphicsRendererResult(result, tmpResult);
+
 	return result;
 }
 
 static void onUiPanelDestroy(void* _handle)
 {
 	assert(_handle);
+
 	UiPanelHandle handle = (UiPanelHandle)_handle;
-	destroyGraphicsRender(handle->render);
-	destroyTransform(handle->transform);
+	GraphicsRender render = handle->render;
+
+	if (render)
+	{
+		Transform transform = getGraphicsRenderTransform(render);
+		destroyGraphicsRender(render);
+		destroyTransform(transform);
+	}
+
+	free(handle);
 }
-UiPanel createUiPanel(
+MpgxResult createUiPanel(
 	UserInterface ui,
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
 	LinearColor color,
 	Transform parent,
-	bool isActive)
+	const InterfaceElementEvents* events,
+	void* _handle,
+	bool isActive,
+	InterfaceElement* uiPanel)
 {
 	assert(ui);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale.x > 0.0f);
+	assert(scale.y > 0.0f);
+	assert(uiPanel);
+
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
 
 	UiPanelHandle handle = calloc(1,
 		sizeof(UiPanelHandle_T));
 
 	if (!handle)
-		return NULL;
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+	handle->handle = _handle;
 
 	Transform transform = createTransform(
 		ui->transformer,
@@ -293,10 +369,8 @@ UiPanel createUiPanel(
 	if (!transform)
 	{
 		onUiPanelDestroy(handle);
-		return NULL;
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
-
-	handle->transform = transform;
 
 	GraphicsRender render = createSpriteRender(
 		ui->spriteRenderer,
@@ -307,37 +381,274 @@ UiPanel createUiPanel(
 
 	if (!render)
 	{
+		destroyTransform(transform);
 		onUiPanelDestroy(handle);
-		return NULL;
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
 	handle->render = render;
 
-	InterfaceElementEvents events = {
-		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	};
+#ifndef NDEBUG
+	const char* name = UI_PANEL_NAME;
+#else
+	const char* name = NULL;
+#endif
 
 	InterfaceElement element = createInterfaceElement(
 		ui->interface,
+		name,
 		transform,
 		alignment,
 		position,
 		oneSizeBox2F,
 		false,
 		onUiPanelDestroy,
-		&events,
+		events,
 		handle);
 
 	if (!element)
 	{
 		onUiPanelDestroy(handle);
-		return NULL;
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	return element;
+	*uiPanel = element;
+	return SUCCESS_MPGX_RESULT;
+}
+void* getUiPanelHandle(InterfaceElement panel)
+{
+	assert(panel);
+	assert(strcmp(getInterfaceElementName(
+		panel), UI_PANEL_NAME) == 0);
+	UiPanelHandle handle =
+		getInterfaceElementHandle(panel);
+	return handle->handle;
+}
+GraphicsRender getUiPanelRender(InterfaceElement panel)
+{
+	assert(panel);
+	assert(strcmp(getInterfaceElementName(
+		panel), UI_PANEL_NAME) == 0);
+	UiPanelHandle handle =
+		getInterfaceElementHandle(panel);
+	return handle->render;
 }
 
-static void onUiWindowClick(InterfaceElement element)
+static void onUiLabelDestroy(void* _handle)
+{
+	assert(_handle);
+
+	UiLabelHandle handle = (UiLabelHandle)_handle;
+	GraphicsRender render = handle->render;
+
+	if (render)
+	{
+		Text text = getTextRenderText(render);
+		Transform transform = getGraphicsRenderTransform(render);
+		destroyGraphicsRender(render);
+		destroyText(text);
+		destroyTransform(transform);
+	}
+
+	free(handle);
+}
+MpgxResult createUiLabel32(
+	UserInterface ui,
+	const uint32_t* string,
+	size_t stringLength,
+	AlignmentType alignment,
+	Vec3F position,
+	cmmt_float_t scale,
+	SrgbColor color,
+	bool useTags,
+	bool isBold,
+	bool isItalic,
+	bool isConstant,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* _handle,
+	bool isActive,
+	InterfaceElement* uiLabel)
+{
+	assert(ui);
+	assert(string);
+	assert(stringLength > 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale > 0.0f);
+	assert(uiLabel);
+
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
+
+	UiLabelHandle handle = calloc(1,
+		sizeof(UiButtonHandle_T));
+
+	if (!handle)
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+	handle->handle = _handle;
+
+	Transform transform = createTransform(
+		ui->transformer,
+		zeroVec3F,
+		vec3F(scale, scale, (cmmt_float_t)1.0),
+		oneQuat,
+		NO_ROTATION_TYPE,
+		parent,
+		isActive);
+
+	if (!transform)
+	{
+		onUiLabelDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	Text text;
+
+	MpgxResult mpgxResult = createAtlasText32(
+		ui->fontAtlas,
+		string,
+		stringLength,
+		alignment,
+		color,
+		useTags,
+		isBold,
+		isItalic,
+		isConstant,
+		&text);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		destroyTransform(transform);
+		onUiLabelDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	GraphicsRender render = createTextRender(
+		ui->textRenderer,
+		transform,
+		oneSizeBox3F, // TODO:
+		text,
+		zeroVec4I);
+
+	if (!render)
+	{
+		destroyText(text);
+		destroyTransform(transform);
+		onUiLabelDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	handle->render = render;
+
+#ifndef NDEBUG
+	const char* name = UI_LABEL_NAME;
+#else
+	const char* name = NULL;
+#endif
+
+	InterfaceElement element = createInterfaceElement(
+		ui->interface,
+		name,
+		transform,
+		alignment,
+		position,
+		oneSizeBox2F,
+		false,
+		onUiLabelDestroy,
+		events,
+		handle);
+
+	if (!element)
+	{
+		onUiLabelDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	*uiLabel = element;
+	return SUCCESS_MPGX_RESULT;
+}
+MpgxResult createUiLabel(
+	UserInterface ui,
+	const char* string,
+	size_t stringLength,
+	AlignmentType alignment,
+	Vec3F position,
+	cmmt_float_t scale,
+	SrgbColor color,
+	bool useTags,
+	bool isBold,
+	bool isItalic,
+	bool isConstant,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* handle,
+	bool isActive,
+	InterfaceElement* uiLabel)
+{
+	assert(ui);
+	assert(string);
+	assert(stringLength > 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale > 0.0f);
+	assert(uiLabel);
+
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
+
+	uint32_t* string32;
+	size_t stringLength32;
+
+	MpgxResult mpgxResult = allocateStringUTF32(
+		string,
+		stringLength,
+		&string32,
+		&stringLength32);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+		return mpgxResult;
+
+	mpgxResult = createUiLabel32(
+		ui,
+		string32,
+		stringLength32,
+		alignment,
+		position,
+		scale,
+		color,
+		useTags,
+		isBold,
+		isItalic,
+		isConstant,
+		parent,
+		events,
+		handle,
+		isActive,
+		uiLabel);
+
+	free(string32);
+	return mpgxResult;
+}
+void* getUiLabelHandle(InterfaceElement label)
+{
+	assert(label);
+	assert(strcmp(getInterfaceElementName(
+		label), UI_LABEL_NAME) == 0);
+	UiLabelHandle handle =
+		getInterfaceElementHandle(label);
+	return handle->handle;
+}
+GraphicsRender getUiLabelRender(InterfaceElement label)
+{
+	assert(label);
+	assert(strcmp(getInterfaceElementName(
+		label), UI_LABEL_NAME) == 0);
+	UiLabelHandle handle =
+		getInterfaceElementHandle(label);
+	return handle->render;
+}
+
+static void onUiWindowPress(InterfaceElement element)
 {
 	assert(element);
 
@@ -350,6 +661,9 @@ static void onUiWindowClick(InterfaceElement element)
 			getWindowCursorPosition(handle->window);
 		handle->isDragging = true;
 	}
+
+	if (handle->onPress)
+		handle->onPress(element);
 }
 static void onUiWindowUpdate(InterfaceElement element)
 {
@@ -380,37 +694,86 @@ static void onUiWindowUpdate(InterfaceElement element)
 		setInterfaceElementPosition(element, position);
 		handle->lastCursorPosition = cursorPosition;
 	}
+
+	if (handle->onUpdate)
+		handle->onUpdate(element);
 }
 static void onUiWindowDestroy(void* _handle)
 {
 	assert(_handle);
 	UiWindowHandle handle = (UiWindowHandle)_handle;
-	destroyGraphicsRender(handle->panelRender);
-	destroyTransform(handle->panelTransform);
-	destroyGraphicsRender(handle->barRender);
-	destroyTransform(handle->barTransform);
+
+	Transform transform;
+	GraphicsRender render = handle->titleRender;
+
+	if (render)
+	{
+		Text text = getTextRenderText(render);
+		transform = getGraphicsRenderTransform(render);
+		destroyGraphicsRender(render);
+		destroyText(text);
+		destroyTransform(transform);
+	}
+
+	render = handle->panelRender;
+
+	if (render)
+	{
+		transform = getGraphicsRenderTransform(render);
+		destroyGraphicsRender(render);
+		destroyTransform(transform);
+	}
+
+	render = handle->barRender;
+
+	if (render)
+	{
+		transform = getGraphicsRenderTransform(render);
+		destroyGraphicsRender(render);
+		destroyTransform(transform);
+	}
+
+	free(handle);
 }
-UiWindow createUiWindow(
+MpgxResult createUiWindow32(
 	UserInterface ui,
+	const uint32_t* title,
+	size_t titleLength,
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	float barHeight,
+	cmmt_float_t barHeight,
+	cmmt_float_t titleHeight,
 	LinearColor barColor,
 	LinearColor panelColor,
+	SrgbColor titleColor,
 	Transform parent,
-	bool isActive)
+	const InterfaceElementEvents* events,
+	void* _handle,
+	bool isActive,
+	InterfaceElement* uiWindow)
 {
 	assert(ui);
+	assert(title);
+	assert(titleLength > 0);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale.x > 0.0f);
+	assert(scale.y > 0.0f);
+	assert(barHeight > 0.0f);
+	assert(titleHeight > 0.0f);
+	assert(uiWindow);
+
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
 
 	UiWindowHandle handle = calloc(1,
 		sizeof(UiWindowHandle_T));
 
 	if (!handle)
-		return NULL;
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
 	handle->window = ui->window;
+	handle->handle = _handle;
 	handle->lastCursorPosition = zeroVec2F;
 	handle->isDragging = false;
 
@@ -430,10 +793,8 @@ UiWindow createUiWindow(
 	if (!barTransform)
 	{
 		onUiWindowDestroy(handle);
-		return NULL;
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
-
-	handle->barTransform = barTransform;
 
 	GraphicsRender barRender = createSpriteRender(
 		spriteRenderer,
@@ -444,23 +805,24 @@ UiWindow createUiWindow(
 
 	if (!barRender)
 	{
+		destroyTransform(barTransform);
 		onUiWindowDestroy(handle);
-		return NULL;
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
 	handle->barRender = barRender;
 
-	Vec3F panelPosition = vec3F(
-		position.x,
-		position.y -
-			(scale.y * (cmmt_float_t)0.5 +
-			barHeight * (cmmt_float_t)0.5),
-		(cmmt_float_t)0.0);
-
 	Transform panelTransform = createTransform(
 		transformer,
-		panelPosition,
-		vec3F(scale.x, scale.y, (cmmt_float_t)1.0),
+		vec3F(
+			(cmmt_float_t)0.0,
+			-(scale.y * (cmmt_float_t)0.5 +
+				barHeight * (cmmt_float_t)0.5),
+			(cmmt_float_t)0.0),
+		vec3F(
+			scale.x,
+			scale.y,
+			(cmmt_float_t)1.0),
 		oneQuat,
 		NO_ROTATION_TYPE,
 		barTransform,
@@ -469,10 +831,8 @@ UiWindow createUiWindow(
 	if (!panelTransform)
 	{
 		onUiWindowDestroy(handle);
-		return NULL;
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
-
-	handle->panelTransform = panelTransform;
 
 	GraphicsRender panelRender = createSpriteRender(
 		spriteRenderer,
@@ -483,39 +843,232 @@ UiWindow createUiWindow(
 
 	if (!panelRender)
 	{
+		destroyTransform(panelTransform);
 		onUiWindowDestroy(handle);
-		return NULL;
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
 	handle->panelRender = panelRender;
 
-	InterfaceElementEvents events = {
-		onUiWindowUpdate,
-		NULL, NULL, NULL, NULL, NULL,
-		onUiWindowClick,
-		NULL,
-	};
+	Transform titleTransform = createTransform(
+		transformer,
+		vec3F(
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)-0.001),
+		vec3F(
+			titleHeight,
+			titleHeight,
+			(cmmt_float_t)1.0),
+		oneQuat,
+		NO_ROTATION_TYPE,
+		barTransform,
+		true);
+
+	if (!titleTransform)
+	{
+		onUiWindowDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	Text text;
+
+	MpgxResult mpgxResult = createAtlasText32(
+		ui->fontAtlas,
+		title,
+		titleLength,
+		CENTER_ALIGNMENT_TYPE,
+		titleColor,
+		true,
+		true,
+		false,
+		true,
+		&text);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		destroyTransform(titleTransform);
+		onUiWindowDestroy(handle);
+		return mpgxResult;
+	}
+
+	GraphicsRender titleRender = createTextRender(
+		ui->textRenderer,
+		titleTransform,
+		oneSizeBox3F, // TODO: adjust
+		text,
+		zeroVec4I);
+
+	if (!titleRender)
+	{
+		destroyText(text);
+		destroyTransform(titleTransform);
+		onUiWindowDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	handle->titleRender = titleRender;
+
+#ifndef NDEBUG
+	const char* name = UI_WINDOW_NAME;
+#else
+	const char* name = NULL;
+#endif
+
+	InterfaceElementEvents elementEvents = events ?
+		*events : emptyInterfaceElementEvents;
+	handle->onUpdate = elementEvents.onUpdate;
+	handle->onPress = elementEvents.onPress;
+	elementEvents.onUpdate = onUiWindowUpdate;
+	elementEvents.onPress = onUiWindowPress;
+	handle->onUpdate = elementEvents.onPress;
 
 	InterfaceElement element = createInterfaceElement(
 		ui->interface,
+		name,
 		barTransform,
 		alignment,
 		position,
 		oneSizeBox2F,
 		true,
 		onUiWindowDestroy,
-		&events,
+		&elementEvents,
 		handle);
 
 	if (!element)
 	{
 		onUiWindowDestroy(handle);
-		return NULL;
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	return element;
+	*uiWindow = element;
+	return SUCCESS_MPGX_RESULT;
+}
+MpgxResult createUiWindow(
+	UserInterface ui,
+	const char* title,
+	size_t titleLength,
+	AlignmentType alignment,
+	Vec3F position,
+	Vec2F scale,
+	cmmt_float_t barHeight,
+	cmmt_float_t titleHeight,
+	LinearColor barColor,
+	LinearColor panelColor,
+	SrgbColor titleColor,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* handle,
+	bool isActive,
+	InterfaceElement* uiWindow)
+{
+	assert(ui);
+	assert(title);
+	assert(titleLength > 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale.x > 0.0f);
+	assert(scale.y > 0.0f);
+	assert(barHeight > 0.0f);
+	assert(titleHeight > 0.0f);
+	assert(uiWindow);
+
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
+
+	uint32_t* title32;
+	size_t titleLength32;
+
+	MpgxResult mpgxResult = allocateStringUTF32(
+		title,
+		titleLength,
+		&title32,
+		&titleLength32);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+		return mpgxResult;
+
+	mpgxResult = createUiWindow32(
+		ui,
+		title32,
+		titleLength32,
+		alignment,
+		position,
+		scale,
+		barHeight,
+		titleHeight,
+		barColor,
+		panelColor,
+		titleColor,
+		parent,
+		events,
+		handle,
+		isActive,
+		uiWindow);
+
+	free(title32);
+	return mpgxResult;
+}
+void* getUiWindowHandle(InterfaceElement window)
+{
+	assert(window);
+	assert(strcmp(getInterfaceElementName(
+		window), UI_WINDOW_NAME) == 0);
+	UiWindowHandle handle =
+		getInterfaceElementHandle(window);
+	return handle->handle;
+}
+GraphicsRender getUiWindowPanelRender(InterfaceElement window)
+{
+	assert(window);
+	assert(strcmp(getInterfaceElementName(
+		window), UI_WINDOW_NAME) == 0);
+	UiWindowHandle handle =
+		getInterfaceElementHandle(window);
+	return handle->panelRender;
+}
+GraphicsRender getUiWindowBarRender(InterfaceElement window)
+{
+	assert(window);
+	assert(strcmp(getInterfaceElementName(
+		window), UI_WINDOW_NAME) == 0);
+	UiWindowHandle handle =
+		getInterfaceElementHandle(window);
+	return handle->barRender;
+}
+GraphicsRender getUiWindowTitleRender(InterfaceElement window)
+{
+	assert(window);
+	assert(strcmp(getInterfaceElementName(
+		window), UI_WINDOW_NAME) == 0);
+	UiWindowHandle handle =
+		getInterfaceElementHandle(window);
+	return handle->titleRender;
 }
 
+static void onUiButtonDisable(InterfaceElement element)
+{
+	assert(element);
+
+	UiButtonHandle handle = (UiButtonHandle)
+		getInterfaceElementHandle(element);
+	setSpriteRenderColor(
+		handle->panelRender,
+		handle->disabledColor);
+	if (handle->onDisable)
+		handle->onDisable(element);
+}
+static void onUiButtonEnable(InterfaceElement element)
+{
+	assert(element);
+
+	UiButtonHandle handle = (UiButtonHandle)
+		getInterfaceElementHandle(element);
+	setSpriteRenderColor(
+		handle->panelRender,
+		handle->enabledColor);
+	if (handle->onEnable)
+		handle->onEnable(element);
+}
 static void onUiButtonEnter(InterfaceElement element)
 {
 	assert(element);
@@ -523,8 +1076,10 @@ static void onUiButtonEnter(InterfaceElement element)
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
 	setSpriteRenderColor(
-		handle->render,
+		handle->panelRender,
 		handle->hoveredColor);
+	if (handle->onEnter)
+		handle->onEnter(element);
 }
 static void onUiButtonExit(InterfaceElement element)
 {
@@ -533,8 +1088,10 @@ static void onUiButtonExit(InterfaceElement element)
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
 	setSpriteRenderColor(
-		handle->render,
+		handle->panelRender,
 		handle->enabledColor);
+	if (handle->onExit)
+		handle->onExit(element);
 }
 static void onUiButtonPress(InterfaceElement element)
 {
@@ -543,8 +1100,10 @@ static void onUiButtonPress(InterfaceElement element)
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
 	setSpriteRenderColor(
-		handle->render,
+		handle->panelRender,
 		handle->pressedColor);
+	if (handle->onPress)
+		handle->onPress(element);
 }
 static void onUiButtonRelease(InterfaceElement element)
 {
@@ -553,45 +1112,87 @@ static void onUiButtonRelease(InterfaceElement element)
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
 	setSpriteRenderColor(
-		handle->render,
+		handle->panelRender,
 		handle->hoveredColor);
+	if (handle->onRelease)
+		handle->onRelease(element);
 }
 static void onUiButtonDestroy(void* _handle)
 {
 	assert(_handle);
 	UiButtonHandle handle = (UiButtonHandle)_handle;
-	destroyGraphicsRender(handle->render);
-	destroyTransform(handle->transform);
+
+	Transform transform;
+	GraphicsRender render = handle->textRender;
+
+	if (render)
+	{
+		Text text = getTextRenderText(render);
+		transform = getGraphicsRenderTransform(render);
+		destroyGraphicsRender(render);
+		destroyText(text);
+		destroyTransform(transform);
+	}
+
+	render = handle->panelRender;
+
+	if (render)
+	{
+		transform = getGraphicsRenderTransform(render);
+		destroyGraphicsRender(render);
+		destroyTransform(transform);
+	}
+
+	free(handle);
 }
-UiButton createUiButton(
+MpgxResult createUiButton32(
 	UserInterface ui,
+	const uint32_t* text,
+	size_t textLength,
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
+	cmmt_float_t textHeight,
 	LinearColor disabledColor,
 	LinearColor enabledColor,
 	LinearColor hoveredColor,
 	LinearColor pressedColor,
+	SrgbColor textColor,
 	Transform parent,
+	const InterfaceElementEvents* events,
+	void* _handle,
 	bool isEnabled,
-	bool isActive)
+	bool isActive,
+	InterfaceElement* uiButton)
 {
 	assert(ui);
+	assert(text);
+	assert(textLength > 0);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale.x > 0.0f);
+	assert(scale.y > 0.0f);
+	assert(textHeight > 0.0f);
+	assert(uiButton);
+
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
 
 	UiButtonHandle handle = calloc(1,
 		sizeof(UiButtonHandle_T));
 
 	if (!handle)
-		return NULL;
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
+	handle->handle = _handle;
 	handle->disabledColor = disabledColor;
 	handle->enabledColor = enabledColor;
 	handle->hoveredColor = hoveredColor;
 	handle->pressedColor = pressedColor;
 
-	Transform transform = createTransform(
-		ui->transformer,
+	Transformer transformer = ui->transformer;
+
+	Transform panelTransform = createTransform(
+		transformer,
 		zeroVec3F,
 		vec3F(scale.x, scale.y, (cmmt_float_t)1.0),
 		oneQuat,
@@ -599,54 +1200,222 @@ UiButton createUiButton(
 		parent,
 		isActive);
 
-	if (!transform)
+	if (!panelTransform)
 	{
 		onUiButtonDestroy(handle);
-		return NULL;
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	handle->transform = transform;
-
-	GraphicsRender render = createSpriteRender(
+	GraphicsRender panelRender = createSpriteRender(
 		ui->spriteRenderer,
-		transform,
+		panelTransform,
 		oneSizeBox3F,
 		enabledColor,
 		ui->squareMesh);
 
-	if (!render)
+	if (!panelRender)
 	{
+		destroyTransform(panelTransform);
 		onUiButtonDestroy(handle);
-		return NULL;
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	handle->render = render;
+	handle->panelRender = panelRender;
 
-	InterfaceElementEvents events = {
-		NULL, NULL, NULL,
-		onUiButtonEnter,
-		onUiButtonExit,
-		NULL,
-		onUiButtonPress,
-		onUiButtonRelease,
-	};
+	Transform textTransform = createTransform(
+		transformer,
+		vec3F(
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)-0.001),
+		vec3F(
+			textHeight,
+			textHeight,
+			(cmmt_float_t)1.0),
+		oneQuat,
+		NO_ROTATION_TYPE,
+		panelTransform,
+		true);
+
+	if (!textTransform)
+	{
+		onUiWindowDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	Text textInstance;
+
+	MpgxResult mpgxResult = createAtlasText32(
+		ui->fontAtlas,
+		text,
+		textLength,
+		CENTER_ALIGNMENT_TYPE,
+		textColor,
+		true,
+		false,
+		false,
+		true,
+		&textInstance);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		destroyTransform(textTransform);
+		onUiWindowDestroy(handle);
+		return mpgxResult;
+	}
+
+	GraphicsRender textRender = createTextRender(
+		ui->textRenderer,
+		textTransform,
+		oneSizeBox3F, // TODO: adjust
+		textInstance,
+		zeroVec4I);
+
+	if (!textRender)
+	{
+		destroyText(textInstance);
+		destroyTransform(textTransform);
+		onUiWindowDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	handle->textRender = textRender;
+
+#ifndef NDEBUG
+	const char* name = UI_BUTTON_NAME;
+#else
+	const char* name = NULL;
+#endif
+
+	InterfaceElementEvents elementEvents = events ?
+		*events : emptyInterfaceElementEvents;
+	handle->onEnable = elementEvents.onEnable;
+	handle->onDisable = elementEvents.onDisable;
+	handle->onEnter = elementEvents.onEnter;
+	handle->onExit = elementEvents.onExit;
+	handle->onPress = elementEvents.onPress;
+	handle->onRelease = elementEvents.onRelease;
+	elementEvents.onEnable = onUiButtonEnable;
+	elementEvents.onDisable = onUiButtonDisable;
+	elementEvents.onEnter = onUiButtonEnter;
+	elementEvents.onExit = onUiButtonExit;
+	elementEvents.onPress = onUiButtonPress;
+	elementEvents.onRelease = onUiButtonRelease;
 
 	InterfaceElement element = createInterfaceElement(
 		ui->interface,
-		transform,
+		name,
+		panelTransform,
 		alignment,
 		position,
 		oneSizeBox2F,
 		isEnabled,
 		onUiButtonDestroy,
-		&events,
+		&elementEvents,
 		handle);
 
 	if (!element)
 	{
 		onUiButtonDestroy(handle);
-		return NULL;
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	return element;
+	*uiButton = element;
+	return SUCCESS_MPGX_RESULT;
 }
+MpgxResult createUiButton(
+	UserInterface ui,
+	const char* text,
+	size_t textLength,
+	AlignmentType alignment,
+	Vec3F position,
+	Vec2F scale,
+	cmmt_float_t textHeight,
+	LinearColor disabledColor,
+	LinearColor enabledColor,
+	LinearColor hoveredColor,
+	LinearColor pressedColor,
+	SrgbColor textColor,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* handle,
+	bool isEnabled,
+	bool isActive,
+	InterfaceElement* uiButton)
+{
+	assert(ui);
+	assert(text);
+	assert(textLength > 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale.x > 0.0f);
+	assert(scale.y > 0.0f);
+	assert(textHeight > 0.0f);
+	assert(uiButton);
+
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
+
+	uint32_t* text32;
+	size_t textLength32;
+
+	MpgxResult mpgxResult = allocateStringUTF32(
+		text,
+		textLength,
+		&text32,
+		&textLength32);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+		return mpgxResult;
+
+	mpgxResult = createUiButton32(
+		ui,
+		text32,
+		textLength32,
+		alignment,
+		position,
+		scale,
+		textHeight,
+		disabledColor,
+		enabledColor,
+		hoveredColor,
+		pressedColor,
+		textColor,
+		parent,
+		events,
+		handle,
+		isEnabled,
+		isActive,
+		uiButton);
+
+	free(text32);
+	return mpgxResult;
+}
+void* getUiButtonHandle(InterfaceElement button)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	return handle->handle;
+}
+GraphicsRender getUiButtonPanelRender(InterfaceElement button)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	return handle->panelRender;
+}
+GraphicsRender getUiButtonTextRender(InterfaceElement button)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	return handle->textRender;
+}
+
+// TODO: return text color value, use SDF instead in text

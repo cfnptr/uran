@@ -29,6 +29,10 @@ struct InterfaceElement_T
 	AlignmentType alignment;
 	bool isEnabled;
 	bool isPressed;
+#ifndef NDEBUG
+	uint8_t _alignment[1];
+	const char* name;
+#endif
 };
 struct Interface_T
 {
@@ -37,7 +41,7 @@ struct Interface_T
 	size_t elementCapacity;
 	size_t elementCount;
 	InterfaceElement lastElement;
-	float scale;
+	cmmt_float_t scale;
 	bool isPressed;
 #ifndef NDEBUG
 	bool isEnumerating;
@@ -57,7 +61,7 @@ void destroyInterface(Interface interface)
 }
 Interface createInterface(
 	Window window,
-	float scale,
+	cmmt_float_t scale,
 	size_t capacity)
 {
 	assert(window);
@@ -106,7 +110,7 @@ size_t getInterfaceElementCount(Interface interface)
 	return interface->elementCount;
 }
 
-float getInterfaceScale(
+cmmt_float_t getInterfaceScale(
 	Interface interface)
 {
 	assert(interface);
@@ -114,7 +118,7 @@ float getInterfaceScale(
 }
 void setInterfaceScale(
 	Interface interface,
-	float scale)
+	cmmt_float_t scale)
 {
 	assert(interface);
 	assert(scale > 0.0f);
@@ -176,7 +180,7 @@ Camera createInterfaceCamera(
 	assert(interface);
 
 	Vec2I windowSize = getWindowSize(interface->window);
-	float scale = interface->scale;
+	cmmt_float_t scale = interface->scale;
 
 	Vec2F halfSize = vec2F(
 		((cmmt_float_t)windowSize.x / scale) * (cmmt_float_t)0.5,
@@ -187,7 +191,7 @@ Camera createInterfaceCamera(
 		halfSize.x,
 		-halfSize.y,
 		halfSize.y,
-		-1.0f,
+		0.0f,
 		1.0f);
 }
 
@@ -202,7 +206,7 @@ void updateInterface(Interface interface)
 	if (elementCount == 0 || !isWindowFocused(window))
 		return;
 
-	float interfaceScale = interface->scale;
+	cmmt_float_t interfaceScale = interface->scale;
 	Vec2I windowSize = getWindowSize(window);
 	Vec2F cursor = getWindowCursorPosition(window);
 
@@ -216,7 +220,7 @@ void updateInterface(Interface interface)
 		(size.y - (cursor.y / interfaceScale)) - halfSize.y);
 
 	InterfaceElement newElement = NULL;
-	float elementDistance = INFINITY;
+	cmmt_float_t elementDistance = INFINITY;
 
 	for (size_t i = 0; i < elementCount; i++)
 	{
@@ -339,6 +343,7 @@ void updateInterface(Interface interface)
 			}
 			else
 			{
+				// TODO: store pressed element instead of bools
 				if (lastElement->isPressed && isChanged)
 				{
 					lastElement->isPressed = false;
@@ -464,6 +469,7 @@ void updateInterface(Interface interface)
 
 InterfaceElement createInterfaceElement(
 	Interface interface,
+	const char* name,
 	Transform transform,
 	AlignmentType alignment,
 	Vec3F position,
@@ -477,7 +483,6 @@ InterfaceElement createInterfaceElement(
 	assert(transform);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(onDestroy);
-	assert(events);
 	assert(handle);
 	assert(!interface->isEnumerating);
 
@@ -489,7 +494,7 @@ InterfaceElement createInterfaceElement(
 
 	element->interface = interface;
 	element->onDestroy = onDestroy;
-	element->events = *events;
+	element->events = events ? *events : emptyInterfaceElementEvents;
 	element->handle = handle;
 	element->transform = transform;
 	element->position = position;
@@ -497,6 +502,9 @@ InterfaceElement createInterfaceElement(
 	element->alignment = alignment;
 	element->isEnabled = isEnabled;
 	element->isPressed = false;
+#ifndef NDEBUG
+	element->name = name;
+#endif
 
 	size_t count = interface->elementCount;
 
@@ -521,31 +529,6 @@ InterfaceElement createInterfaceElement(
 	interface->elements[count] = element;
 	interface->elementCount = count + 1;
 	return element;
-}
-InterfaceElement createDefaultInterfaceElement(
-	Interface interface,
-	Transform transform,
-	OnInterfaceElementDestroy onDestroy,
-	const InterfaceElementEvents* events,
-	void* handle)
-{
-	assert(interface);
-	assert(transform);
-	assert(onDestroy);
-	assert(events);
-	assert(handle);
-	assert(!interface->isEnumerating);
-
-	return createInterfaceElement(
-		interface,
-		transform,
-		CENTER_ALIGNMENT_TYPE,
-		zeroVec3F,
-		oneSizeBox2F,
-		true,
-		onDestroy,
-		events,
-		handle);
 }
 void destroyInterfaceElement(InterfaceElement element)
 {
@@ -580,6 +563,15 @@ Interface getInterfaceElementInterface(InterfaceElement element)
 {
 	assert(element);
 	return element->interface;
+}
+const char* getInterfaceElementName(InterfaceElement element)
+{
+	assert(element);
+#ifndef NDEBUG
+	return element->name;
+#else
+	abort();
+#endif
 }
 Transform getInterfaceElementTransform(InterfaceElement element)
 {

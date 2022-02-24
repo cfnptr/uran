@@ -19,7 +19,6 @@
 
 typedef struct Handle_T
 {
-	LinearColor color;
 	Text text;
 	Vec4I scissor;
 } Handle_T;
@@ -49,9 +48,6 @@ static size_t onDraw(
 	setTextPipelineMVP(
 		graphicsPipeline,
 		mvp);
-	setTextPipelineColor(
-		graphicsPipeline,
-		handle->color);
 	return drawText(
 		handle->text,
 		handle->scissor);
@@ -82,8 +78,7 @@ GraphicsRenderer createTextRenderer(
 GraphicsRender createTextRender(
 	GraphicsRenderer textRenderer,
 	Transform transform,
-	Box3F bounding,
-	LinearColor color,
+	Box3F bounds,
 	Text text,
 	Vec4I scissor)
 {
@@ -99,7 +94,8 @@ GraphicsRender createTextRender(
 		getGraphicsRendererPipeline(
 		textRenderer)) ==
 		getGraphicsPipelineWindow(
-		getTextPipeline(text)));
+		getFontAtlasPipeline(
+		getTextFontAtlas(text))));
 	assert(strcmp(getGraphicsPipelineName(
 		getGraphicsRendererPipeline(
 		textRenderer)),
@@ -110,14 +106,13 @@ GraphicsRender createTextRender(
 	if (!handle)
 		return NULL;
 
-	handle->color = color;
 	handle->text = text;
 	handle->scissor = scissor;
 
 	GraphicsRender render = createGraphicsRender(
 		textRenderer,
 		transform,
-		bounding,
+		bounds,
 		handle);
 
 	if (!render)
@@ -127,34 +122,6 @@ GraphicsRender createTextRender(
 	}
 
 	return render;
-}
-
-LinearColor getTextRenderColor(
-	GraphicsRender textRender)
-{
-	assert(textRender);
-	assert(strcmp(getGraphicsPipelineName(
-		getGraphicsRendererPipeline(
-		getGraphicsRenderRenderer(
-		textRender))),
-		TEXT_PIPELINE_NAME) == 0);
-	Handle handle = getGraphicsRenderHandle(
-		textRender);
-	return handle->color;
-}
-void setTextRenderColor(
-	GraphicsRender textRender,
-	LinearColor color)
-{
-	assert(textRender);
-	assert(strcmp(getGraphicsPipelineName(
-		getGraphicsRendererPipeline(
-		getGraphicsRenderRenderer(
-		textRender))),
-		TEXT_PIPELINE_NAME) == 0);
-	Handle handle = getGraphicsRenderHandle(
-		textRender);
-	handle->color = color;
 }
 
 Text getTextRenderText(

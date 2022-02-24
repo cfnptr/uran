@@ -143,13 +143,6 @@ Transform createTransform(
 	Transform parent,
 	bool isActive);
 /*
- * Create a new transform instance.
- * Returns transform instance on success, otherwise NULL.
- *
- * transformer - transformer instance.
- */
-Transform createDefaultTransform(Transformer transformer);
-/*
  * Destroys transform instance.
  * transform - transform instance or NULL.
  */

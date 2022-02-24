@@ -237,7 +237,6 @@ static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 		GL_FALSE,
 		sizeof(Vec2F),
 		0);
-
 	assertOpenGL();
 }
 static MpgxResult onGlResize(

@@ -16,28 +16,50 @@
 #include "uran/graphics_renderer.h"
 #include "uran/text.h"
 
+/*
+ * Create a new text renderer instance.
+ * Returns text renderer instance in success, otherwise NULL.
+ *
+ * textPipeline - text pipeline instance.
+ * sorting - render sorting type.
+ * useCulling - use frustum culling.
+ * capacity - initial render array capacity or 0.
+ * threadPool - thread pool instance or NULL.
+ */
 GraphicsRenderer createTextRenderer(
 	GraphicsPipeline textPipeline,
 	GraphicsRenderSorting sorting,
 	bool useCulling,
 	size_t capacity,
 	ThreadPool threadPool);
+/*
+ * Create a new text render instance.
+ * Returns text render instance on success, otherwise NULL.
+ *
+ * textRenderer - text renderer instance.
+ * transform - transform instance.
+ * bounds - render bounds.
+ * color - render color.
+ * text - render text.
+ * scissors - text scissors.
+ */
 GraphicsRender createTextRender(
 	GraphicsRenderer textRenderer,
 	Transform transform,
-	Box3F bounding,
-	LinearColor color,
+	Box3F bounds,
 	Text text,
 	Vec4I scissor);
 
-LinearColor getTextRenderColor(
-	GraphicsRender render);
-void setTextRenderColor(
-	GraphicsRender render,
-	LinearColor color);
-
+/*
+ * Returns text render text.
+ * textRender - text render instance.
+ */
 Text getTextRenderText(
 	GraphicsRender textRender);
+/*
+ * Sets text render text.
+ * textRender - text render instance.
+ */
 void setTextRenderText(
 	GraphicsRender textRender,
 	Text text);

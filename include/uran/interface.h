@@ -70,6 +70,13 @@ typedef struct InterfaceElementEvents
 } InterfaceElementEvents;
 
 /*
+ * Empty interface element events.
+ */
+static const InterfaceElementEvents emptyInterfaceElementEvents = {
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+};
+
+/*
  * Create a new interface instance.
  * Returns interface instance on success, otherwise NULL.
  *
@@ -79,7 +86,7 @@ typedef struct InterfaceElementEvents
  */
 Interface createInterface(
 	Window window,
-	float scale,
+	cmmt_float_t scale,
 	size_t capacity);
 /*
  * Destroys interface instance.
@@ -102,7 +109,7 @@ size_t getInterfaceElementCount(Interface interface);
  * Returns interface scale multiplier value.
  * interface - interface instance.
  */
-float getInterfaceScale(
+cmmt_float_t getInterfaceScale(
 	Interface interface);
 /*
  * Sets interface scale multiplier value.
@@ -112,7 +119,7 @@ float getInterfaceScale(
  */
 void setInterfaceScale(
 	Interface interface,
-	float scale);
+	cmmt_float_t scale);
 
 /*
  * Enumerates interface elements.
@@ -152,38 +159,24 @@ void updateInterface(Interface interface);
  * Returns interface element instance on success, otherwise NUL.
  *
  * interface - interface instance.
+ * name - name string or NULL. (for debugging)
  * transform - transform instance.
  * alignment - interface element alignment type.
  * position - interface element position.
  * bounds - interface element bounds.
  * isEnabled - is interface element enabled.
- * onDestroy - on element destroy function.
- * events - interface element events.
+ * onDestroy - element destroy function.
+ * events - interface element events or NULL.
  * handle - interface element handle.
  */
 InterfaceElement createInterfaceElement(
 	Interface interface,
+	const char* name,
 	Transform transform,
 	AlignmentType alignment,
 	Vec3F position,
 	Box2F bounds,
 	bool isEnabled,
-	OnInterfaceElementDestroy onDestroy,
-	const InterfaceElementEvents* events,
-	void* handle);
-/*
- * Create a new default interface element instance.
- * Returns interface element instance on success, otherwise NUL.
- *
- * interface - interface instance.
- * transform - transform instance.
- * onDestroy - on element destroy function.
- * events - interface element events.
- * handle - interface element handle.
- */
-InterfaceElement createDefaultInterfaceElement(
-	Interface interface,
-	Transform transform,
 	OnInterfaceElementDestroy onDestroy,
 	const InterfaceElementEvents* events,
 	void* handle);
@@ -200,6 +193,11 @@ void destroyInterfaceElement(InterfaceElement element);
  * element - interface element instance.
  */
 Interface getInterfaceElementInterface(InterfaceElement element);
+/*
+ * Returns interface element name string. (for debugging)
+ * element - interface element instance.
+ */
+const char* getInterfaceElementName(InterfaceElement element);
 /*
  * Returns interface element transform.
  * element - interface element instance.

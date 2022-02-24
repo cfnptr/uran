@@ -359,20 +359,6 @@ Transform createTransform(
 	transformer->transformCount = count + 1;
 	return transform;
 }
-Transform createDefaultTransform(Transformer transformer)
-{
-	assert(transformer);
-	assert(!transformer->isEnumerating);
-
-	return createTransform(
-		transformer,
-		zeroVec3F,
-		oneVec3F,
-		oneQuat,
-		SPIN_ROTATION_TYPE,
-		NULL,
-		true);
-}
 void destroyTransform(Transform transform)
 {
 	if (!transform)

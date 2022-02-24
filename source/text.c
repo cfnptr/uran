@@ -14,18 +14,18 @@
 
 #include "uran/text.h"
 #include "mpgx/_source/window.h"
-#include "mpgx/_source/graphics_pipeline.h"
 #include "mpgx/_source/image.h"
 #include "mpgx/_source/sampler.h"
+#include "mpgx/_source/graphics_mesh.h"
+#include "mpgx/_source/graphics_pipeline.h"
 
+
+#define FT_CONFIG_OPTION_ERROR_STRINGS
 #include "ft2build.h"
 #include FT_FREETYPE_H
 
 #include "cmmt/common.h"
 #include <assert.h>
-
-// TODO: possibly bake in separated text pipeline thread
-// TODO: improve construction steps (like in rederer)
 
 struct Font_T
 {
@@ -33,83 +33,108 @@ struct Font_T
 	FT_Face face;
 };
 
-struct Text_T
+typedef struct Glyph
 {
-	Font font;
+	uint32_t value;
+	float positionX;
+	float positionY;
+	float positionZ;
+	float positionW;
+	float texCoordsX;
+	float texCoordsY;
+	float texCoordsZ;
+	float texCoordsW;
+	float advance;
+	bool isVisible;
+	uint8_t _alignment[3];
+} Glyph;
+struct FontAtlas_T
+{
 	GraphicsPipeline pipeline;
-	uint32_t* data;
-	size_t dataCapacity;
-	size_t dataLength;
-	Image texture;
-	GraphicsMesh mesh;
-	Vec2F textSize;
+	Font* regularFonts;
+	Font* boldFonts;
+	Font* italicFonts;
+	Font* boldItalicFonts;
+	size_t fontCount;
+	Glyph* regularGlyphs;
+	Glyph* boldGlyphs;
+	Glyph* italicGlyphs;
+	Glyph* boldItalicGlyphs;
+	size_t glyphCount;
+	Image regularImage;
+	Image boldImage;
+	Image italicImage;
+	Image boldItalicImage;
 	uint32_t fontSize;
-	AlignmentType alignment;
+	float newLineAdvance;
 	bool isConstant;
 #if MPGX_SUPPORT_VULKAN
-	uint8_t _alignment[2];
+	uint8_t _alignment[3];
 	VkDescriptorPool descriptorPool;
-	VkDescriptorSet* descriptorSets;
+	VkDescriptorSet descriptorSet;
+#endif
+#ifndef NDEBUG
+	bool isGenerated; // TODO: do not allow to use generated atlas
 #endif
 };
 
-typedef struct Glyph
+typedef struct TextVertex
 {
-	Vec4F position;
-	Vec4F texCoords;
-	float advance;
-	uint32_t value;
-	bool isVisible;
-} Glyph;
+	Vec2F position;
+	Vec3F texCoords;
+	SrgbColor color;
+} TextVertex;
+struct Text_T
+{
+	FontAtlas fontAtlas;
+	GraphicsMesh mesh;
+	Vec2F textSize;
+	AlignmentType alignment;
+	bool isConstant;
+};
 
 typedef struct VertexPushConstants
 {
 	Mat4F mvp;
 } VertexPushConstants;
-typedef struct FragmentPushConstants
-{
-	LinearColor color;
-} FragmentPushConstants;
 typedef struct BaseHandle
 {
 	Window window;
-	Image texture;
 	Sampler sampler;
 	VertexPushConstants vpc;
-	FragmentPushConstants fpc;
 	Text* texts;
 	size_t textCapacity;
 	size_t textCount;
+	Buffer indexBuffer;
 } BaseHandle;
 #if MPGX_SUPPORT_VULKAN
 typedef struct VkHandle
 {
 	Window window;
-	Image texture;
 	Sampler sampler;
 	VertexPushConstants vpc;
-	FragmentPushConstants fpc;
 	Text* texts;
 	size_t textCapacity;
 	size_t textCount;
+	Buffer indexBuffer;
 	VkDescriptorSetLayout descriptorSetLayout;
-	uint32_t bufferCount;
 } VkHandle;
 #endif
 #if MPGX_SUPPORT_OPENGL
 typedef struct GlHandle
 {
 	Window window;
-	Image texture;
 	Sampler sampler;
 	VertexPushConstants vpc;
-	FragmentPushConstants fpc;
 	Text* texts;
 	size_t textCapacity;
 	size_t textCount;
+	Buffer indexBuffer;
 	GLint mvpLocation;
-	GLint colorLocation;
-	GLint textureLocation;
+	GLint regularAtlasLocation;
+	GLint boldAtlasLocation;
+	GLint italicAtlasLocation;
+	GLint boldItalicAtlasLocation;
 } GlHandle;
 #endif
 typedef union Handle_T
@@ -128,24 +153,44 @@ typedef Handle_T* Handle;
 static bool textInitialized = false;
 static FT_Library ftLibrary = NULL;
 
-bool initializeText()
+bool initializeText(Logger logger)
 {
 	if (textInitialized)
 		return false;
 
-	if (FT_Init_FreeType(&ftLibrary) == 0)
+	FT_Error ftResult = FT_Init_FreeType(&ftLibrary);
+
+	if (ftResult != 0)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to initialize FreeType. (error: %s)",
+				FT_Error_String(ftResult));
+		}
 		return false;
+	}
 
 	textInitialized = true;
 	return true;
 }
-void terminateText()
+void terminateText(Logger logger)
 {
 	if (!textInitialized)
 		return;
 
-	if (FT_Done_FreeType(ftLibrary) != 0)
+	FT_Error ftResult = FT_Done_FreeType(ftLibrary);
+
+	if (ftResult != 0)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to terminate FreeType. (error: %s)",
+				FT_Error_String(ftResult));
+		}
 		abort();
+	}
 
 	ftLibrary = NULL;
 }
@@ -154,111 +199,101 @@ bool isTextInitialized()
 	return textInitialized;
 }
 
-bool createStringUTF8(
-	const uint32_t* data,
-	size_t dataLength,
-	char** _array,
-	size_t* _arrayLength)
+MpgxResult allocateStringUTF8(
+	const uint32_t* source,
+	size_t sourceLength,
+	char** destination,
+	size_t* destinationLength)
 {
-	assert(data);
-	assert(dataLength > 0);
-	assert(_array);
-	assert(_arrayLength);
+	assert(source);
+	assert(sourceLength > 0);
+	assert(destination);
+	assert(destinationLength);
 
-	size_t arrayLength = 0;
+	size_t length = 0;
 
-	for (size_t i = 0; i < dataLength; i++)
+	for (size_t i = 0; i < sourceLength; i++)
 	{
-		uint32_t value = data[i];
+		uint32_t value = source[i];
 
-		if (value < 128)
-			arrayLength += 1;
-		else if (value < 2048)
-			arrayLength += 2;
-		else if (value < 65536)
-			arrayLength += 3;
-		else if (value < 2097152)
-			arrayLength += 4;
-		else
-			return false;
+		if (value < 128) length += 1;
+		else if (value < 2048) length += 2;
+		else if (value < 65536) length += 3;
+		else if (value < 2097152) length += 4;
+		else return BAD_VALUE_MPGX_RESULT;
 	}
 
-	char* array = malloc(
-		(arrayLength + 1) * sizeof(char));
+	char* destinationArray = malloc(
+		(length + 1) * sizeof(char));
 
-	if (!array)
-		return false;
+	if (!destinationArray)
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
-	for (size_t i = 0, j = 0; i < dataLength; i++)
+	for (size_t i = 0, j = 0; i < sourceLength; i++)
 	{
-		uint32_t value = data[i];
+		uint32_t value = source[i];
 
 		if (value < 128)
 		{
-			array[j] = (char)value;
+			destinationArray[j] = (char)value;
 			j += 1;
 		}
 		else if (value < 2048)
 		{
-			array[j] = (char)(((value >> 6) | 0b11000000) & 0b11011111);
-			array[j + 1] = (char)((value | 0b10000000) & 0b10111111);
+			destinationArray[j] = (char)(((value >> 6) | 0b11000000) & 0b11011111);
+			destinationArray[j + 1] = (char)((value | 0b10000000) & 0b10111111);
 			j += 2;
 		}
 		else if (value < 65536)
 		{
-			array[j] = (char)(((value >> 12) | 0b11100000) & 0b11101111);
-			array[j + 1] = (char)(((value >> 6) | 0b10000000) & 0b10111111);
-			array[j + 2] = (char)((value | 0b10000000) & 0b10111111);
+			destinationArray[j] = (char)(((value >> 12) | 0b11100000) & 0b11101111);
+			destinationArray[j + 1] = (char)(((value >> 6) | 0b10000000) & 0b10111111);
+			destinationArray[j + 2] = (char)((value | 0b10000000) & 0b10111111);
 			j += 3;
 		}
 		else
 		{
-			array[j] = (char)(((value >> 18) | 0b11110000) & 0b11110111);
-			array[j + 1] = (char)(((value >> 12) | 0b10000000) & 0b10111111);
-			array[j + 2] = (char)(((value >> 6) | 0b10000000) & 0b10111111);
-			array[j + 3] = (char)((value | 0b10000000) & 0b10111111);
+			destinationArray[j] = (char)(((value >> 18) | 0b11110000) & 0b11110111);
+			destinationArray[j + 1] = (char)(((value >> 12) | 0b10000000) & 0b10111111);
+			destinationArray[j + 2] = (char)(((value >> 6) | 0b10000000) & 0b10111111);
+			destinationArray[j + 3] = (char)((value | 0b10000000) & 0b10111111);
 			j += 4;
 		}
 	}
 
-	array[arrayLength] = '\0';
+	destinationArray[length] = '\0';
 
-	*_array = array;
-	*_arrayLength = arrayLength;
-	return true;
+	*destination = destinationArray;
+	*destinationLength = length;
+	return SUCCESS_MPGX_RESULT;
 }
-void destroyStringUTF8(char* array)
-{
-	free(array);
-}
-
 bool validateStringUTF8(
-	const char* array,
-	size_t arrayLength)
+	const char* string,
+	size_t stringLength)
 {
-	assert(array);
-	assert(arrayLength > 0);
+	assert(string);
+	assert(stringLength > 0);
 
-	for (size_t i = 0; i < arrayLength; i++)
+	for (size_t i = 0; i < stringLength; i++)
 	{
-		char value = array[i];
+		char value = string[i];
 
-		if (!((value & 0b10000000) == 0) ||
+		if ((value & 0b10000000) ^ 0 ||
 
-			!(i + 1 < arrayLength &&
-			(value & 0b11100000) == 0b11000000 &&
-			(array[i + 1] & 0b11000000) == 0b10000000) ||
+			(i + 1 >= stringLength ||
+			(value & 0b11100000) ^ 0b11000000 |
+			(string[i + 1] & 0b11000000) ^ 0b10000000) ||
 
-			!(i + 2 < arrayLength &&
-			(value & 0b11110000) == 0b11100000 &&
-			(array[i + 1] & 0b11000000) == 0b10000000 &&
-			(array[i + 2] & 0b11000000) == 0b10000000) ||
+			(i + 2 >= stringLength ||
+			(value & 0b11110000) ^ 0b11100000 |
+			(string[i + 1] & 0b11000000) ^ 0b10000000 |
+			(string[i + 2] & 0b11000000) ^ 0b10000000) ||
 
-			!(i + 3 < arrayLength &&
-			(value & 0b11111000) == 0b11110000 &&
-			(array[i + 1] & 0b11000000) == 0b10000000 &&
-			(array[i + 2] & 0b11000000) == 0b10000000 &&
-			(array[i + 3] & 0b11000000) == 0b10000000))
+			(i + 3 >= stringLength ||
+			(value & 0b11111000) ^ 0b11110000 |
+			(string[i + 1] & 0b11000000) ^ 0b10000000 |
+			(string[i + 2] & 0b11000000) ^ 0b10000000 |
+			(string[i + 3] & 0b11000000) ^ 0b10000000))
 		{
 			return false;
 		}
@@ -267,219 +302,285 @@ bool validateStringUTF8(
 	return true;
 }
 
-bool createStringUTF32(
-	const char* data,
-	size_t dataLength,
-	uint32_t** _array,
-	size_t* _arrayLength)
+MpgxResult allocateStringUTF32(
+	const char* source,
+	size_t sourceLength,
+	uint32_t** destination,
+	size_t* destinationLength)
 {
-	assert(data);
-	assert(dataLength > 0);
-	assert(_array);
-	assert(_arrayLength);
+	assert(source);
+	assert(sourceLength > 0);
+	assert(destination);
+	assert(destinationLength);
 
-	size_t arrayLength = 0;
+	size_t length = 0;
 
-	for (size_t i = 0; i < dataLength;)
+	for (size_t i = 0; i < sourceLength;)
 	{
-		char value = data[i];
+		char value = source[i];
 
 		if ((value & 0b10000000) == 0)
 		{
 			i += 1;
 		}
-		else if (i + 1 < dataLength &&
-			(value & 0b11100000) == 0b11000000 &&
-			(data[i + 1] & 0b11000000) == 0b10000000)
+		else if (i + 1 < sourceLength &&
+			!((value & 0b11100000) ^ 0b11000000 |
+			(source[i + 1] & 0b11000000) ^ 0b10000000))
 		{
 			i += 2;
 		}
-		else if (i + 2 < dataLength &&
-			(value & 0b11110000) == 0b11100000 &&
-			(data[i + 1] & 0b11000000) == 0b10000000 &&
-			(data[i + 2] & 0b11000000) == 0b10000000)
+		else if (i + 2 < sourceLength &&
+			!((value & 0b11110000) ^ 0b11100000 |
+			(source[i + 1] & 0b11000000) ^ 0b10000000 |
+			(source[i + 2] & 0b11000000) ^ 0b10000000))
 		{
 			i += 3;
 		}
-		else if (i + 3 < dataLength &&
-			(value & 0b11111000) == 0b11110000 &&
-			(data[i + 1] & 0b11000000) == 0b10000000 &&
-			(data[i + 2] & 0b11000000) == 0b10000000 &&
-			(data[i + 3] & 0b11000000) == 0b10000000)
+		else if (i + 3 < sourceLength &&
+			!((value & 0b11111000) ^ 0b11110000 |
+			(source[i + 1] & 0b11000000) ^ 0b10000000 |
+			(source[i + 2] & 0b11000000) ^ 0b10000000 |
+			(source[i + 3] & 0b11000000) ^ 0b10000000))
 		{
 			i += 4;
 		}
 		else
 		{
-			return false;
+			return BAD_VALUE_MPGX_RESULT;
 		}
 
-		arrayLength++;
+		length++;
 	}
 
-	uint32_t* array = malloc(
-		(arrayLength + 1) * sizeof(uint32_t));
+	uint32_t* destinationArray = malloc(
+		(length + 1) * sizeof(uint32_t));
 
-	if (!array)
-		return false;
+	if (!destinationArray)
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
-	for (size_t i = 0, j = 0; i < dataLength; j++)
+	for (size_t i = 0, j = 0; i < sourceLength; j++)
 	{
-		char value = data[i];
+		char value = source[i];
 
 		if ((value & 0b10000000) == 0)
 		{
-			array[j] = (uint32_t)data[i];
+			destinationArray[j] = (uint32_t)source[i];
 			i += 1;
 		}
 		else if ((value & 0b11100000) == 0b11000000)
 		{
-			array[j] = (uint32_t)(data[i] & 0b00011111) << 6 |
-				(uint32_t)(data[i + 1] & 0b00111111);
+			destinationArray[j] =
+				(uint32_t)(source[i] & 0b00011111) << 6 |
+				(uint32_t)(source[i + 1] & 0b00111111);
 			i += 2;
 		}
 		else if ((value & 0b11110000) == 0b11100000)
 		{
-			array[j] = (uint32_t)(data[i] & 0b00001111) << 12 |
-				(uint32_t)(data[i + 1] & 0b00111111) << 6 |
-				(uint32_t)(data[i + 2] & 0b00111111);
+			destinationArray[j] =
+				(uint32_t)(source[i] & 0b00001111) << 12 |
+				(uint32_t)(source[i + 1] & 0b00111111) << 6 |
+				(uint32_t)(source[i + 2] & 0b00111111);
 			i += 3;
 		}
 		else
 		{
-			array[j] = (uint32_t)(data[i] & 0b00000111) << 18 |
-				(uint32_t)(data[i + 1] & 0b00111111) << 12 |
-				(uint32_t)(data[i + 2] & 0b00111111) << 6 |
-				(uint32_t)(data[i + 3] & 0b00111111);
+			destinationArray[j] =
+				(uint32_t)(source[i] & 0b00000111) << 18 |
+				(uint32_t)(source[i + 1] & 0b00111111) << 12 |
+				(uint32_t)(source[i + 2] & 0b00111111) << 6 |
+				(uint32_t)(source[i + 3] & 0b00111111);
 			i += 4;
 		}
 	}
 
-	array[arrayLength] = 0;
+	destinationArray[length] = 0;
 
-	*_array = array;
-	*_arrayLength = arrayLength;
-	return true;
+	*destination = destinationArray;
+	*destinationLength = length;
+	return SUCCESS_MPGX_RESULT;
 }
-void destroyStringUTF32(uint32_t* array)
-{
-	free(array);
-}
-
 bool validateStringUTF32(
-	const uint32_t* array,
-	size_t arrayLength)
+	const uint32_t* string,
+	size_t stringLength)
 {
-	assert(array);
-	assert(arrayLength > 0);
+	assert(string);
+	assert(stringLength > 0);
 
-	for (size_t i = 0; i < arrayLength; i++)
+	for (size_t i = 0; i < stringLength; i++)
 	{
-		if (array[i] >= 2097152)
+		uint32_t value = string[i];
+
+		if (value == 0 || value >= 2097152)
 			return false;
 	}
 
 	return true;
 }
 
-MpgxResult createFont(
-	const void* _data,
+Font createFont(
+	const void* data,
 	size_t size,
-	Font* font)
+	size_t index,
+	Logger logger)
 {
-	assert(_data);
+	assert(data);
 	assert(size > 0);
-	assert(font);
 
-	Font fontInstance = malloc(sizeof(Font_T));
+	if (!textInitialized)
+		return NULL;
 
-	if (!fontInstance)
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	Font font = calloc(1,
+		sizeof(Font_T));
 
-	uint8_t* data = malloc(
+	if (!font)
+		return NULL;
+
+	uint8_t* dataArray = malloc(
 		size * sizeof(uint8_t));
 
-	if (!data)
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	if (!dataArray)
+	{
+		destroyFont(font);
+		return NULL;
+	}
 
-	memcpy(data, _data, size);
+	font->data = dataArray;
+	memcpy(dataArray, data, size);
 
 	FT_Face face;
 
-	FT_Error result = FT_New_Memory_Face(
+	FT_Error ftResult = FT_New_Memory_Face(
 		ftLibrary,
-		data,
+		dataArray,
 		(FT_Long)size,
-		0,
+		(FT_Long)index,
 		&face);
 
-	if (result != 0)
+	if (ftResult != 0)
 	{
-		free(data);
-		free(font);
-		return UNKNOWN_ERROR_MPGX_RESULT; // TODO: handle freetype error
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to create FreeType memory face. (error: %s)",
+				FT_Error_String(ftResult));
+		}
+		destroyFont(font);
+		return NULL;
 	}
 
-	result = FT_Select_Charmap(
-		face,
+	font->face = face;
+
+	ftResult = FT_Select_Charmap(face,
 		FT_ENCODING_UNICODE);
 
-	if (result != 0)
+	if (ftResult != 0)
 	{
-		FT_Done_Face(face);
-		free(data);
-		free(font);
-		return UNKNOWN_ERROR_MPGX_RESULT;
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to select FreeType char map. (error: %s)",
+				FT_Error_String(ftResult));
+		}
+		destroyFont(font);
+		return NULL;
 	}
 
-	fontInstance->data = data;
-	fontInstance->face = face;
-
-	*font = fontInstance;
-	return SUCCESS_MPGX_RESULT;
+	return font;
 }
-MpgxResult createFontFromFile(
-	const void* filePath,
-	Font* font)
+Font createFontFromFile(
+	const void* path,
+	size_t index,
+	Logger logger)
 {
-	assert(filePath);
-	assert(font);
+	assert(path);
 
-	Font fontInstance = malloc(sizeof(Font_T));
+	if (!textInitialized)
+		return NULL;
 
-	if (!fontInstance)
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	Font font = calloc(1,
+		sizeof(Font_T));
+
+	if (!font)
+		return NULL;
+
+	font->data = NULL;
 
 	FT_Face face;
 
-	FT_Error result = FT_New_Face(
+	FT_Error ftResult = FT_New_Face(
 		ftLibrary,
-		filePath,
-		0,
+		path,
+		(FT_Long)index,
 		&face);
 
-	if (result != 0)
+	if (ftResult != 0)
 	{
-		free(font);
-		return UNKNOWN_ERROR_MPGX_RESULT; // TODO: handle freetype error
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to create FreeType face. "
+				"(error: %s, path: %s)",
+				FT_Error_String(ftResult), path);
+		}
+		destroyFont(font);
+		return NULL;
 	}
 
-	result = FT_Select_Charmap(
-		face,
+	font->face = face;
+
+	ftResult = FT_Select_Charmap(face,
 		FT_ENCODING_UNICODE);
 
-	if (result != 0)
+	if (ftResult != 0)
 	{
-		FT_Done_Face(face);
-		free(font);
-		return UNKNOWN_ERROR_MPGX_RESULT;
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to select FreeType char map. "
+				"(error: %s, path: %s)",
+				FT_Error_String(ftResult), path);
+		}
+		destroyFont(font);
+		return NULL;
 	}
 
-	fontInstance->data = NULL;
-	fontInstance->face = face;
+	return font;
+}
+Font createFontFromPack(
+	PackReader packReader,
+	const char* path,
+	size_t index,
+	Logger logger)
+{
+	assert(packReader);
+	assert(path);
 
-	*font = fontInstance;
-	return SUCCESS_MPGX_RESULT;
+	const uint8_t* data;
+	uint32_t size;
+
+	PackResult packResult = readPackPathItemData(
+		packReader,
+		path,
+		&data,
+		&size);
+
+	if (packResult != SUCCESS_PACK_RESULT)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to read pack font data. "
+				"(error: %s, path: %s)",
+				packResultToString(packResult), path);
+		}
+		return NULL;
+	}
+
+	return createFont(
+		data,
+		size,
+		index,
+		logger);
 }
 void destroyFont(Font font)
 {
@@ -488,120 +589,137 @@ void destroyFont(Font font)
 	if (!font)
 		return;
 
-	FT_Done_Face(font->face);
+	if (font->face)
+		FT_Done_Face(font->face);
 	free(font->data);
 	free(font);
 }
 
-static int compareGlyph(
-	const void* a,
-	const void* b)
+static int compareGlyph(const void* a, const void* b)
 {
 	// NOTE: a and b should not be NULL!
 	// Skipping assertion for debug build speed.
 
 	if (((Glyph*)a)->value < ((Glyph*)b)->value)
 		return -1;
-	if (((Glyph*)a)->value == ((Glyph*)b)->value)
-		return 0;
 	if (((Glyph*)a)->value > ((Glyph*)b)->value)
 		return 1;
-
-	abort();
+	return 0;
 }
-inline static bool createTextGlyphs( // TODO: use instead of bools MpgxResults
-	const uint32_t* array,
-	size_t arrayLength,
-	Glyph** _glyphs,
-	size_t* _glyphCount)
+inline static MpgxResult createGlyphs(
+	const uint32_t* string,
+	size_t stringLength,
+	Glyph** glyphs,
+	size_t* glyphCount)
 {
-	assert(array);
-	assert(arrayLength > 0);
-	assert(_glyphs);
-	assert(_glyphCount > 0);
+	assert(string);
+	assert(stringLength > 0);
+	assert(glyphs);
+	assert(glyphCount > 0);
 
-	Glyph* glyphs = malloc(
-		arrayLength * sizeof(Glyph));
+	Glyph* glyphArray = malloc(
+		stringLength * sizeof(Glyph));
 
-	if (!glyphs)
-		return false;
+	if (!glyphArray)
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
-	size_t glyphCount = 0;
+	size_t count = 0;
 
-	for (size_t i = 0; i < arrayLength; i++)
+	for (size_t i = 0; i < stringLength; i++)
 	{
-		uint32_t value = array[i];
+		uint32_t value = string[i];
 
-		if (value == '\n')
-			continue;
-		else if (value == '\t')
-			value = ' ';
-
-		Glyph searchGlyph;
-		searchGlyph.value = value;
+		if (value == '\n') continue;
+		else if (value == '\t') value = ' ';
 
 		Glyph* glyph = bsearch(
-			&searchGlyph,
-			glyphs,
-			glyphCount,
+			&value,
+			glyphArray,
+			count,
 			sizeof(Glyph),
 			compareGlyph);
 
 		if (!glyph)
 		{
-			glyphs[glyphCount].value = value;
-			glyphCount++;
+			glyphArray[count++].value = value;
 
-			qsort(
-				glyphs,
-				glyphCount,
+			qsort(glyphArray,
+				count,
 				sizeof(Glyph),
 				compareGlyph);
 		}
 	}
 
-	if (glyphCount == 0)
+	if (count == 0)
 	{
-		free(glyphs);
+		free(glyphArray);
+		return BAD_VALUE_MPGX_RESULT;
+	}
+
+	*glyphs = glyphArray;
+	*glyphCount = count;
+	return SUCCESS_MPGX_RESULT;
+}
+
+inline static bool setFtPixelSize(
+	FT_Face face,
+	uint32_t size,
+	Logger logger)
+{
+	assert(face);
+	assert(size > 0);
+
+	FT_Error ftResult = FT_Set_Pixel_Sizes(
+		face,
+		0,
+		(FT_UInt)size);
+
+	if (ftResult != 0)
+	{
+		if (logger)
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to set FreeType pixel sizes. (error: %s)",
+				FT_Error_String(ftResult));
+		}
 		return false;
 	}
 
-	*_glyphs = glyphs;
-	*_glyphCount = glyphCount;
 	return true;
 }
-inline static bool createTextPixels(
-	FT_Face face,
+inline static bool fillAtlasPixels(
+	Font* fonts,
+	size_t fontCount,
 	uint32_t fontSize,
 	Glyph* glyphs,
 	size_t glyphCount,
-	uint32_t textPixelLength,
-	uint8_t** _pixels,
-	size_t* _pixelCount,
-	uint32_t* _pixelLength)
+	uint32_t glyphLength,
+	uint32_t pixelLength,
+	uint32_t pixelSquare,
+	uint8_t* pixels,
+	Logger logger)
 {
-	assert(face);
+	assert(fonts);
+	assert(fontCount > 0);
 	assert(fontSize > 0);
 	assert(glyphs);
 	assert(glyphCount > 0);
-	assert(textPixelLength > 0);
-	assert(_pixels);
-	assert(_pixelCount);
-	assert(_pixelLength);
+	assert(glyphLength > 0);
+	assert(pixelSquare > 0);
+	assert(pixels);
 
-	uint32_t glyphLength = (uint32_t)ceilf(sqrtf((float)glyphCount));
-	uint32_t pixelLength = glyphLength * fontSize;
-	size_t pixelCount = (size_t)pixelLength * pixelLength;
+	for (size_t i = 0; i < fontCount; i++)
+	{
+		bool result = setFtPixelSize(
+			fonts[i]->face,
+			fontSize,
+			logger);
 
-	uint8_t* pixels = calloc(
-		pixelCount,
-		sizeof(uint8_t));
+		if (!result)
+			return false;
+	}
 
-	if (!pixels)
-		return false;
-
-	if (textPixelLength < pixelLength)
-		textPixelLength = pixelLength;
+	FT_Face mainFace = fonts[0]->face;
 
 	for (size_t i = 0; i < glyphCount; i++)
 	{
@@ -609,471 +727,164 @@ inline static bool createTextPixels(
 		glyph.value = glyphs[i].value;
 
 		FT_UInt charIndex = FT_Get_Char_Index(
-			face,
+			mainFace,
 			glyph.value);
-		FT_Error result = FT_Load_Glyph(
-			face,
+		FT_Face charFace = mainFace;
+
+		if (charIndex == 0)
+		{
+			for (size_t j = 1; j < fontCount; j++)
+			{
+				FT_Face face = fonts[j]->face;
+
+				charIndex = FT_Get_Char_Index(
+					face,
+					glyph.value);
+
+				if (charIndex != 0)
+				{
+					charFace = face;
+					break;
+				}
+			}
+		}
+
+		FT_Error ftResult = FT_Load_Glyph(
+			charFace,
 			charIndex,
 			FT_LOAD_RENDER);
 
-		if (result != 0)
+		if (ftResult != 0)
 		{
-			free(pixels);
+			if (logger)
+			{
+				logMessage(logger, ERROR_LOG_LEVEL,
+					"Failed to load FreeType glyph. (error: %s)",
+					FT_Error_String(ftResult));
+			}
 			return false;
 		}
 
-		FT_GlyphSlot glyphSlot = face->glyph;
-		uint8_t* bitmap = glyphSlot->bitmap.buffer;
-
-		uint32_t pixelPosY = (uint32_t)(i / glyphLength);
-		uint32_t pixelPosX = (uint32_t)(i - pixelPosY * glyphLength);
-
-		pixelPosX *= fontSize;
-		pixelPosY *= fontSize;
-
+		FT_GlyphSlot glyphSlot = charFace->glyph;
 		uint32_t glyphWidth = glyphSlot->bitmap.width;
 		uint32_t glyphHeight = glyphSlot->bitmap.rows;
 
+		glyph.advance = ((float)glyphSlot->advance.x /
+			64.0f) / (float)fontSize;
+
 		if (glyphWidth * glyphHeight == 0)
 		{
-			glyph.position = zeroVec4F;
-			glyph.texCoords = zeroVec4F;
 			glyph.isVisible = false;
 		}
 		else
 		{
-			glyph.position.x = (float)glyphSlot->bitmap_left / (float)fontSize;
-			glyph.position.y = ((float)glyphSlot->bitmap_top - (float)glyphHeight) / (float)fontSize;
-			glyph.position.z = glyph.position.x + (float)glyphWidth / (float)fontSize;
-			glyph.position.w = glyph.position.y + (float)glyphHeight /(float)fontSize;
-			glyph.texCoords.x = (float)pixelPosX / (float)textPixelLength;
-			glyph.texCoords.y = (float)pixelPosY / (float)textPixelLength;
-			glyph.texCoords.z = glyph.texCoords.x + (float)glyphWidth / (float)textPixelLength;
-			glyph.texCoords.w = glyph.texCoords.y + (float)glyphHeight / (float)textPixelLength;
+			uint8_t* bitmap = glyphSlot->bitmap.buffer;
+			uint32_t glyphPosY = (uint32_t)(i / glyphLength);
+			uint32_t glyphPosX = (uint32_t)(i - glyphPosY * glyphLength);
+			uint32_t pixelPosX = glyphPosX * fontSize;
+			uint32_t pixelPosY = glyphPosY * fontSize;
+
+			glyph.positionX = (float)glyphSlot->bitmap_left / (float)fontSize;
+			glyph.positionY = ((float)glyphSlot->bitmap_top - (float)glyphHeight) / (float)fontSize;
+			glyph.positionZ = glyph.positionX + (float)glyphWidth / (float)fontSize;
+			glyph.positionW = glyph.positionY + (float)glyphHeight /(float)fontSize;
+			glyph.texCoordsX = (float)pixelPosX / (float)pixelLength; //tpl
+			glyph.texCoordsY = (float)pixelPosY / (float)pixelLength; //tpl
+			glyph.texCoordsZ = glyph.texCoordsX + (float)glyphWidth / (float)pixelLength; //tpl
+			glyph.texCoordsW = glyph.texCoordsY + (float)glyphHeight / (float)pixelLength; //tpl
 			glyph.isVisible = true;
 
-			for (size_t y = 0; y < glyphHeight; y++)
+			for (uint32_t y = 0; y < glyphHeight; y++)
 			{
-				for (size_t x = 0; x < glyphWidth; x++)
-				{
-					pixels[(y + pixelPosY) * pixelLength + (x + pixelPosX)] =
-						bitmap[y * glyphWidth + x];
-				}
+				for (uint32_t x = 0; x < glyphWidth; x++)
+					pixels[(x + pixelPosX) + (y + pixelPosY) * pixelLength] = bitmap[x + y * glyphWidth];
 			}
 		}
 
-		glyph.advance = ((float)glyphSlot->advance.x / 64.0f) / (float)fontSize;
 		glyphs[i] = glyph;
 	}
 
-	*_pixels = pixels;
-	*_pixelCount = pixelCount;
-	*_pixelLength = pixelLength;
 	return true;
 }
-inline static bool createTextVertices(
-	const uint32_t* array,
-	size_t arrayLength,
-	const Glyph* glyphs,
+inline static MpgxResult createAtlasImage(
+	Window window,
+	bool isConstant,
+	Font* fonts,
+	size_t fontCount,
+	uint32_t fontSize,
+	Glyph* glyphs,
 	size_t glyphCount,
-	float newLineAdvance,
-	AlignmentType alignment,
-	float** _vertices,
-	size_t* _vertexCount,
-	Vec2F* _textSize)
+	uint32_t glyphLength,
+	uint32_t pixelLength,
+	uint32_t pixelSquare,
+	uint8_t* pixels,
+	Logger logger,
+	Image* atlas)
 {
-	assert(array);
-	assert(arrayLength > 0);
+	assert(window);
+	assert(fonts);
+	assert(fontCount > 0);
+	assert(fontSize > 0);
 	assert(glyphs);
 	assert(glyphCount > 0);
-	assert(_vertices);
-	assert(_vertexCount);
-	assert(_textSize);
+	assert(glyphLength > 0);
+	assert(pixelSquare > 0);
+	assert(pixels);
+	assert(atlas);
 
-	// TODO: use mapBuffer here
-	size_t vertexCount = arrayLength * 16;
-	float* vertices = malloc(vertexCount * sizeof(float));
+	bool result = fillAtlasPixels(
+		fonts,
+		fontCount,
+		fontSize,
+		glyphs,
+		glyphCount,
+		glyphLength,
+		pixelLength,
+		pixelSquare,
+		pixels,
+		logger);
 
-	if (!vertices)
-		return false;
+	if (!result)
+		return UNKNOWN_ERROR_MPGX_RESULT;
 
-	Vec2F vertexOffset = vec2F(
-		0.0f, -newLineAdvance * 0.5f);
-	Vec2F textSize = zeroVec2F;
+	Image atlasInstance;
 
-	size_t vertexIndex = 0;
-	size_t lastNewLineIndex = 0;
-
-	float offset;
-
-	for (size_t i = 0; i < arrayLength; i++)
-	{
-		uint32_t value = array[i];
-
-		if (value == '\n')
-		{
-			switch (alignment)
-			{
-			default:
-				abort();
-			case CENTER_ALIGNMENT_TYPE:
-				offset = vertexOffset.x * -0.5f;
-
-				for (size_t j = lastNewLineIndex; j < vertexIndex; j += 16)
-				{
-					vertices[j + 0] += offset;
-					vertices[j + 4] += offset;
-					vertices[j + 8] += offset;
-					vertices[j + 12] += offset;
-				}
-				break;
-			case LEFT_ALIGNMENT_TYPE:
-				break;
-			case RIGHT_ALIGNMENT_TYPE:
-				offset = -vertexOffset.x;
-
-				for (size_t j = lastNewLineIndex; j < vertexIndex; j += 16)
-				{
-					vertices[j + 0] += offset;
-					vertices[j + 4] += offset;
-					vertices[j + 8] += offset;
-					vertices[j + 12] += offset;
-				}
-				break;
-			case BOTTOM_ALIGNMENT_TYPE:
-				offset = vertexOffset.x * -0.5f;
-
-				for (size_t j = lastNewLineIndex; j < vertexIndex; j += 16)
-				{
-					vertices[j + 0] += offset;
-					vertices[j + 4] += offset;
-					vertices[j + 8] += offset;
-					vertices[j + 12] += offset;
-				}
-				break;
-			case TOP_ALIGNMENT_TYPE:
-				offset = vertexOffset.x * -0.5f;
-
-				for (size_t j = lastNewLineIndex; j < vertexIndex; j += 16)
-				{
-					vertices[j + 0] += offset;
-					vertices[j + 4] += offset;
-					vertices[j + 8] += offset;
-					vertices[j + 12] += offset;
-				}
-				break;
-			case LEFT_BOTTOM_ALIGNMENT_TYPE:
-			case LEFT_TOP_ALIGNMENT_TYPE:
-				break;
-			case RIGHT_BOTTOM_ALIGNMENT_TYPE:
-				offset = -vertexOffset.x;
-
-				for (size_t j = lastNewLineIndex; j < vertexIndex; j += 16)
-				{
-					vertices[j + 0] += offset;
-					vertices[j + 4] += offset;
-					vertices[j + 8] += offset;
-					vertices[j + 12] += offset;
-				}
-				break;
-			case RIGHT_TOP_ALIGNMENT_TYPE:
-				offset = -vertexOffset.x;
-
-				for (size_t j = lastNewLineIndex; j < vertexIndex; j += 16)
-				{
-					vertices[j + 0] += offset;
-					vertices[j + 4] += offset;
-					vertices[j + 8] += offset;
-					vertices[j + 12] += offset;
-				}
-				break;
-			}
-
-			lastNewLineIndex = vertexIndex;
-
-			if (textSize.x < vertexOffset.x)
-				textSize.x = vertexOffset.x;
-
-			vertexOffset.y -= newLineAdvance;
-			vertexOffset.x = 0.0f;
-			continue;
-		}
-		else if (value == '\t')
-		{
-			Glyph searchGlyph;
-			searchGlyph.value = ' ';
-
-			Glyph* glyph = bsearch(
-				&searchGlyph,
-				glyphs,
-				glyphCount,
-				sizeof(Glyph),
-				compareGlyph);
-
-			if (!glyph)
-			{
-				free(vertices);
-				return false;
-			}
-
-			vertexOffset.x += glyph->advance * 4;
-			continue;
-		}
-
-		Glyph searchGlyph;
-		searchGlyph.value = value;
-
-		Glyph* glyph = bsearch(
-			&searchGlyph,
-			glyphs,
-			glyphCount,
-			sizeof(Glyph),
-			compareGlyph);
-
-		if (!glyph)
-		{
-			free(vertices);
-			return false;
-		}
-
-		if (glyph->isVisible)
-		{
-			Vec4F position = vec4F(
-				vertexOffset.x + glyph->position.x,
-				vertexOffset.y + glyph->position.y,
-				vertexOffset.x + glyph->position.z,
-				vertexOffset.y + glyph->position.w);
-			Vec4F texCoords = glyph->texCoords;
-
-			vertices[vertexIndex + 0] = position.x;
-			vertices[vertexIndex + 1] = position.y;
-			vertices[vertexIndex + 2] = texCoords.x;
-			vertices[vertexIndex + 3] = texCoords.w;
-			vertices[vertexIndex + 4] = position.x;
-			vertices[vertexIndex + 5] = position.w;
-			vertices[vertexIndex + 6] = texCoords.x;
-			vertices[vertexIndex + 7] = texCoords.y;
-			vertices[vertexIndex + 8] = position.z;
-			vertices[vertexIndex + 9] = position.w;
-			vertices[vertexIndex + 10] = texCoords.z;
-			vertices[vertexIndex + 11] = texCoords.y;
-			vertices[vertexIndex + 12] = position.z;
-			vertices[vertexIndex + 13] = position.y;
-			vertices[vertexIndex + 14] = texCoords.z;
-			vertices[vertexIndex + 15] = texCoords.w;
-
-			vertexIndex += 16;
-		}
-
-		vertexOffset.x += glyph->advance;
-	}
-
-	if (vertexIndex == 0)
-	{
-		free(vertices);
-		return false;
-	}
-
-	if (textSize.x < vertexOffset.x)
-		textSize.x = vertexOffset.x;
-	textSize.y = -vertexOffset.y;
-
-	switch (alignment)
-	{
-	default:
-		abort();
-	case CENTER_ALIGNMENT_TYPE:
-		offset = vertexOffset.x * -0.5f;
-
-		for (size_t i = lastNewLineIndex; i < vertexIndex; i += 16)
-		{
-			vertices[i + 0] += offset;
-			vertices[i + 4] += offset;
-			vertices[i + 8] += offset;
-			vertices[i + 12] += offset;
-		}
-
-		offset = textSize.y * 0.5f;
-
-		for (size_t i = 0; i < vertexIndex; i += 16)
-		{
-			vertices[i + 1] += offset;
-			vertices[i + 5] += offset;
-			vertices[i + 9] += offset;
-			vertices[i + 13] += offset;
-		}
-		break;
-	case LEFT_ALIGNMENT_TYPE:
-		offset = textSize.y * 0.5f;
-
-		for (size_t i = 0; i < vertexIndex; i += 16)
-		{
-			vertices[i + 1] += offset;
-			vertices[i + 5] += offset;
-			vertices[i + 9] += offset;
-			vertices[i + 13] += offset;
-		}
-		break;
-	case RIGHT_ALIGNMENT_TYPE:
-		offset = -vertexOffset.x;
-
-		for (size_t i = lastNewLineIndex; i < vertexIndex; i += 16)
-		{
-			vertices[i + 0] += offset;
-			vertices[i + 4] += offset;
-			vertices[i + 8] += offset;
-			vertices[i + 12] += offset;
-		}
-
-		offset = textSize.y * 0.5f;
-
-		for (size_t i = 0; i < vertexIndex; i += 16)
-		{
-			vertices[i + 1] += offset;
-			vertices[i + 5] += offset;
-			vertices[i + 9] += offset;
-			vertices[i + 13] += offset;
-		}
-		break;
-	case BOTTOM_ALIGNMENT_TYPE:
-		offset = vertexOffset.x * -0.5f;
-
-		for (size_t i = lastNewLineIndex; i < vertexIndex; i += 16)
-		{
-			vertices[i + 0] += offset;
-			vertices[i + 4] += offset;
-			vertices[i + 8] += offset;
-			vertices[i + 12] += offset;
-		}
-
-		offset = textSize.y;
-
-		for (size_t i = 0; i < vertexIndex; i += 16)
-		{
-			vertices[i + 1] += offset;
-			vertices[i + 5] += offset;
-			vertices[i + 9] += offset;
-			vertices[i + 13] += offset;
-		}
-		break;
-	case TOP_ALIGNMENT_TYPE:
-		offset = vertexOffset.x * -0.5f;
-
-		for (size_t i = lastNewLineIndex; i < vertexIndex; i += 16)
-		{
-			vertices[i + 0] += offset;
-			vertices[i + 4] += offset;
-			vertices[i + 8] += offset;
-			vertices[i + 12] += offset;
-		}
-		break;
-	case LEFT_BOTTOM_ALIGNMENT_TYPE:
-		offset = textSize.y;
-
-		for (size_t i = 0; i < vertexIndex; i += 16)
-		{
-			vertices[i + 1] += offset;
-			vertices[i + 5] += offset;
-			vertices[i + 9] += offset;
-			vertices[i + 13] += offset;
-		}
-		break;
-	case LEFT_TOP_ALIGNMENT_TYPE:
-		break;
-	case RIGHT_BOTTOM_ALIGNMENT_TYPE:
-		offset = -vertexOffset.x;
-
-		for (size_t i = lastNewLineIndex; i < vertexIndex; i += 16)
-		{
-			vertices[i + 0] += offset;
-			vertices[i + 4] += offset;
-			vertices[i + 8] += offset;
-			vertices[i + 12] += offset;
-		}
-
-		offset = textSize.y;
-
-		for (size_t i = 0; i < vertexIndex; i += 16)
-		{
-			vertices[i + 1] += offset;
-			vertices[i + 5] += offset;
-			vertices[i + 9] += offset;
-			vertices[i + 13] += offset;
-		}
-		break;
-	case RIGHT_TOP_ALIGNMENT_TYPE:
-		offset = -vertexOffset.x;
-
-		for (size_t i = lastNewLineIndex; i < vertexIndex; i += 16)
-		{
-			vertices[i + 0] += offset;
-			vertices[i + 4] += offset;
-			vertices[i + 8] += offset;
-			vertices[i + 12] += offset;
-		}
-		break;
-	}
-
-	*_vertices = vertices;
-	*_vertexCount = vertexIndex;
-	*_textSize = textSize;
-	return true;
-}
-inline static bool createTextIndices(
-	size_t vertexCount,
-	uint32_t** _indices,
-	size_t* _indexCount)
-{
-	assert(vertexCount > 0);
-	assert(_indices);
-	assert(_indexCount > 0);
-
-	size_t indexCount = (vertexCount / 16) * 6;
-
-	uint32_t* indices = malloc(
-		indexCount * sizeof(uint32_t));
-
-	if (!indices)
-		return false;
-
-	for (size_t i = 0, j = 0; i < indexCount; i += 6, j += 4)
-	{
-		indices[i + 0] = (uint32_t)j + 0;
-		indices[i + 1] = (uint32_t)j + 1;
-		indices[i + 2] = (uint32_t)j + 2;
-		indices[i + 3] = (uint32_t)j + 0;
-		indices[i + 4] = (uint32_t)j + 2;
-		indices[i + 5] = (uint32_t)j + 3;
-	}
-
-	*_indices = indices;
-	*_indexCount = indexCount;
-	return true;
+	return createImage(
+		window,
+		SAMPLED_IMAGE_TYPE,
+		IMAGE_2D,
+		R8_UNORM_IMAGE_FORMAT,
+		pixels,
+		vec3I(
+			(cmmt_int_t)pixelLength,
+			(cmmt_int_t)pixelLength,
+			1),
+		1,
+		isConstant,
+		atlas);
 }
 
 #if MPGX_SUPPORT_VULKAN
-inline static MpgxResult createVkDescriptorPoolInstance(
+inline static MpgxResult createVkDescriptorPool(
 	VkDevice device,
-	uint32_t bufferCount,
 	VkDescriptorPool* descriptorPool)
 {
 	assert(device);
-	assert(bufferCount > 0);
 	assert(descriptorPool);
 
 	VkDescriptorPoolSize descriptorPoolSizes[1] = {
 		{
 			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			bufferCount * 2, // TODO: why * 2 ?
+			4,
 		},
 	};
 	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
 		VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 		NULL,
 		0,
-		bufferCount,
 		1,
-		descriptorPoolSizes
+		1,
+		descriptorPoolSizes,
 	};
 
 	VkDescriptorPool descriptorPoolInstance;
@@ -1090,74 +901,1180 @@ inline static MpgxResult createVkDescriptorPoolInstance(
 	*descriptorPool = descriptorPoolInstance;
 	return SUCCESS_MPGX_RESULT;
 }
-inline static MpgxResult createVkDescriptorSetArray(
+inline static MpgxResult createVkDescriptorSet(
 	VkDevice device,
 	VkDescriptorSetLayout descriptorSetLayout,
 	VkDescriptorPool descriptorPool,
-	uint32_t bufferCount,
 	VkSampler sampler,
-	VkImageView imageView,
-	VkDescriptorSet** descriptorSets)
+	VkImageView regularImageView,
+	VkImageView boldImageView,
+	VkImageView italicImageView,
+	VkImageView boldItalicImageView,
+	VkDescriptorSet* descriptorSet)
 {
 	assert(device);
 	assert(descriptorSetLayout);
 	assert(descriptorPool);
-	assert(bufferCount > 0);
 	assert(sampler);
-	assert(imageView);
-	assert(descriptorSets);
+	assert(regularImageView);
+	assert(boldImageView);
+	assert(italicImageView);
+	assert(boldItalicImageView);
+	assert(descriptorSet);
 
-	VkDescriptorSet* descriptorSetArray;
+	VkDescriptorSet descriptorSetInstance;
 
-	// TODO: possibly allocate only one descriptor set?
-	MpgxResult mpgxResult = allocateVkDescriptorSets(
-		device,
-		descriptorSetLayout,
+	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
+		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+		NULL,
 		descriptorPool,
-		bufferCount,
-		&descriptorSetArray);
+		1,
+		&descriptorSetLayout,
+	};
 
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-		return mpgxResult;
+	VkResult vkResult = vkAllocateDescriptorSets(
+		device,
+		&descriptorSetAllocateInfo,
+		&descriptorSetInstance);
 
-	for (uint32_t i = 0; i < bufferCount; i++)
-	{
-		VkDescriptorImageInfo descriptorImageInfos[1] = {
-			{
-				sampler,
-				imageView,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			},
-		};
-		VkWriteDescriptorSet writeDescriptorSets[1] = {
-			{
-				VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				NULL,
-				descriptorSetArray[i],
-				0,
-				0,
-				1,
-				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				descriptorImageInfos,
-				NULL,
-				NULL,
-			},
-		};
+	if (vkResult != VK_SUCCESS)
+		return vkToMpgxResult(vkResult);
 
-		vkUpdateDescriptorSets(
-			device,
-			1,
-			writeDescriptorSets,
+	VkDescriptorImageInfo descriptorImageInfos[4] = {
+		{
+			sampler,
+			regularImageView,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		},
+		{
+			sampler,
+			boldImageView,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		},
+		{
+			sampler,
+			italicImageView,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		},
+		{
+			sampler,
+			boldItalicImageView,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		},
+	};
+	VkWriteDescriptorSet writeDescriptorSets[1] = {
+		{
+			VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			NULL,
+			descriptorSetInstance,
 			0,
-			NULL);
-	}
+			0,
+			4,
+			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			descriptorImageInfos,
+			NULL,
+			NULL,
+		},
+	};
 
-	*descriptorSets = descriptorSetArray;
+	vkUpdateDescriptorSets(
+		device,
+		1,
+		writeDescriptorSets,
+		0,
+		NULL);
+
+	*descriptorSet = descriptorSetInstance;
 	return SUCCESS_MPGX_RESULT;
 }
 #endif
 
-MpgxResult createText32(
+MpgxResult createFontAtlas(
+	GraphicsPipeline textPipeline,
+	Font* regularFonts,
+	Font* boldFonts,
+	Font* italicFonts,
+	Font* boldItalicFonts,
+	size_t fontCount,
+	uint32_t fontSize,
+	const uint32_t* chars,
+	size_t charCount,
+	bool isConstant,
+	Logger logger,
+	FontAtlas* fontAtlas)
+{
+	assert(textPipeline);
+	assert(regularFonts);
+	assert(boldFonts);
+	assert(italicFonts);
+	assert(boldItalicFonts);
+	assert(fontCount > 0);
+	assert(fontSize > 0);
+	assert(chars);
+	assert(charCount > 0);
+	assert(fontAtlas);
+	assert(fontSize % 2 == 0);
+	assert(textInitialized);
+
+	FontAtlas fontAtlasInstance = calloc(
+		1, sizeof(FontAtlas_T));
+
+	if (!fontAtlasInstance)
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+	fontAtlasInstance->pipeline = textPipeline;
+	fontAtlasInstance->fontSize = fontSize;
+	fontAtlasInstance->isConstant = isConstant;
+
+	FT_Face defaultFace = regularFonts[0]->face;
+
+	bool result = setFtPixelSize(
+		defaultFace,
+		fontSize,
+		logger);
+
+	if (!result)
+	{
+		destroyFontAtlas(fontAtlasInstance);
+		return UNKNOWN_ERROR_MPGX_RESULT;
+	}
+
+	fontAtlasInstance->newLineAdvance =
+		((float)defaultFace->size->metrics.height /
+		64.0f) / (float)fontSize;
+
+	Font* regularFontArray = malloc(
+		fontCount * sizeof(Font));
+
+	if (!regularFontArray)
+	{
+		destroyFontAtlas(fontAtlasInstance);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	memcpy(regularFontArray, regularFonts,
+		fontCount * sizeof(Font));
+	fontAtlasInstance->regularFonts = regularFontArray;
+	fontAtlasInstance->fontCount = fontCount;
+
+	Font* boldFontArray = malloc(fontCount * sizeof(Font));
+
+	if (!boldFontArray)
+	{
+		destroyFontAtlas(fontAtlasInstance);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	memcpy(boldFontArray, boldFonts,
+		fontCount * sizeof(Font));
+	fontAtlasInstance->boldFonts = boldFontArray;
+
+	Font* italicFontArray = malloc(fontCount * sizeof(Font));
+
+	if (!italicFontArray)
+	{
+		destroyFontAtlas(fontAtlasInstance);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	memcpy(italicFontArray, italicFonts,
+		fontCount * sizeof(Font));
+	fontAtlasInstance->italicFonts = italicFontArray;
+
+	Font* boldItalicFontArray = malloc(fontCount * sizeof(Font));
+
+	if (!boldItalicFontArray)
+	{
+		destroyFontAtlas(fontAtlasInstance);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	memcpy(boldItalicFontArray, boldItalicFonts,
+		fontCount * sizeof(Font));
+	fontAtlasInstance->boldItalicFonts = boldItalicFontArray;
+
+	Glyph* regularGlyphs;
+	size_t glyphCount;
+
+	MpgxResult mpgxResult = createGlyphs(
+		chars,
+		charCount,
+		&regularGlyphs,
+		&glyphCount);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		destroyFontAtlas(fontAtlasInstance);
+		return mpgxResult;
+	}
+
+	fontAtlasInstance->regularGlyphs = regularGlyphs;
+	fontAtlasInstance->glyphCount = glyphCount;
+
+	Glyph* boldGlyphs = malloc(glyphCount * sizeof(Glyph));
+
+	if (!boldGlyphs)
+	{
+		destroyFontAtlas(fontAtlasInstance);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	memcpy(boldGlyphs, regularGlyphs,
+		glyphCount * sizeof(Glyph));
+	fontAtlasInstance->boldGlyphs = boldGlyphs;
+
+	Glyph* italicGlyphs = malloc(glyphCount * sizeof(Glyph));
+
+	if (!italicGlyphs)
+	{
+		destroyFontAtlas(fontAtlasInstance);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	memcpy(italicGlyphs, regularGlyphs,
+		glyphCount * sizeof(Glyph));
+	fontAtlasInstance->italicGlyphs = italicGlyphs;
+
+	Glyph* boldItalicGlyphs = malloc(glyphCount * sizeof(Glyph));
+
+	if (!boldItalicGlyphs)
+	{
+		destroyFontAtlas(fontAtlasInstance);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	memcpy(boldItalicGlyphs, regularGlyphs,
+		glyphCount * sizeof(Glyph));
+	fontAtlasInstance->boldItalicGlyphs = boldItalicGlyphs;
+
+	uint32_t glyphLength = (uint32_t)ceil(sqrt((double)glyphCount));
+	uint32_t pixelLength = glyphLength * fontSize;
+	uint32_t pixelSquare = pixelLength * pixelLength;
+
+	uint8_t* pixels = malloc(pixelSquare * sizeof(uint8_t));
+
+	if (!pixels)
+	{
+		destroyFontAtlas(fontAtlasInstance);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	Window window = textPipeline->base.framebuffer->base.window;
+
+	Image regularImage;
+
+	mpgxResult = createAtlasImage(
+		window,
+		isConstant,
+		regularFonts,
+		fontCount,
+		fontSize,
+		regularGlyphs,
+		glyphCount,
+		glyphLength,
+		pixelLength,
+		pixelSquare,
+		pixels,
+		logger,
+		&regularImage);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		free(pixels);
+		destroyFontAtlas(fontAtlasInstance);
+		return mpgxResult;
+	}
+
+	fontAtlasInstance->regularImage = regularImage;
+
+	Image boldImage;
+
+	mpgxResult = createAtlasImage(
+		window,
+		isConstant,
+		boldFonts,
+		fontCount,
+		fontSize,
+		boldGlyphs,
+		glyphCount,
+		glyphLength,
+		pixelLength,
+		pixelSquare,
+		pixels,
+		logger,
+		&boldImage);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		free(pixels);
+		destroyFontAtlas(fontAtlasInstance);
+		return mpgxResult;
+	}
+
+	fontAtlasInstance->boldImage = boldImage;
+
+	Image italicImage;
+
+	mpgxResult = createAtlasImage(
+		window,
+		isConstant,
+		italicFonts,
+		fontCount,
+		fontSize,
+		italicGlyphs,
+		glyphCount,
+		glyphLength,
+		pixelLength,
+		pixelSquare,
+		pixels,
+		logger,
+		&italicImage);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		free(pixels);
+		destroyFontAtlas(fontAtlasInstance);
+		return mpgxResult;
+	}
+
+	fontAtlasInstance->italicImage = italicImage;
+
+	Image boldItalicImage;
+
+	mpgxResult = createAtlasImage(
+		window,
+		isConstant,
+		boldItalicFonts,
+		fontCount,
+		fontSize,
+		boldItalicGlyphs,
+		glyphCount,
+		glyphLength,
+		pixelLength,
+		pixelSquare,
+		pixels,
+		logger,
+		&boldItalicImage);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		free(pixels);
+		destroyFontAtlas(fontAtlasInstance);
+		return mpgxResult;
+	}
+
+	fontAtlasInstance->boldItalicImage = boldItalicImage;
+
+#if MPGX_SUPPORT_VULKAN
+	GraphicsAPI api = getGraphicsAPI();
+
+	if (api == VULKAN_GRAPHICS_API)
+	{
+		VkWindow vkWindow = getVkWindow(window);
+		Handle pipelineHandle = textPipeline->vk.handle;
+
+		VkDescriptorPool descriptorPool;
+
+		mpgxResult = createVkDescriptorPool(
+			vkWindow->device,
+			&descriptorPool);
+
+		if (mpgxResult != SUCCESS_MPGX_RESULT)
+		{
+			destroyFontAtlas(fontAtlasInstance);
+			return mpgxResult;
+		}
+
+		fontAtlasInstance->descriptorPool = descriptorPool;
+
+		VkDescriptorSet descriptorSet;
+
+		mpgxResult = createVkDescriptorSet(
+			vkWindow->device,
+			pipelineHandle->vk.descriptorSetLayout,
+			descriptorPool,
+			pipelineHandle->vk.sampler->vk.handle,
+			regularImage->vk.imageView,
+			boldImage->vk.imageView,
+			italicImage->vk.imageView,
+			boldItalicImage->vk.imageView,
+			&descriptorSet);
+
+		if (mpgxResult != SUCCESS_MPGX_RESULT)
+		{
+			destroyFontAtlas(fontAtlasInstance);
+			return mpgxResult;
+		}
+
+		fontAtlasInstance->descriptorSet = descriptorSet;
+	}
+	else
+	{
+		fontAtlasInstance->descriptorPool = NULL;
+		fontAtlasInstance->descriptorSet = NULL;
+	}
+#endif
+
+	*fontAtlas = fontAtlasInstance;
+	return SUCCESS_MPGX_RESULT;
+}
+MpgxResult createAsciiFontAtlas(
+	GraphicsPipeline textPipeline,
+	Font* regularFonts,
+	Font* boldFonts,
+	Font* italicFonts,
+	Font* boldItalicFonts,
+	size_t fontCount,
+	uint32_t fontSize,
+	bool isConstant,
+	Logger logger,
+	FontAtlas* fontAtlas)
+{
+	assert(textPipeline);
+	assert(regularFonts);
+	assert(boldFonts);
+	assert(italicFonts);
+	assert(boldItalicFonts);
+	assert(fontCount > 0);
+	assert(fontSize > 0);
+	assert(fontAtlas);
+	assert(fontSize % 2 == 0);
+	assert(textInitialized);
+
+
+	return createFontAtlas(
+		textPipeline,
+		regularFonts,
+		boldFonts,
+		italicFonts,
+		boldItalicFonts,
+		fontCount,
+		fontSize,
+		printableAscii32,
+		sizeof(printableAscii32) / sizeof(uint32_t),
+		isConstant,
+		logger,
+		fontAtlas);
+}
+void destroyFontAtlas(FontAtlas fontAtlas)
+{
+	assert(textInitialized);
+
+	if (!fontAtlas)
+		return;
+
+#if MPGX_SUPPORT_VULKAN
+	GraphicsAPI api = getGraphicsAPI();
+
+	if (api == VULKAN_GRAPHICS_API)
+	{
+		VkWindow vkWindow = getVkWindow(
+			fontAtlas->pipeline->base.framebuffer->base.window);
+
+		vkDestroyDescriptorPool(
+			vkWindow->device,
+			fontAtlas->descriptorPool,
+			NULL);
+	}
+#endif
+
+	destroyImage(fontAtlas->boldItalicImage);
+	destroyImage(fontAtlas->italicImage);
+	destroyImage(fontAtlas->boldImage);
+	destroyImage(fontAtlas->regularImage);
+	free(fontAtlas->boldItalicGlyphs);
+	free(fontAtlas->italicGlyphs);
+	free(fontAtlas->boldGlyphs);
+	free(fontAtlas->regularGlyphs);
+	free(fontAtlas->boldItalicFonts);
+	free(fontAtlas->italicFonts);
+	free(fontAtlas->boldFonts);
+	free(fontAtlas->regularFonts);
+	free(fontAtlas);
+}
+
+GraphicsPipeline getFontAtlasPipeline(FontAtlas fontAtlas)
+{
+	assert(fontAtlas);
+	assert(textInitialized);
+	return fontAtlas->pipeline;
+}
+Font* getFontAtlasRegularFonts(FontAtlas fontAtlas)
+{
+	assert(fontAtlas);
+	assert(textInitialized);
+	return fontAtlas->regularFonts;
+}
+Font* getFontAtlasBoldFonts(FontAtlas fontAtlas)
+{
+	assert(fontAtlas);
+	assert(textInitialized);
+	return fontAtlas->boldFonts;
+}
+Font* getFontAtlasItalicFonts(FontAtlas fontAtlas)
+{
+	assert(fontAtlas);
+	assert(textInitialized);
+	return fontAtlas->italicFonts;
+}
+Font* getFontAtlasBoldItalicFonts(FontAtlas fontAtlas)
+{
+	assert(fontAtlas);
+	assert(textInitialized);
+	return fontAtlas->boldItalicFonts;
+}
+size_t getFontAtlasFontCount(FontAtlas fontAtlas)
+{
+	assert(fontAtlas);
+	assert(textInitialized);
+	return fontAtlas->fontCount;
+}
+uint32_t getFontAtlasFontSize(FontAtlas fontAtlas)
+{
+	assert(fontAtlas);
+	assert(textInitialized);
+	return fontAtlas->fontSize;
+}
+bool isFontAtlasConstant(FontAtlas fontAtlas)
+{
+	assert(fontAtlas);
+	assert(textInitialized);
+	return fontAtlas->isConstant;
+}
+
+inline static bool fillVertices(
+	const uint32_t* string,
+	size_t stringLength,
+	const Glyph* regularGlyphs,
+	const Glyph* boldGlyphs,
+	const Glyph* italicGlyphs,
+	const Glyph* boldItalicGlyphs,
+	size_t glyphCount,
+	float newLineAdvance,
+	AlignmentType alignment,
+	SrgbColor color,
+	bool useTags,
+	bool isBold,
+	bool isItalic,
+	TextVertex* vertices,
+	size_t* vertexCount,
+	Vec2F* textSize)
+{
+	assert(string);
+	assert(stringLength > 0);
+	assert(regularGlyphs);
+	assert(boldGlyphs);
+	assert(italicGlyphs);
+	assert(boldItalicGlyphs);
+	assert(glyphCount > 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(vertices);
+	assert(vertexCount);
+	assert(textSize);
+
+	SrgbColor useColor = color;
+	bool useBold = isBold;
+	bool useItalic = isItalic;
+
+	const Glyph* glyphs;
+	float atlasIndex;
+
+	if (isBold & isItalic)
+	{
+		glyphs = boldItalicGlyphs;
+		atlasIndex = 3.0f;
+	}
+	else if (isBold)
+	{
+		glyphs = boldGlyphs;
+		atlasIndex = 1.0f;
+	}
+	else if (isItalic)
+	{
+		glyphs = italicGlyphs;
+		atlasIndex = 2.0f;
+	}
+	else
+	{
+		glyphs = regularGlyphs;
+		atlasIndex = 0.0f;
+	}
+
+	float sizeX = 0.0f, sizeY = 0.0f;
+	float vertexOffsetX = 0.0f, vertexOffsetY = -newLineAdvance * 0.5f;
+	size_t vertexIndex = 0, lastNewLineIndex = 0;
+
+	float offset;
+
+	for (size_t i = 0; i < stringLength; i++)
+	{
+		uint32_t value = string[i];
+
+		if (value == '\n')
+		{
+			switch (alignment)
+			{
+			default:
+				abort();
+			case CENTER_ALIGNMENT_TYPE:
+				offset = vertexOffsetX * -0.5f;
+
+				for (size_t j = lastNewLineIndex; j < vertexIndex; j++)
+					vertices[j].position.x += offset;
+				break;
+			case LEFT_ALIGNMENT_TYPE:
+				break;
+			case RIGHT_ALIGNMENT_TYPE:
+				offset = -vertexOffsetX;
+
+				for (size_t j = lastNewLineIndex; j < vertexIndex; j++)
+					vertices[j].position.x += offset;
+				break;
+			case BOTTOM_ALIGNMENT_TYPE:
+				offset = vertexOffsetX * -0.5f;
+
+				for (size_t j = lastNewLineIndex; j < vertexIndex; j++)
+					vertices[j].position.x += offset;
+				break;
+			case TOP_ALIGNMENT_TYPE:
+				offset = vertexOffsetX * -0.5f;
+
+				for (size_t j = lastNewLineIndex; j < vertexIndex; j++)
+					vertices[j].position.x += offset;
+				break;
+			case LEFT_BOTTOM_ALIGNMENT_TYPE:
+			case LEFT_TOP_ALIGNMENT_TYPE:
+				break;
+			case RIGHT_BOTTOM_ALIGNMENT_TYPE:
+				offset = -vertexOffsetX;
+
+				for (size_t j = lastNewLineIndex; j < vertexIndex; j++)
+					vertices[j].position.x += offset;
+				break;
+			case RIGHT_TOP_ALIGNMENT_TYPE:
+				offset = -vertexOffsetX;
+
+				for (size_t j = lastNewLineIndex; j < vertexIndex; j++)
+					vertices[j].position.x += offset;
+				break;
+			}
+
+			lastNewLineIndex = vertexIndex;
+
+			if (sizeX < vertexOffsetX)
+				sizeX = vertexOffsetX;
+
+			vertexOffsetY -= newLineAdvance;
+			vertexOffsetX = 0.0f;
+			continue;
+		}
+		else if (value == '\t')
+		{
+			value = ' ';
+
+			const Glyph* glyph = bsearch(
+				&value,
+				glyphs,
+				glyphCount,
+				sizeof(Glyph),
+				compareGlyph);
+
+			if (!glyph)
+				return false;
+
+			vertexOffsetX += glyph->advance * 4;
+			continue;
+		}
+		else if ((value == '<') & useTags) // TODO: parse color
+		{
+			if (i + 2 < stringLength & string[i + 2] == '>')
+			{
+				if (string[i + 1] == 'b')
+				{
+					if (useItalic)
+					{
+						glyphs = boldItalicGlyphs;
+						atlasIndex = 3.0f;
+					}
+					else
+					{
+						glyphs = boldGlyphs;
+						atlasIndex = 1.0f;
+					}
+
+					useBold = true;
+					i += 2;
+					continue;
+				}
+				else if (string[i + 1] == 'i')
+				{
+					if (useBold)
+					{
+						glyphs = boldItalicGlyphs;
+						atlasIndex = 3.0f;
+					}
+					else
+					{
+						glyphs = italicGlyphs;
+						atlasIndex = 2.0f;
+					}
+
+					useItalic = true;
+					i += 2;
+					continue;
+				}
+			}
+			else if (i + 3 < stringLength & string[i + 1] == '/' & string[i + 3] == '>')
+			{
+				if (string[i + 2] == 'b')
+				{
+					if (useItalic)
+					{
+						glyphs = italicGlyphs;
+						atlasIndex = 2.0f;
+					}
+					else
+					{
+						glyphs = regularGlyphs;
+						atlasIndex = 0.0f;
+					}
+
+					useBold = false;
+					i += 3;
+					continue;
+				}
+				else if (string[i + 2] == 'i')
+				{
+					if (useBold)
+					{
+						glyphs = boldGlyphs;
+						atlasIndex = 1.0f;
+					}
+					else
+					{
+						glyphs = regularGlyphs;
+						atlasIndex = 0.0f;
+					}
+
+					useItalic = false;
+					i += 3;
+					continue;
+				}
+			}
+		}
+
+		const Glyph* glyph = bsearch(
+			&value,
+			glyphs,
+			glyphCount,
+			sizeof(Glyph),
+			compareGlyph);
+
+		if (!glyph)
+			return false;
+
+		if (glyph->isVisible)
+		{
+			float positionX = vertexOffsetX + glyph->positionX;
+			float positionY = vertexOffsetY + glyph->positionY;
+			float positionZ = vertexOffsetX + glyph->positionZ;
+			float positionW = vertexOffsetY + glyph->positionW;
+			float texCoordsX = glyph->texCoordsX;
+			float texCoordsY = glyph->texCoordsY;
+			float texCoordsZ = glyph->texCoordsZ;
+			float texCoordsW = glyph->texCoordsW;
+
+			TextVertex vertex;
+			vertex.position.x = positionX;
+			vertex.position.y = positionY;
+			vertex.texCoords.x = texCoordsX;
+			vertex.texCoords.y = texCoordsW;
+			vertex.texCoords.z = atlasIndex;
+			vertex.color = useColor;
+			vertices[vertexIndex + 0] = vertex;
+
+			vertex.position.x = positionX;
+			vertex.position.y = positionW;
+			vertex.texCoords.x = texCoordsX;
+			vertex.texCoords.y = texCoordsY;
+			vertices[vertexIndex + 1] = vertex;
+
+			vertex.position.x = positionZ;
+			vertex.position.y = positionW;
+			vertex.texCoords.x = texCoordsZ;
+			vertex.texCoords.y = texCoordsY;
+			vertices[vertexIndex + 2] = vertex;
+
+			vertex.position.x = positionZ;
+			vertex.position.y = positionY;
+			vertex.texCoords.x = texCoordsZ;
+			vertex.texCoords.y = texCoordsW;
+			vertices[vertexIndex + 3] = vertex;
+
+			vertexIndex += 4;
+		}
+
+		vertexOffsetX += glyph->advance;
+	}
+
+	if (vertexIndex == 0)
+		return false;
+
+	if (sizeX < vertexOffsetX)
+		sizeX = vertexOffsetX;
+	sizeY = -vertexOffsetY;
+
+	switch (alignment)
+	{
+	default:
+		abort();
+	case CENTER_ALIGNMENT_TYPE:
+		offset = vertexOffsetX * -0.5f;
+
+		for (size_t i = lastNewLineIndex; i < vertexIndex; i++)
+			vertices[i].position.x += offset;
+
+		offset = sizeY * 0.5f;
+
+		for (size_t i = 0; i < vertexIndex; i++)
+			vertices[i].position.y += offset;
+		break;
+	case LEFT_ALIGNMENT_TYPE:
+		offset = sizeY * 0.5f;
+
+		for (size_t i = 0; i < vertexIndex; i++)
+			vertices[i].position.y += offset;
+		break;
+	case RIGHT_ALIGNMENT_TYPE:
+		offset = -vertexOffsetX;
+
+		for (size_t i = lastNewLineIndex; i < vertexIndex; i++)
+			vertices[i].position.x += offset;
+
+		offset = sizeY * 0.5f;
+
+		for (size_t i = 0; i < vertexIndex; i++)
+			vertices[i].position.y += offset;
+		break;
+	case BOTTOM_ALIGNMENT_TYPE:
+		offset = vertexOffsetX * -0.5f;
+
+		for (size_t i = lastNewLineIndex; i < vertexIndex; i++)
+			vertices[i].position.x += offset;
+
+		offset = sizeY;
+
+		for (size_t i = 0; i < vertexIndex; i++)
+			vertices[i].position.y += offset;
+		break;
+	case TOP_ALIGNMENT_TYPE:
+		offset = vertexOffsetX * -0.5f;
+
+		for (size_t i = lastNewLineIndex; i < vertexIndex; i++)
+			vertices[i].position.x += offset;
+		break;
+	case LEFT_BOTTOM_ALIGNMENT_TYPE:
+		offset = sizeY;
+
+		for (size_t i = 0; i < vertexIndex; i++)
+			vertices[i].position.y += offset;
+		break;
+	case LEFT_TOP_ALIGNMENT_TYPE:
+		break;
+	case RIGHT_BOTTOM_ALIGNMENT_TYPE:
+		offset = -vertexOffsetX;
+
+		for (size_t i = lastNewLineIndex; i < vertexIndex; i++)
+			vertices[i].position.x += offset;
+
+		offset = sizeY;
+
+		for (size_t i = 0; i < vertexIndex; i++)
+			vertices[i].position.y += offset;
+		break;
+	case RIGHT_TOP_ALIGNMENT_TYPE:
+		offset = -vertexOffsetX;
+
+		for (size_t i = lastNewLineIndex; i < vertexIndex; i++)
+			vertices[i].position.x += offset;
+		break;
+	}
+
+	*vertexCount = vertexIndex;
+	*textSize = vec2F(sizeX, sizeY);
+	return true;
+}
+inline static uint32_t* createIndices(size_t indexCount)
+{
+	assert(indexCount > 0);
+
+	uint32_t* indices = malloc(
+		indexCount * sizeof(uint32_t));
+
+	if (!indices)
+		return NULL;
+
+	for (size_t i = 0, j = 0; i < indexCount; i += 6, j += 4)
+	{
+		indices[i + 0] = (uint32_t)j + 0;
+		indices[i + 1] = (uint32_t)j + 1;
+		indices[i + 2] = (uint32_t)j + 2;
+		indices[i + 3] = (uint32_t)j + 0;
+		indices[i + 4] = (uint32_t)j + 2;
+		indices[i + 5] = (uint32_t)j + 3;
+	}
+
+	return indices;
+}
+
+inline static void internalDestroyText(Text text)
+{
+	if (!text)
+		return;
+
+	GraphicsMesh mesh = text->mesh;
+
+	if (mesh)
+	{
+		Buffer vertexBuffer = getGraphicsMeshVertexBuffer(mesh);
+		destroyGraphicsMesh(mesh);
+		destroyBuffer(vertexBuffer);
+	}
+
+	free(text);
+}
+
+MpgxResult createAtlasText32(
+	FontAtlas fontAtlas,
+	const uint32_t* string,
+	size_t stringLength,
+	AlignmentType alignment,
+	SrgbColor color,
+	bool useTags,
+	bool isBold,
+	bool isItalic,
+	bool isConstant,
+	Text* text)
+{
+	assert(fontAtlas);
+	assert(string);
+	assert(stringLength > 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(text);
+	assert(textInitialized);
+
+	Text textInstance = calloc(
+		1, sizeof(Text_T));
+
+	if (!textInstance)
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+	textInstance->fontAtlas = fontAtlas;
+	textInstance->alignment = alignment;
+	textInstance->isConstant = isConstant;
+
+	TextVertex* vertices = malloc(
+		stringLength * 4 * sizeof(TextVertex));
+
+	if (!vertices)
+	{
+		internalDestroyText(textInstance);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	size_t vertexCount;
+
+	bool result = fillVertices(
+		string,
+		stringLength,
+		fontAtlas->regularGlyphs,
+		fontAtlas->boldGlyphs,
+		fontAtlas->italicGlyphs,
+		fontAtlas->boldItalicGlyphs,
+		fontAtlas->glyphCount,
+		fontAtlas->newLineAdvance,
+		alignment,
+		color,
+		useTags,
+		isBold,
+		isItalic,
+		vertices,
+		&vertexCount,
+		&textInstance->textSize);
+
+	if (!result)
+	{
+		free(vertices);
+		internalDestroyText(textInstance);
+		return BAD_VALUE_MPGX_RESULT;
+	}
+
+	GraphicsPipeline pipeline = fontAtlas->pipeline;
+	Window window = pipeline->base.framebuffer->base.window;
+	Handle handle = pipeline->base.handle;
+
+	Buffer vertexBuffer;
+
+	MpgxResult mpgxResult = createBuffer(
+		window,
+		VERTEX_BUFFER_TYPE,
+		isConstant ? CPU_TO_GPU_BUFFER_USAGE : GPU_ONLY_BUFFER_USAGE,
+		vertices,
+		vertexCount * sizeof(TextVertex),
+		&vertexBuffer);
+
+	free(vertices);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		internalDestroyText(textInstance);
+		return mpgxResult;
+	}
+
+	size_t textCount = handle->base.textCount;
+	Buffer indexBuffer = handle->base.indexBuffer;
+	Text* texts = handle->base.texts;
+
+	GraphicsAPI api = getGraphicsAPI();
+	size_t indexCount = (vertexCount / 4) * 6;
+
+	if (indexBuffer == NULL || indexBuffer->base.size <
+		indexCount * sizeof(uint32_t))
+	{
+		uint32_t* indices = createIndices(indexCount);
+
+		if (!indices)
+		{
+			destroyBuffer(vertexBuffer);
+			internalDestroyText(textInstance);
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+		}
+
+		Buffer newIndexBuffer;
+
+		mpgxResult = createBuffer(window,
+			INDEX_BUFFER_TYPE,
+			GPU_ONLY_BUFFER_USAGE,
+			indices,
+			indexCount * sizeof(uint32_t),
+			&newIndexBuffer);
+
+		free(indices);
+
+		if (mpgxResult != SUCCESS_MPGX_RESULT)
+		{
+			destroyBuffer(vertexBuffer);
+			internalDestroyText(textInstance);
+			return mpgxResult;
+		}
+
+		if (api == OPENGL_GRAPHICS_API ||
+			api == OPENGL_ES_GRAPHICS_API)
+		{
+			for (size_t i = 0; i < textCount; i++)
+			{
+				GraphicsMesh textMesh = texts[i]->mesh;
+				textMesh->base.indexBuffer = newIndexBuffer;
+			}
+		}
+
+		handle->base.indexBuffer = newIndexBuffer;
+		destroyBuffer(indexBuffer);
+	}
+
+	GraphicsMesh mesh;
+
+	mpgxResult = createGraphicsMesh(
+		window,
+		UINT32_INDEX_TYPE,
+		indexCount,
+		0,
+		vertexBuffer,
+		api == OPENGL_GRAPHICS_API ||
+			api == OPENGL_ES_GRAPHICS_API ?
+			handle->base.indexBuffer : NULL,
+		&mesh);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		destroyBuffer(vertexBuffer);
+		internalDestroyText(textInstance);
+		return mpgxResult;
+	}
+
+	textInstance->mesh = mesh;
+
+	if (textCount == handle->base.textCapacity)
+	{
+		size_t capacity = handle->base.textCapacity * 2;
+
+		Text* newTexts = realloc(texts,
+			sizeof(Text) * capacity);
+
+		if (!newTexts)
+		{
+			internalDestroyText(textInstance);
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+		}
+
+		handle->base.texts = newTexts;
+		handle->base.textCapacity = capacity;
+	}
+
+	handle->base.texts[textCount] = textInstance;
+	handle->base.textCount = textCount + 1;
+
+	*text = textInstance;
+	return SUCCESS_MPGX_RESULT;
+}
+MpgxResult createAtlasText(
+	FontAtlas fontAtlas,
+	const char* string,
+	size_t stringLength,
+	AlignmentType alignment,
+	SrgbColor color,
+	bool useTags,
+	bool isBold,
+	bool isItalic,
+	bool isConstant,
+	Text* text)
+{
+	assert(fontAtlas);
+	assert(string);
+	assert(stringLength > 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(text);
+	assert(textInitialized);
+
+	uint32_t* string32;
+	size_t stringLength32;
+
+	MpgxResult mpgxResult = allocateStringUTF32(
+		string,
+		stringLength,
+		&string32,
+		&stringLength32);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+		return mpgxResult;
+
+	mpgxResult = createAtlasText32(
+		fontAtlas,
+		string32,
+		stringLength32,
+		alignment,
+		color,
+		useTags,
+		isBold,
+		isItalic,
+		isConstant,
+		text);
+
+	free(string32);
+	return mpgxResult;
+}
+
+/*MpgxResult createText32(
 	GraphicsPipeline textPipeline,
 	Font font,
 	uint32_t fontSize,
@@ -1198,17 +2115,17 @@ MpgxResult createText32(
 	Glyph* glyphs;
 	size_t glyphCount;
 
-	bool result = createTextGlyphs(
+	MpgxResult mpgxResult = createGlyphs(
 		_data,
 		dataLength,
 		&glyphs,
 		&glyphCount);
 
-	if (!result)
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
 		free(data);
 		free(text);
-		return UNKNOWN_ERROR_MPGX_RESULT; // TODO: handle bad text data
+		return mpgxResult;
 	}
 
 	FT_Face face = font->face;
@@ -1234,15 +2151,7 @@ MpgxResult createText32(
 	size_t pixelCount;
 	uint32_t pixelLength;
 
-	result = createTextPixels(
-		face,
-		fontSize,
-		glyphs,
-		glyphCount,
-		0,
-		&pixels,
-		&pixelCount,
-		&pixelLength);
+	bool result = true;
 
 	if (!result)
 	{
@@ -1256,7 +2165,7 @@ MpgxResult createText32(
 
 	Image texture;
 
-	MpgxResult mpgxResult = createImage(
+	mpgxResult = createImage(
 		window,
 		SAMPLED_IMAGE_TYPE,
 		IMAGE_2D,
@@ -1398,9 +2307,8 @@ MpgxResult createText32(
 
 		VkDescriptorPool descriptorPool;
 
-		mpgxResult = createVkDescriptorPoolInstance(
+		mpgxResult = createVkDescriptorPool(
 			device,
-			bufferCount,
 			&descriptorPool);
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
@@ -1415,14 +2323,13 @@ MpgxResult createText32(
 
 		VkDescriptorSet* descriptorSets;
 
-		mpgxResult = createVkDescriptorSetArray(
+		mpgxResult = createVkDescriptorSet(
 			device,
 			handle->vk.descriptorSetLayout,
 			descriptorPool,
-			bufferCount,
 			handle->vk.sampler->vk.handle,
 			texture->vk.imageView,
-			&descriptorSets);
+			descriptorSets);
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
 		{
@@ -1524,7 +2431,7 @@ MpgxResult createText8(
 	uint32_t* array;
 	size_t arrayLength;
 
-	bool result = createStringUTF32(
+	bool result = allocateStringUTF32(
 		data,
 		dataLength,
 		&array,
@@ -1543,9 +2450,9 @@ MpgxResult createText8(
 		isConstant,
 		text);
 
-	destroyStringUTF32(array);
+	free(array);
 	return mpgxResult;
-}
+}*/
 void destroyText(Text text)
 {
 	assert(textInitialized);
@@ -1553,7 +2460,7 @@ void destroyText(Text text)
 	if (!text)
 		return;
 
-	Handle handle = text->pipeline->base.handle;
+	Handle handle = text->fontAtlas->pipeline->base.handle;
 	Text* texts = handle->base.texts;
 	size_t textCount = handle->base.textCount;
 
@@ -1565,37 +2472,7 @@ void destroyText(Text text)
 		for (size_t j = i + 1; j < textCount; j++)
 			texts[j - 1] = texts[j];
 
-#if MPGX_SUPPORT_VULKAN
-		GraphicsPipeline pipeline = text->pipeline;
-		GraphicsAPI api = getGraphicsAPI();
-
-		if (api == VULKAN_GRAPHICS_API)
-		{
-			VkWindow vkWindow = getVkWindow(
-				pipeline->vk.framebuffer->vk.window);
-			VkDevice device = vkWindow->device;
-
-			VkResult vkResult = vkQueueWaitIdle(
-				vkWindow->graphicsQueue);
-
-			if (vkResult != VK_SUCCESS)
-				abort();
-
-			free(text->descriptorSets);
-
-			vkDestroyDescriptorPool(
-				device,
-				text->descriptorPool,
-				NULL);
-		}
-#endif
-		// TODO: destroy transform, add it to the text handle
-		destroyGraphicsMesh(text->mesh);
-		destroyImage(text->texture);
-
-		free(text->data);
-		free(text);
-
+		internalDestroyText(text);
 		handle->base.textCount--;
 		return;
 	}
@@ -1603,11 +2480,17 @@ void destroyText(Text text)
 	abort();
 }
 
-GraphicsPipeline getTextPipeline(Text text)
+FontAtlas getTextFontAtlas(Text text)
 {
 	assert(text);
 	assert(textInitialized);
-	return text->pipeline;
+	return text->fontAtlas;
+}
+Vec2F getTextSize(Text text)
+{
+	assert(text);
+	assert(textInitialized);
+	return text->textSize;
 }
 bool isTextConstant(Text text)
 {
@@ -1616,12 +2499,8 @@ bool isTextConstant(Text text)
 	return text->isConstant;
 }
 
-Vec2F getTextSize(Text text)
-{
-	assert(text);
-	assert(textInitialized);
-	return text->textSize;
-}
+// TODO: inspect cmmt float vectors \/
+
 Vec2F getTextOffset(Text text)
 {
 	assert(text);
@@ -1674,7 +2553,7 @@ Vec2F getTextOffset(Text text)
 }
 
 // TODO: take into account text alignment
-bool getTextCaretAdvance(
+/*bool getTextCaretAdvance(
 	Text text,
 	size_t index,
 	Vec2F* _advance)
@@ -1771,42 +2650,7 @@ bool getTextCaretPosition(
 
 	// TODO:
 	abort();
-}
-
-Font getTextFont(
-	Text text)
-{
-	assert(text);
-	assert(textInitialized);
-	return text->font;
-}
-void setTextFont(
-	Text text,
-	Font font)
-{
-	assert(text);
-	assert(font);
-	assert(!text->isConstant);
-	assert(textInitialized);
-	text->font = font;
-}
-
-uint32_t getTextFontSize(
-	Text text)
-{
-	assert(text);
-	assert(textInitialized);
-	return text->fontSize;
-}
-void setTextFontSize(
-	Text text,
-	uint32_t fontSize)
-{
-	assert(text);
-	assert(!text->isConstant);
-	assert(textInitialized);
-	text->fontSize = fontSize;
-}
+}*/
 
 AlignmentType getTextAlignment(
 	Text text)
@@ -1826,18 +2670,18 @@ void setTextAlignment(
 	text->alignment = alignment;
 }
 
-size_t getTextDataLength(Text text)
+/*size_t getTextStringLength(Text text)
 {
 	assert(text);
 	assert(textInitialized);
-	return text->dataLength;
+	return text->stringLength;
 }
-const uint32_t* getTextData(
+const uint32_t* getTextString(
 	Text text)
 {
 	assert(text);
 	assert(textInitialized);
-	return text->data;
+	return text->string;
 }
 
 bool setTextData32(
@@ -1908,7 +2752,7 @@ bool setTextData8(
 	uint32_t* array;
 	size_t arrayLength;
 
-	bool result = createStringUTF32(
+	bool result = allocateStringUTF32(
 		data,
 		dataLength,
 		&array,
@@ -1923,7 +2767,7 @@ bool setTextData8(
 		arrayLength,
 		reuseBuffers);
 
-	destroyStringUTF32(array);
+	free(array);
 	return result;
 }
 
@@ -1947,14 +2791,14 @@ MpgxResult bakeText(
 		Glyph* glyphs;
 		size_t glyphCount;
 
-		bool result = createTextGlyphs(
+		MpgxResult mpgxResult = createGlyphs(
 			data,
 			dataLength,
 			&glyphs,
 			&glyphCount);
 
-		if (!result)
-			return UNKNOWN_ERROR_MPGX_RESULT; // TODO:
+		if (mpgxResult != SUCCESS_MPGX_RESULT)
+			return mpgxResult;
 
 		FT_Face face = text->font->face;
 		uint32_t fontSize = text->fontSize;
@@ -1981,15 +2825,7 @@ MpgxResult bakeText(
 		size_t pixelCount;
 		uint32_t pixelLength;
 
-		result = createTextPixels(
-			face,
-			fontSize,
-			glyphs,
-			glyphCount,
-			textPixelLength,
-			&pixels,
-			&pixelCount,
-			&pixelLength);
+		bool result = true;
 
 		if (!result)
 		{
@@ -2032,14 +2868,13 @@ MpgxResult bakeText(
 				VkDevice device = vkWindow->device;
 				Handle handle = pipeline->vk.handle;
 
-				mpgxResult = createVkDescriptorSetArray(
+				mpgxResult = createVkDescriptorSet(
 					device,
 					handle->vk.descriptorSetLayout,
 					text->descriptorPool,
-					handle->vk.bufferCount,
 					handle->vk.sampler->vk.handle,
 					texture->vk.imageView,
-					&descriptorSets);
+					descriptorSets);
 
 				if (mpgxResult != SUCCESS_MPGX_RESULT)
 				{
@@ -2217,14 +3052,14 @@ MpgxResult bakeText(
 		Glyph* glyphs;
 		size_t glyphCount;
 
-		bool result = createTextGlyphs(
+		MpgxResult mpgxResult = createGlyphs(
 			data,
 			dataLength,
 			&glyphs,
 			&glyphCount);
 
-		if (!result)
-			return UNKNOWN_ERROR_MPGX_RESULT; // TODO:
+		if (mpgxResult != SUCCESS_MPGX_RESULT)
+			return mpgxResult;
 
 		FT_Face face = text->font->face;
 		uint32_t fontSize = text->fontSize;
@@ -2248,15 +3083,7 @@ MpgxResult bakeText(
 		size_t pixelCount;
 		uint32_t pixelLength;
 
-		result = createTextPixels(
-			face,
-			fontSize,
-			glyphs,
-			glyphCount,
-			0,
-			&pixels,
-			&pixelCount,
-			&pixelLength);
+		bool result = true;
 
 		if (!result)
 		{
@@ -2266,7 +3093,7 @@ MpgxResult bakeText(
 
 		Image texture;
 
-		MpgxResult mpgxResult = createImage(
+		mpgxResult = createImage(
 			window,
 			SAMPLED_IMAGE_TYPE,
 			IMAGE_2D,
@@ -2390,14 +3217,13 @@ MpgxResult bakeText(
 
 			VkDescriptorSet* descriptorSets;
 
-			mpgxResult = createVkDescriptorSetArray(
+			mpgxResult = createVkDescriptorSet(
 				device,
 				handle->vk.descriptorSetLayout,
 				descriptorPool,
-				bufferCount,
 				handle->vk.sampler->vk.handle,
 				texture->vk.imageView,
-				&descriptorSets);
+				descriptorSets);
 
 			if (mpgxResult != SUCCESS_MPGX_RESULT)
 			{
@@ -2424,7 +3250,8 @@ MpgxResult bakeText(
 	}
 
 	return SUCCESS_MPGX_RESULT;
-}
+}*/
+
 size_t drawText(
 	Text text,
 	Vec4I scissor)
@@ -2436,9 +3263,8 @@ size_t drawText(
 	assert(scissor.w >= 0);
 	assert(textInitialized);
 
-	GraphicsPipeline pipeline = text->pipeline;
-	Handle textPipeline = pipeline->base.handle;
-	textPipeline->base.texture = text->texture;
+	FontAtlas fontAtlas = text->fontAtlas;
+	GraphicsPipeline pipeline = fontAtlas->pipeline;
 
 	bool dynamicScissor = scissor.z + scissor.w != 0;
 
@@ -2451,7 +3277,7 @@ size_t drawText(
 		VkWindow vkWindow = getVkWindow(window);
 		VkCommandBuffer commandBuffer = vkWindow->currenCommandBuffer;
 
-		if (dynamicScissor)
+		if (dynamicScissor) // TODO: fix
 		{
 			VkRect2D vkScissor = {
 				(int32_t)scissor.x,
@@ -2466,15 +3292,41 @@ size_t drawText(
 				&vkScissor);
 		}
 
+		Handle handle = pipeline->vk.handle;
+		GraphicsMesh mesh = text->mesh;
+		uint32_t indexCount = mesh->vk.indexCount;
+		const VkDeviceSize offset = 0;
+
+		vkCmdPushConstants(
+			vkWindow->currenCommandBuffer,
+			pipeline->vk.layout,
+			VK_SHADER_STAGE_VERTEX_BIT,
+			0,
+			sizeof(VertexPushConstants),
+			&handle->vk.vpc);
 		vkCmdBindDescriptorSets(
 			commandBuffer,
 			VK_PIPELINE_BIND_POINT_GRAPHICS,
 			pipeline->vk.layout,
 			0,
 			1,
-			&text->descriptorSets[vkWindow->bufferIndex],
+			&fontAtlas->descriptorSet,
 			0,
 			NULL);
+		vkCmdBindVertexBuffers(
+			commandBuffer,
+			0,
+			1,
+			&mesh->vk.vertexBuffer->vk.handle,
+			&offset);
+		vkCmdDrawIndexed(
+			commandBuffer,
+			indexCount,
+			1,
+			0,
+			0,
+			0);
+		return indexCount;
 #else
 		abort();
 #endif
@@ -2491,6 +3343,39 @@ size_t drawText(
 				(GLsizei)scissor.z,
 				(GLsizei)scissor.w);
 		}
+
+		Handle handle = pipeline->gl.handle;
+		GLuint sampler = handle->gl.sampler->gl.handle;
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(
+			GL_TEXTURE_2D,
+			fontAtlas->regularImage->gl.handle);
+		glBindSampler(0, sampler);
+
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(
+			GL_TEXTURE_2D,
+			fontAtlas->boldImage->gl.handle);
+		glBindSampler(1, sampler);
+
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(
+			GL_TEXTURE_2D,
+			fontAtlas->italicImage->gl.handle);
+		glBindSampler(2, sampler);
+
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(
+			GL_TEXTURE_2D,
+			fontAtlas->boldItalicImage->gl.handle);
+		glBindSampler(3, sampler);
+
+		assertOpenGL();
+
+		return drawGraphicsMesh(
+			pipeline,
+			text->mesh);
 #else
 		abort();
 #endif
@@ -2499,31 +3384,6 @@ size_t drawText(
 	{
 		abort();
 	}
-
-	return drawGraphicsMesh(
-		pipeline,
-		text->mesh);
-}
-
-float getTextPlatformScale(
-	GraphicsPipeline textPipeline)
-{
-	assert(textPipeline);
-	assert(strcmp(
-		textPipeline->base.name,
-		TEXT_PIPELINE_NAME) == 0);
-	assert(textInitialized);
-
-	Framebuffer framebuffer =
-		getGraphicsPipelineFramebuffer(textPipeline);
-	Vec2I framebufferSize =
-		getFramebufferSize(framebuffer);
-	Vec2I windowSize = getWindowSize(
-		getFramebufferWindow(framebuffer));
-
-	return max(
-		(float)framebufferSize.x / (float)windowSize.x,
-		(float)framebufferSize.y / (float)windowSize.y);
 }
 
 MpgxResult createTextSampler(
@@ -2535,8 +3395,8 @@ MpgxResult createTextSampler(
 
 	return createSampler(
 		window,
-		LINEAR_IMAGE_FILTER,
-		LINEAR_IMAGE_FILTER,
+		NEAREST_IMAGE_FILTER,
+		NEAREST_IMAGE_FILTER,
 		NEAREST_IMAGE_FILTER,
 		false,
 		REPEAT_IMAGE_WRAP,
@@ -2553,11 +3413,11 @@ MpgxResult createTextSampler(
 static const VkVertexInputBindingDescription vertexInputBindingDescriptions[1] = {
 	{
 		0,
-		sizeof(Vec2F) * 2,
+		sizeof(TextVertex),
 		VK_VERTEX_INPUT_RATE_VERTEX,
 	},
 };
-static const VkVertexInputAttributeDescription vertexInputAttributeDescriptions[2] = {
+static const VkVertexInputAttributeDescription vertexInputAttributeDescriptions[3] = {
 	{
 		0,
 		0,
@@ -2567,46 +3427,39 @@ static const VkVertexInputAttributeDescription vertexInputAttributeDescriptions[
 	{
 		1,
 		0,
-		VK_FORMAT_R32G32_SFLOAT,
+		VK_FORMAT_R32G32B32_SFLOAT,
 		sizeof(Vec2F),
 	},
+	{
+		2,
+		0,
+		VK_FORMAT_R8G8B8A8_UINT,
+		sizeof(Vec2F) + sizeof(Vec3F),
+	},
 };
-static const VkPushConstantRange pushConstantRanges[2] = {
+static const VkPushConstantRange pushConstantRanges[1] = {
 	{
 		VK_SHADER_STAGE_VERTEX_BIT,
 		0,
 		sizeof(VertexPushConstants),
 	},
-	{
-		VK_SHADER_STAGE_FRAGMENT_BIT,
-		sizeof(VertexPushConstants),
-		sizeof(FragmentPushConstants),
-	},
 };
 
-static void onVkUniformsSet(GraphicsPipeline graphicsPipeline)
+static void onVkBind(GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
 
 	Handle handle = graphicsPipeline->vk.handle;
 	VkWindow vkWindow = getVkWindow(handle->vk.window);
-	VkCommandBuffer commandBuffer = vkWindow->currenCommandBuffer;
-	VkPipelineLayout layout = graphicsPipeline->vk.layout;
 
-	vkCmdPushConstants(
-		commandBuffer,
-		layout,
-		VK_SHADER_STAGE_VERTEX_BIT,
-		0,
-		sizeof(VertexPushConstants),
-		&handle->vk.vpc);
-	vkCmdPushConstants(
-		commandBuffer,
-		layout,
-		VK_SHADER_STAGE_FRAGMENT_BIT,
-		sizeof(VertexPushConstants),
-		sizeof(FragmentPushConstants),
-		&handle->vk.fpc);
+	if (handle->vk.indexBuffer)
+	{
+		vkCmdBindIndexBuffer(
+			vkWindow->currenCommandBuffer,
+			handle->vk.indexBuffer->vk.handle,
+			0,
+			VK_INDEX_TYPE_UINT32);
+	}
 }
 static MpgxResult onVkResize(
 	GraphicsPipeline graphicsPipeline,
@@ -2619,64 +3472,6 @@ static MpgxResult onVkResize(
 	assert(createData);
 
 	Handle handle = graphicsPipeline->vk.handle;
-	Window window = handle->vk.window;
-	VkWindow vkWindow = getVkWindow(window);
-	uint32_t bufferCount = vkWindow->swapchain->bufferCount;
-
-	if (bufferCount != handle->vk.bufferCount)
-	{
-		Text* texts = handle->vk.texts;
-		size_t textCount = handle->vk.textCount;
-		VkDevice device = vkWindow->device;
-
-		for (size_t i = 0; i < textCount; i++)
-		{
-			Text text = texts[i];
-
-			VkDescriptorPool descriptorPool;
-
-			MpgxResult mpgxResult = createVkDescriptorPoolInstance(
-				device,
-				bufferCount,
-				&descriptorPool);
-
-			if (mpgxResult != SUCCESS_MPGX_RESULT)
-				return mpgxResult;
-
-			VkDescriptorSet* descriptorSets;
-
-			mpgxResult = createVkDescriptorSetArray(
-				device,
-				handle->vk.descriptorSetLayout,
-				descriptorPool,
-				bufferCount,
-				handle->vk.sampler->vk.handle,
-				text->texture->vk.imageView,
-				&descriptorSets);
-
-			if (mpgxResult != SUCCESS_MPGX_RESULT)
-			{
-				vkDestroyDescriptorPool(
-					device,
-					descriptorPool,
-					NULL);
-				return mpgxResult;
-			}
-
-			free(text->descriptorSets);
-
-			vkDestroyDescriptorPool(
-				device,
-				text->descriptorPool,
-				NULL);
-
-			text->descriptorPool = descriptorPool;
-			text->descriptorSets = descriptorSets;
-
-		}
-
-		handle->vk.bufferCount = bufferCount;
-	}
 
 	Vec4I size = vec4I(0, 0,
 		newSize.x, newSize.y);
@@ -2695,11 +3490,11 @@ static MpgxResult onVkResize(
 	VkGraphicsPipelineCreateData _createData = {
 		1,
 		vertexInputBindingDescriptions,
-		2,
+		3,
 		vertexInputAttributeDescriptions,
 		1,
 		&handle->vk.descriptorSetLayout,
-		2,
+		1,
 		pushConstantRanges,
 	};
 
@@ -2708,7 +3503,7 @@ static MpgxResult onVkResize(
 }
 static void onVkDestroy(void* _handle)
 {
-	Handle handle = _handle;
+	Handle handle = (Handle)_handle;
 
 	if (!handle)
 		return;
@@ -2718,6 +3513,7 @@ static void onVkDestroy(void* _handle)
 	VkWindow vkWindow = getVkWindow(handle->vk.window);
 	VkDevice device = vkWindow->device;
 
+	destroyBuffer(handle->vk.indexBuffer);
 	vkDestroyDescriptorSetLayout(
 		device,
 		handle->vk.descriptorSetLayout,
@@ -2727,6 +3523,7 @@ static void onVkDestroy(void* _handle)
 }
 inline static MpgxResult createVkPipeline(
 	Framebuffer framebuffer,
+	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
 	Shader* shaders,
@@ -2747,7 +3544,7 @@ inline static MpgxResult createVkPipeline(
 		{
 			0,
 			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			1,
+			4,
 			VK_SHADER_STAGE_FRAGMENT_BIT,
 			NULL,
 		},
@@ -2777,23 +3574,22 @@ inline static MpgxResult createVkPipeline(
 	VkGraphicsPipelineCreateData createData = {
 		1,
 		vertexInputBindingDescriptions,
-		2,
+		3,
 		vertexInputAttributeDescriptions,
 		1,
 		&descriptorSetLayout,
-		2,
+		1,
 		pushConstantRanges,
 	};
 
 	handle->vk.descriptorSetLayout = descriptorSetLayout;
-	handle->vk.bufferCount = vkWindow->swapchain->bufferCount;
 
 	return createGraphicsPipeline(
 		framebuffer,
-		TEXT_PIPELINE_NAME,
+		name,
 		state,
+		onVkBind,
 		NULL,
-		onVkUniformsSet,
 		onVkResize,
 		onVkDestroy,
 		handle,
@@ -2805,10 +3601,21 @@ inline static MpgxResult createVkPipeline(
 #endif
 
 #if MPGX_SUPPORT_OPENGL
+static void onGlBind(GraphicsPipeline graphicsPipeline)
+{
+	assert(graphicsPipeline);
+	Handle handle = graphicsPipeline->gl.handle;
+
+	glUniform1i(handle->gl.regularAtlasLocation, 0);
+	glUniform1i(handle->gl.boldAtlasLocation, 1);
+	glUniform1i(handle->gl.italicAtlasLocation, 2);
+	glUniform1i(handle->gl.boldItalicAtlasLocation, 3);
+
+	assertOpenGL();
+}
 static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
-
 	Handle handle = graphicsPipeline->gl.handle;
 
 	glUniformMatrix4fv(
@@ -2816,42 +3623,31 @@ static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 		1,
 		GL_FALSE,
 		(const float*)&handle->gl.vpc.mvp);
-	glUniform4fv(
-		handle->gl.colorLocation,
-		1,
-		(const float*)&handle->gl.fpc.color);
 
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
 
 	glVertexAttribPointer(
 		0,
 		2,
 		GL_FLOAT,
 		GL_FALSE,
-		sizeof(Vec2F) * 2,
+		sizeof(TextVertex),
 		0);
 	glVertexAttribPointer(
 		1,
-		2,
+		3,
 		GL_FLOAT,
 		GL_FALSE,
-		sizeof(Vec2F) * 2,
+		sizeof(TextVertex),
 		(const void*)sizeof(Vec2F));
-
-	glUniform1i(
-		handle->gl.textureLocation,
-		0);
-
-	glActiveTexture(GL_TEXTURE0);
-
-	glBindTexture(
-		GL_TEXTURE_2D,
-		handle->gl.texture->gl.handle);
-	glBindSampler(
-		0,
-		handle->gl.sampler->gl.handle);
-
+	glVertexAttribIPointer(
+		2,
+		4,
+		GL_UNSIGNED_BYTE,
+		sizeof(TextVertex),
+		(const void*)(sizeof(Vec2F) + sizeof(Vec3F)));
 	assertOpenGL();
 }
 static MpgxResult onGlResize(
@@ -2877,22 +3673,25 @@ static MpgxResult onGlResize(
 	{
 		graphicsPipeline->gl.state.scissor = size;
 	}
+
 	return SUCCESS_MPGX_RESULT;
 }
 static void onGlDestroy(void* _handle)
 {
-	Handle handle = _handle;
+	Handle handle = (Handle)_handle;
 
 	if (!handle)
 		return;
 
 	assert(handle->gl.textCount == 0);
 
+	destroyBuffer(handle->gl.indexBuffer);
 	free(handle->gl.texts);
 	free(handle);
 }
 inline static MpgxResult createGlPipeline(
 	Framebuffer framebuffer,
+	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
 	Shader* shaders,
@@ -2910,9 +3709,9 @@ inline static MpgxResult createGlPipeline(
 
 	MpgxResult mpgxResult = createGraphicsPipeline(
 		framebuffer,
-		TEXT_PIPELINE_NAME,
+		name,
 		state,
-		NULL,
+		onGlBind,
 		onGlUniformsSet,
 		onGlResize,
 		onGlDestroy,
@@ -2930,7 +3729,8 @@ inline static MpgxResult createGlPipeline(
 
 	GLuint glHandle = graphicsPipelineInstance->gl.glHandle;
 
-	GLint mvpLocation, colorLocation, textureLocation;
+	GLint mvpLocation, regularAtlasLocation, boldAtlasLocation,
+		italicAtlasLocation, boldItalicAtlasLocation;
 
 	bool result = getGlUniformLocation(
 		glHandle,
@@ -2938,12 +3738,20 @@ inline static MpgxResult createGlPipeline(
 		&mvpLocation);
 	result &= getGlUniformLocation(
 		glHandle,
-		"u_Color",
-		&colorLocation);
+		"u_RegularAtlas",
+		&regularAtlasLocation);
 	result &= getGlUniformLocation(
 		glHandle,
-		"u_Texture",
-		&textureLocation);
+		"u_BoldAtlas",
+		&boldAtlasLocation);
+	result &= getGlUniformLocation(
+		glHandle,
+		"u_ItalicAtlas",
+		&italicAtlasLocation);
+	result &= getGlUniformLocation(
+		glHandle,
+		"u_BoldItalicAtlas",
+		&boldItalicAtlasLocation);
 
 	if (!result)
 	{
@@ -2954,29 +3762,29 @@ inline static MpgxResult createGlPipeline(
 	assertOpenGL();
 
 	handle->gl.mvpLocation = mvpLocation;
-	handle->gl.colorLocation = colorLocation;
-	handle->gl.textureLocation = textureLocation;
+	handle->gl.regularAtlasLocation = regularAtlasLocation;
+	handle->gl.boldAtlasLocation = boldAtlasLocation;
+	handle->gl.italicAtlasLocation = italicAtlasLocation;
+	handle->gl.boldItalicAtlasLocation = boldItalicAtlasLocation;
 
 	*graphicsPipeline = graphicsPipelineInstance;
 	return SUCCESS_MPGX_RESULT;
 }
 #endif
 
-MpgxResult createTextPipelineExt(
+MpgxResult createTextPipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
 	Sampler sampler,
 	const GraphicsPipelineState* state,
-	size_t textCapacity,
+	size_t capacity,
 	GraphicsPipeline* textPipeline)
 {
 	assert(framebuffer);
 	assert(vertexShader);
 	assert(fragmentShader);
 	assert(sampler);
-	assert(state);
-	assert(textCapacity > 0);
 	assert(textPipeline);
 	assert(vertexShader->base.type == VERTEX_SHADER_TYPE);
 	assert(fragmentShader->base.type == FRAGMENT_SHADER_TYPE);
@@ -2989,8 +3797,11 @@ MpgxResult createTextPipelineExt(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
+	if (capacity == 0)
+		capacity = MPGX_DEFAULT_CAPACITY;
+
 	Text* texts = malloc(
-		textCapacity * sizeof(Text));
+		capacity * sizeof(Text));
 
 	if (!texts)
 	{
@@ -3000,70 +3811,18 @@ MpgxResult createTextPipelineExt(
 
 	Window window = framebuffer->base.window;
 	handle->base.window = window;
-	handle->base.texture = NULL;
 	handle->base.sampler = sampler;
 	handle->base.vpc.mvp = identMat4F;
-	handle->base.fpc.color = whiteLinearColor;
 	handle->base.texts = texts;
-	handle->base.textCapacity = textCapacity;
+	handle->base.textCapacity = capacity;
 	handle->base.textCount = 0;
+	handle->base.indexBuffer = NULL;
 
-	Shader shaders[2] = {
-		vertexShader,
-		fragmentShader,
-	};
-
-	GraphicsAPI api = getGraphicsAPI();
-
-	if (api == VULKAN_GRAPHICS_API)
-	{
-#if MPGX_SUPPORT_VULKAN
-		return createVkPipeline(
-			framebuffer,
-			state,
-			handle,
-			shaders,
-			2,
-			textPipeline);
+#ifndef NDEBUG
+	const char* name = TEXT_PIPELINE_NAME;
 #else
-		abort();
+	const char* name = NULL;
 #endif
-	}
-	else if (api == OPENGL_GRAPHICS_API ||
-		api == OPENGL_ES_GRAPHICS_API)
-	{
-#if MPGX_SUPPORT_OPENGL
-		return createGlPipeline(
-			framebuffer,
-			state,
-			handle,
-			shaders,
-			2,
-			textPipeline);
-#else
-		abort();
-#endif
-	}
-	else
-	{
-		abort();
-	}
-}
-MpgxResult createTextPipeline(
-	Framebuffer framebuffer,
-	Shader vertexShader,
-	Shader fragmentShader,
-	Sampler sampler,
-	size_t textCapacity,
-	bool useScissor,
-	GraphicsPipeline* textPipeline)
-{
-	assert(framebuffer);
-	assert(vertexShader);
-	assert(fragmentShader);
-	assert(sampler);
-	assert(textCapacity > 0);
-	assert(textPipeline);
 
 	Vec2I framebufferSize =
 		framebuffer->base.size;
@@ -3071,7 +3830,7 @@ MpgxResult createTextPipeline(
 		framebufferSize.x,
 		framebufferSize.y);
 
-	GraphicsPipelineState state = {
+	GraphicsPipelineState defaultState = {
 		TRIANGLE_LIST_DRAW_MODE,
 		FILL_POLYGON_MODE,
 		BACK_CULL_MODE,
@@ -3094,20 +3853,54 @@ MpgxResult createTextPipeline(
 		false,
 		DEFAULT_LINE_WIDTH,
 		size,
-		useScissor ? zeroVec4I : size,
+		size, // TODO: fix scissors
 		defaultDepthRange,
 		defaultDepthBias,
 		defaultBlendColor,
 	};
 
-	return createTextPipelineExt(
-		framebuffer,
+	Shader shaders[2] = {
 		vertexShader,
 		fragmentShader,
-		sampler,
-		&state,
-		textCapacity,
-		textPipeline);
+	};
+
+	GraphicsAPI api = getGraphicsAPI();
+
+	if (api == VULKAN_GRAPHICS_API)
+	{
+#if MPGX_SUPPORT_VULKAN
+		return createVkPipeline(
+			framebuffer,
+			name,
+			state ? state : &defaultState,
+			handle,
+			shaders,
+			2,
+			textPipeline);
+#else
+		abort();
+#endif
+	}
+	else if (api == OPENGL_GRAPHICS_API ||
+		api == OPENGL_ES_GRAPHICS_API)
+	{
+#if MPGX_SUPPORT_OPENGL
+		return createGlPipeline(
+			framebuffer,
+			name,
+			state ? state : &defaultState,
+			handle,
+			shaders,
+			2,
+			textPipeline);
+#else
+		abort();
+#endif
+	}
+	else
+	{
+		abort();
+	}
 }
 
 Sampler getTextPipelineSampler(
@@ -3138,24 +3931,4 @@ void setTextPipelineMVP(
 		TEXT_PIPELINE_NAME) == 0);
 	Handle handle = textPipeline->base.handle;
 	handle->base.vpc.mvp = mvp;
-}
-
-LinearColor getTextPipelineColor(
-	GraphicsPipeline textPipeline)
-{
-	assert(textPipeline);
-	assert(strcmp(textPipeline->base.name,
-		TEXT_PIPELINE_NAME) == 0);
-	Handle handle = textPipeline->base.handle;
-	return handle->base.fpc.color;
-}
-void setTextPipelineColor(
-	GraphicsPipeline textPipeline,
-	LinearColor color)
-{
-	assert(textPipeline);
-	assert(strcmp(textPipeline->base.name,
-		TEXT_PIPELINE_NAME) == 0);
-	Handle handle = textPipeline->base.handle;
-	handle->base.fpc.color = color;
 }

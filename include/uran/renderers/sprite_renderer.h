@@ -21,7 +21,7 @@
  * Returns sprite renderer instance in success, otherwise NULL.
  *
  * spritePipeline - sprite pipeline instance.
- * sorting - sprite render sorting type.
+ * sorting - render sorting type.
  * useCulling - use frustum culling.
  * capacity - initial render array capacity or 0.
  * threadPool - thread pool instance or NULL.
@@ -38,9 +38,9 @@ GraphicsRenderer createSpriteRenderer(
  *
  * spriteRenderer - sprite renderer instance.
  * transform - transform instance.
- * bounds - sprite render bounds.
- * color - sprite render color.
- * mesh - sprite render mesh.
+ * bounds - render bounds.
+ * color - render color.
+ * mesh - render mesh.
  */
 GraphicsRender createSpriteRender(
 	GraphicsRenderer spriteRenderer,

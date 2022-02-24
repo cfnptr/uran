@@ -48,16 +48,6 @@ FreeCamera createFreeCamera(
 	cmmt_float_t nearClipPlane,
 	cmmt_float_t farClipPlane);
 /*
- * Create a new default free camera instance.
- * Returns free camera instance on success, otherwise NULL.
- *
- * framebuffer - framebuffer instance.
- * transformer - transformer instance.
- */
-FreeCamera createDefaultFreeCamera(
-	Framebuffer framebuffer,
-	Transformer transformer);
-/*
  * Destroys free camera instance.
  * freeCamera - free camera instance or NULL.
  */

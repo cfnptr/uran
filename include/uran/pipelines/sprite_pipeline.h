@@ -64,3 +64,5 @@ LinearColor getSpritePipelineColor(
 void setSpritePipelineColor(
 	GraphicsPipeline spritePipeline,
 	LinearColor color);
+
+// TODO: replace Mat4F, Vec4F with ShaderMat etc.

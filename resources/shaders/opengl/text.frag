@@ -13,13 +13,28 @@
 // limitations under the License.
 
 in vec2 f_TexCoords;
+flat in int f_Atlas;
+flat in vec4 f_Color;
+
 layout(location = 0) out vec4 o_Color;
 
-uniform vec4 u_Color;
-uniform sampler2D u_Texture;
+uniform sampler2D u_RegularAtlas;
+uniform sampler2D u_BoldAtlas;
+uniform sampler2D u_ItalicAtlas;
+uniform sampler2D u_BoldItalicAtlas;
 
 void main()
 {
-    float color = texture(u_Texture, f_TexCoords);
-    o_Color = vec4(u_Color.rgb, u_Color.a * color);
+    float alpha;
+    
+    if (f_Atlas == 0)
+        alpha = texture(u_RegularAtlas, f_TexCoords).r;
+    else if (f_Atlas == 1)
+        alpha = texture(u_BoldAtlas, f_TexCoords).r;
+    else if (f_Atlas == 2)
+        alpha = texture(u_ItalicAtlas, f_TexCoords).r;
+    else
+        alpha = texture(u_BoldItalicAtlas, f_TexCoords).r;
+    
+    o_Color = vec4(f_Color.rgb, f_Color.a * alpha);
 }

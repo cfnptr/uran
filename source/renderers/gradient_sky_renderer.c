@@ -37,11 +37,11 @@ MpgxResult createGradientSkyAmbient(
 
 	const uint8_t* pixels = getImageDataPixels(gradient);
 
-	for (uint32_t x = 0; x < size.x; x++)
+	for (int x = 0; x < size.x; x++)
 	{
 		LinearColor color = zeroLinearColor;
 
-		for (uint32_t y = 0; y < size.y; y++)
+		for (int y = 0; y < size.y; y++)
 		{
 			size_t index = (y * size.x + x) * 4;
 

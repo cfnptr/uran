@@ -88,22 +88,6 @@ void destroyFreeCamera(FreeCamera freeCamera)
 	destroyTransform(freeCamera->transform);
 	free(freeCamera);
 }
-FreeCamera createDefaultFreeCamera(
-	Framebuffer framebuffer,
-	Transformer transformer)
-{
-	assert(framebuffer);
-	assert(transformer);
-
-	return createFreeCamera(
-		framebuffer,
-		transformer,
-		(cmmt_float_t)1.0,
-		(cmmt_float_t)1.0,
-		degToRad((cmmt_float_t)60.0),
-		(cmmt_float_t)0.01,
-		(cmmt_float_t)100.0);
-}
 
 Framebuffer getFreeCameraFramebuffer(
 	FreeCamera freeCamera)

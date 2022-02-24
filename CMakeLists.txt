@@ -139,5 +139,6 @@ if (URAN_BUILD_EDITOR)
 			VERBATIM)
 	endif ()
 
-	configure_file(resources/resources.pack resources.pack COPYONLY)
+	configure_file(resources/editor-resources.pack
+		editor-resources.pack COPYONLY)
 endif ()

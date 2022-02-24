@@ -259,13 +259,13 @@ static int ascendingRenderCompare(
 	const GraphicsRenderElement* data =
 		(GraphicsRenderElement*)a;
 
-	float distanceA = distPowVec3F(
+	cmmt_float_t distanceA = distPowVec3F(
 		data->rendererPosition,
 		data->renderPosition);
 
 	data = (GraphicsRenderElement*)b;
 
-	float distanceB = distPowVec3F(
+	cmmt_float_t distanceB = distPowVec3F(
 		data->rendererPosition,
 		data->renderPosition);
 
@@ -288,13 +288,13 @@ static int descendingRenderCompare(
 	const GraphicsRenderElement* data =
 		(GraphicsRenderElement*)a;
 
-	float distanceA = distPowVec3F(
+	cmmt_float_t distanceA = distPowVec3F(
 		data->rendererPosition,
 		data->renderPosition);
 
 	data = (GraphicsRenderElement*)b;
 
-	float distanceB = distPowVec3F(
+	cmmt_float_t distanceB = distPowVec3F(
 		data->rendererPosition,
 		data->renderPosition);
 

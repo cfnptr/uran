@@ -14,13 +14,16 @@
 
 #pragma once
 #include "mpgx/window.h"
+#include "pack/reader.h"
+#include "logy/logger.h"
 #include "cmmt/color.h"
 
 #include <stdbool.h>
 
 #define TEXT_PIPELINE_NAME "Text"
 
-// TODO: add enumerator and count getter
+// TODO: create inside texture square for the underline sampling first full symbol.
+// use SDF fot text
 
 /*
  * Font structure.
@@ -30,6 +33,15 @@ typedef struct Font_T Font_T;
  * Font instance.
  */
 typedef Font_T* Font;
+
+/*
+ * Font atlas structure.
+ */
+typedef struct FontAtlas_T FontAtlas_T;
+/*
+ * Font atlas instance.
+ */
+typedef FontAtlas_T* FontAtlas;
 
 /*
  * Text structure.
@@ -62,51 +74,294 @@ typedef enum AlignmentType_T
 typedef uint8_t AlignmentType;
 
 /*
+ * String containing all printable ASCII UTF-8 characters.
+ */
+static const char printableAscii[] = {
+	' ', '!', '\"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/',
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?', '@',
+	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+	'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '[', '\\', ']', '^', '_', '`',
+	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
+	'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~',
+};
+/*
+ * String containing all printable ASCII UTF-32 characters.
+ */
+static const uint32_t printableAscii32[] = {
+	' ', '!', '\"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/',
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?', '@',
+	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+	'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '[', '\\', ']', '^', '_', '`',
+	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
+	'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~',
+};
+
+/*
  * Initialize text subsystems.
  * Returns true on success.
+ *
+ * logger - logger instance or NULL.
  */
-bool initializeText();
+bool initializeText(Logger logger);
 /*
  * Terminates text subsystems.
+ * logger - logger instance or NULL.
  */
-void terminateText();
+void terminateText(Logger logger);
 /*
  * Returns true if text subsystems are initialized.
  */
 bool isTextInitialized();
 
-// TODO: descriptions
-
-bool createStringUTF8(
-	const uint32_t* data,
-	size_t dataLength,
-	char** array,
-	size_t* arrayLength);
-void destroyStringUTF8(char* array);
-
+/*
+ * Allocate a new UTF-8 string from the UTF-32 string.
+ * Returns operation MPGX result.
+ *
+ * source - source UTF-32 string.
+ * sourceLength - source string length.
+ * destination - pointer to the destination UTF-8 string.
+ * destinationLength - pointer to the destination string length.
+ */
+MpgxResult allocateStringUTF8(
+	const uint32_t* source,
+	size_t sourceLength,
+	char** string,
+	size_t* stringLength);
+/*
+ * Returns true if UTF-8 string is valid.
+ *
+ * string - UTF-8 string.
+ * stringLength - string length.
+ */
 bool validateStringUTF8(
-	const char* array,
-	size_t arrayLength);
+	const char* string,
+	size_t stringLength);
 
-bool createStringUTF32(
-	const char* data,
-	size_t dataLength,
-	uint32_t** array,
-	size_t* arrayLength);
-void destroyStringUTF32(uint32_t* array);
-
+/*
+ * Allocate a new UTF-32 string from the UTF-8 string.
+ * Returns operation MPGX result.
+ *
+ * source - source UTF-8 string.
+ * stringLength - source string length.
+ * destination - pointer to the destination UTF-32 string.
+ * destinationLength - pointer to the destination string length.
+ */
+MpgxResult allocateStringUTF32(
+	const char* source,
+	size_t sourceLength,
+	uint32_t** destination,
+	size_t* destinationLength);
+/*
+ * Returns true if UTF-32 string is valid.
+ *
+ * string - UTF-32 string.
+ * stringLength - string length.
+ */
 bool validateStringUTF32(
-	const uint32_t* array,
-	size_t arrayLength);
+	const uint32_t* string,
+	size_t stringLength);
 
-MpgxResult createFont(
+/*
+ * Create a new font instance.
+ * Returns font instance on success, otherwise NULL.
+ *
+ * data - font data array.
+ * size - data array size.
+ * index - font face index.
+ * logger - logger instance or NULL.
+ */
+Font createFont(
 	const void* data,
 	size_t size,
-	Font* font);
-MpgxResult createFontFromFile(
-	const void* filePath,
-	Font* font);
+	size_t index,
+	Logger logger);
+/*
+ * Create a new font instance from the file.
+ * Returns font instance on success, otherwise NULL.
+ *
+ * path - file path string.
+ * index - font face index.
+ * logger - logger instance or NULL.
+ */
+Font createFontFromFile(
+	const void* path,
+	size_t index,
+	Logger logger);
+/*
+ * Create a new font instance from the pack data.
+ * Returns font instance on success, otherwise NULL.
+ *
+ * packReader - pack reader instance.
+ * path - font data item path string.
+ * index - font face index.
+ * logger - logger instance or NULL.
+ */
+Font createFontFromPack(
+	PackReader packReader,
+	const char* path,
+	size_t index,
+	Logger logger);
+/*
+ * Destroys font instance.
+ * font - font instance or NULL.
+ */
 void destroyFont(Font font);
+
+/*
+ * Create a new font atlas instance.
+ * Returns operation MPGX result.
+ *
+ * textPipeline - text pipeline instance.
+ * regularFonts - regular font array.
+ * boldFonts - bold font array.
+ * italicFonts - italic font array.
+ * boldItalicFonts - bold italic font array.
+ * fontCount - font array size.
+ * fontSize - font pixel size.
+ * chars - atlas char array.
+ * charCount - char array size.
+ * isConstant - is font atlas constant.
+ * logger - logger instance or NULL.
+ * fontAtlas - pointer to the font atlas instance.
+ */
+MpgxResult createFontAtlas(
+	GraphicsPipeline textPipeline,
+	Font* regularFonts,
+	Font* boldFonts,
+	Font* italicFonts,
+	Font* boldItalicFonts,
+	size_t fontCount,
+	uint32_t fontSize,
+	const uint32_t* chars,
+	size_t charCount,
+	bool isConstant,
+	Logger logger,
+	FontAtlas* fontAtlas);
+/*
+ * Create a new ASCII font atlas instance.
+ * Returns operation MPGX result.
+ *
+ * textPipeline - text pipeline instance.
+ * regularFonts - regular font array.
+ * boldFonts - bold font array.
+ * italicFonts - italic font array.
+ * boldItalicFonts - bold italic font array.
+ * fontCount - font array size.
+ * fontSize - font pixel size.
+ * isConstant - is font atlas constant.
+ * logger - logger instance or NULL.
+ * fontAtlas - pointer to the font atlas instance.
+ */
+MpgxResult createAsciiFontAtlas(
+	GraphicsPipeline textPipeline,
+	Font* regularFonts,
+	Font* boldFonts,
+	Font* italicFonts,
+	Font* boldItalicFonts,
+	size_t fontCount,
+	uint32_t fontSize,
+	bool isConstant,
+	Logger logger,
+	FontAtlas* fontAtlas);
+/*
+ * Destroys font atlas instance.
+ * fontAtlas - font atlas instance or NULL.
+ */
+void destroyFontAtlas(FontAtlas fontAtlas);
+
+/*
+ * Returns font atlas text graphics pipeline.
+ * fontAtlas - font atlas instance.
+ */
+GraphicsPipeline getFontAtlasPipeline(FontAtlas fontAtlas);
+/*
+ * Returns font atlas regular font array.
+ * fontAtlas - font atlas instance.
+ */
+Font* getFontAtlasRegularFonts(FontAtlas fontAtlas);
+/*
+ * Returns font atlas bold font array.
+ * fontAtlas - font atlas instance.
+ */
+Font* getFontAtlasBoldFonts(FontAtlas fontAtlas);
+/*
+ * Returns font atlas italic font array.
+ * fontAtlas - font atlas instance.
+ */
+Font* getFontAtlasItalicFonts(FontAtlas fontAtlas);
+/*
+ * Returns font atlas bold italic font array.
+ * fontAtlas - font atlas instance.
+ */
+Font* getFontAtlasBoldItalicFonts(FontAtlas fontAtlas);
+/*
+ * Returns font atlas font array size.
+ * fontAtlas - font atlas instance.
+ */
+size_t getFontAtlasFontCount(FontAtlas fontAtlas);
+/*
+ * Returns font atlas font pixel size.
+ * fontAtlas - font atlas instance.
+ */
+uint32_t getFontAtlasFontSize(FontAtlas fontAtlas);
+/*
+ * Returns true if font atlas is constant.
+ * fontAtlas - font atlas instance.
+ */
+bool isFontAtlasConstant(FontAtlas fontAtlas);
+
+/*
+ * Create a new UTF-32 atlas text instance.
+ * Returns operation MPGX result.
+ *
+ * fontAtlas - font atlas instance.
+ * string - text string.
+ * stringLength - text string length.
+ * alignment - text alignment.
+ * color - default text color.
+ * useTags - use HTML tags.
+ * isBold - is text initially bold.
+ * isItalic - is text initially italic.
+ * text - pointer to the text instance.
+ */
+MpgxResult createAtlasText32(
+	FontAtlas fontAtlas,
+	const uint32_t* string,
+	size_t stringLength,
+	AlignmentType alignment,
+	SrgbColor color,
+	bool useTags,
+	bool isBold,
+	bool isItalic,
+	bool isConstant,
+	Text* text);
+/*
+ * Create a new UTF-8 atlas text instance.
+ * Returns operation MPGX result.
+ *
+ * fontAtlas - font atlas instance.
+ * string - text string.
+ * stringLength - text string length.
+ * alignment - text alignment.
+ * color - default text color.
+ * useTags - use HTML tags.
+ * isBold - is text initially bold.
+ * isItalic - is text initially italic.
+ * text - pointer to the text instance.
+ */
+MpgxResult createAtlasText(
+	FontAtlas fontAtlas,
+	const char* string,
+	size_t stringLength,
+	AlignmentType alignment,
+	SrgbColor color,
+	bool useTags,
+	bool isBold,
+	bool isItalic,
+	bool isConstant,
+	Text* text);
+
+// TODO: shrinkAtlasIndexBuffer
 
 MpgxResult createText32(
 	GraphicsPipeline textPipeline,
@@ -117,7 +372,7 @@ MpgxResult createText32(
 	size_t dataLength,
 	bool isConstant,
 	Text* text);
-MpgxResult createText8(
+MpgxResult createText(
 	GraphicsPipeline textPipeline,
 	Font font,
 	uint32_t fontSize,
@@ -126,12 +381,28 @@ MpgxResult createText8(
 	size_t dataLength,
 	bool isConstant,
 	Text* text);
+/*
+ * Destroys text instance.
+ * text - text instance or NULL.
+ */
 void destroyText(Text text);
 
-GraphicsPipeline getTextPipeline(Text text);
+/*
+ * Returns text font atlas.
+ * text - text instance.
+ */
+FontAtlas getTextFontAtlas(Text text);
+/*
+ * Returns text mesh size.
+ * text - text instance.
+ */
+Vec2F getTextSize(Text text);
+/*
+ * Returns true if text is constant.
+ * text - text instance.
+ */
 bool isTextConstant(Text text);
 
-Vec2F getTextSize(Text text);
 Vec2F getTextOffset(Text text);
 
 bool getTextCaretAdvance(
@@ -143,33 +414,26 @@ bool getTextCaretPosition(
 	Vec2F* advance,
 	size_t* index);
 
-Font getTextFont(
-	Text text);
-void setTextFont(
-	Text text,
-	Font font);
-
-uint32_t getTextFontSize(
-	Text text);
-void setTextFontSize(
-	Text text,
-	uint32_t fontSize);
-
+/*
+ * Returns text alignment type.
+ * text - text instance.
+ */
 AlignmentType getTextAlignment(
 	Text text);
+/*
+ * Sets text alignment type.
+ * text - text instance.
+ */
 void setTextAlignment(
 	Text text,
 	AlignmentType alignment);
-
-size_t getTextDataLength(Text text);
-const uint32_t* getTextData(Text text);
 
 bool setTextData32(
 	Text text,
 	const uint32_t* data,
 	size_t dataLength,
 	bool reuseBuffers);
-bool setTextData8(
+bool setTextData(
 	Text text,
 	const char* data,
 	size_t dataLength,
@@ -178,58 +442,85 @@ bool setTextData8(
 MpgxResult bakeText(
 	Text text,
 	bool reuseBuffers);
+
+/*
+ * Draw text mesh. (rendering command)
+ * Returns drawn index count.
+ *
+ * text - text instance.
+ * scissor - text scissor.
+ */
 size_t drawText(
 	Text text,
 	Vec4I scissor);
 
-float getTextPlatformScale(
-	GraphicsPipeline textPipeline);
-
+/*
+ * Create a new text image sampler.
+ * Returns operation MPGX result.
+ *
+ * window - window instance.
+ * textSampler - pointer to the text sampler instance.
+ */
 MpgxResult createTextSampler(
 	Window window,
 	Sampler* textSampler);
 
-MpgxResult createTextPipelineExt(
-	Framebuffer framebuffer,
-	Shader vertexShader,
-	Shader fragmentShader,
-	Sampler sampler,
-	const GraphicsPipelineState* state,
-	size_t textCapacity,
-	GraphicsPipeline* textPipeline);
+/*
+ * Create a new text pipeline instance.
+ * Returns operation MPGX result.
+ *
+ * framebuffer - framebuffer instance.
+ * vertexShader - text vertex shader instance.
+ * fragmentShader - text fragment shader instance.
+ * sampler - image sampler instance.
+ * state - sprite pipeline state or NULL.
+ * capacity - initial text array capacity.
+ * textPipeline - pointer to the text pipeline.
+ */
 MpgxResult createTextPipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
 	Sampler sampler,
-	size_t textCapacity,
-	bool useScissor,
+	const GraphicsPipelineState* state,
+	size_t capacity,
 	GraphicsPipeline* textPipeline);
 
+/*
+ * Returns text pipeline image sampler.
+ * textPipeline - text pipeline instance.
+ */
 Sampler getTextPipelineSampler(
 	GraphicsPipeline textPipeline);
 
+/*
+ * Returns text pipeline MVP matrix.
+ * textPipeline - text pipeline instance.
+ */
 Mat4F getTextPipelineMVP(
 	GraphicsPipeline textPipeline);
+/*
+ * Sets text pipeline image sampler.
+ * textPipeline - text pipeline instance.
+ */
 void setTextPipelineMVP(
 	GraphicsPipeline textPipeline,
 	Mat4F mvp);
 
-LinearColor getTextPipelineColor(
-	GraphicsPipeline textPipeline);
-void setTextPipelineColor(
-	GraphicsPipeline textPipeline,
-	LinearColor color);
+/*
+ * Returns running platform scale.
+ * framebuffer - framebuffer instance.
+ */
+inline static float calculatePlatformScale(Framebuffer framebuffer)
+{
+	assert(framebuffer);
 
-// TODO: add monochrome text support
-// FT_LOAD_MONOCHROME
+	Vec2I framebufferSize = getFramebufferSize(framebuffer);
+	Vec2I windowSize = getWindowSize(getFramebufferWindow(framebuffer));
 
-// TODO: add text coloring
-// Pass color data to the vertex buffer
+	return max(
+		(float)framebufferSize.x / (float)windowSize.x,
+		(float)framebufferSize.y / (float)windowSize.y);
+}
 
-// TODO: add text fallback fonts
-
-// TODO: add text mode ->
-// generate texture once on init from string
-// and use for rendering
-// struct TextImage
+// TODO: add enumerator and count getter

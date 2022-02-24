@@ -15,17 +15,14 @@
 #version 420
 
 layout(location = 0) in vec2 f_TexCoords;
+layout(location = 1) flat in int f_Atlas;
+layout(location = 2) flat in vec4 f_Color;
+
 layout(location = 0) out vec4 o_Color;
-
-layout(push_constant) uniform FragmentPushConstants
-{
-    layout(offset = 64) vec4 color;
-} fpc;
-
-layout(binding = 0) uniform sampler2D u_Texture;
+layout(binding = 0) uniform sampler2D u_Atlases[4];
 
 void main()
 {
-    float color = texture(u_Texture, f_TexCoords).r;
-    o_Color = vec4(fpc.color.rgb, fpc.color.a * color);
+    float alpha = texture(u_Atlases[f_Atlas], f_TexCoords).r;
+    o_Color = vec4(f_Color.rgb, f_Color.a * alpha);
 }

@@ -20,15 +20,18 @@
 #include "uran/editor.h"
 
 /*
+ * Create editor instance and pass to the createProgram function.
+ */
+#define CREATE_EDITOR 1
+
+/*
  * Program structure.
  */
 typedef struct Program_T
 {
 	Logger logger;
 	ThreadPool threadPool;
-#ifndef NDEBUG
 	Editor editor;
-#endif
 } Program_T;
 /*
  * Program instance.
@@ -41,7 +44,7 @@ typedef Program_T* Program;
  *
  * logger - logger instance.
  * threadPool - thread pool instance.
- * editor - editor instance. (or NULL in release)
+ * editor - editor instance.
  */
 inline static Program createProgram(
 	Logger logger,
@@ -59,9 +62,7 @@ inline static Program createProgram(
 
 	program->logger = logger;
 	program->threadPool = threadPool;
-#ifndef NDEBUG
 	program->editor = editor;
-#endif
 	return program;
 }
 /*
@@ -83,11 +84,7 @@ inline static void destroyProgram(Program program)
 inline static void updateProgram(Program program)
 {
 	assert(program);
-#ifndef NDEBUG
 	updateEditor(program->editor);
-#else
-	abort();
-#endif
 }
 /*
  * Renders program.
@@ -96,11 +93,7 @@ inline static void updateProgram(Program program)
 inline static void renderProgram(Program program)
 {
 	assert(program);
-#ifndef NDEBUG
 	renderEditor(program->editor);
-#else
-	abort();
-#endif
 }
 
 /*
@@ -110,10 +103,5 @@ inline static void renderProgram(Program program)
 inline static Window getProgramWindow(Program program)
 {
 	assert(program);
-#ifndef NDEBUG
 	return getEditorWindow(program->editor);
-#else
-	abort();
-#endif
 }
-

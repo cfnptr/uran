@@ -480,18 +480,10 @@ static void onGlBind(GraphicsPipeline graphicsPipeline)
 
 	Handle handle = graphicsPipeline->gl.handle;
 
-	glUniform1i(
-		handle->gl.bufferLocation,
-		0);
-
+	glUniform1i(handle->gl.bufferLocation, 0);
 	glActiveTexture(GL_TEXTURE0);
-
-	glBindTexture(
-		GL_TEXTURE_2D,
-		handle->gl.buffer->gl.handle);
-	glBindSampler(
-		0,
-		handle->gl.sampler->gl.handle);
+	glBindTexture(GL_TEXTURE_2D, handle->gl.buffer->gl.handle);
+	glBindSampler(0, handle->gl.sampler->gl.handle);
 
 	assertOpenGL();
 }

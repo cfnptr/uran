@@ -545,8 +545,6 @@ MpgxResult createRayTracingColorPipeline(
 	handle->base.rgpc.invProj = identMat4F;
 	handle->base.rgpc.invProj = identMat4F;
 
-	const void* data = NULL;
-
 	Vec2I framebufferSize = getFramebufferSize(
 		getWindowFramebuffer(window));
 	Vec3I size = vec3I(framebufferSize.x, framebufferSize.y, 1);
@@ -558,7 +556,7 @@ MpgxResult createRayTracingColorPipeline(
 		STORAGE_IMAGE_TYPE,
 		IMAGE_2D,
 		R8G8B8A8_UNORM_IMAGE_FORMAT,
-		&data,
+		NULL,
 		size,
 		1,
 		true,

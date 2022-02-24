@@ -15,17 +15,30 @@
 #version 420
 
 layout(location = 0) in vec2 v_Position;
-layout(location = 1) in vec2 v_TexCoords;
+layout(location = 1) in vec3 v_TexCoords;
+layout(location = 2) in uvec4 v_Color;
 
 layout(location = 0) out vec2 f_TexCoords;
+layout(location = 1) flat out int f_Atlas;
+layout(location = 2) flat out vec4 f_Color;
 
 layout(push_constant) uniform VertexPushConstants
 {
     mat4 mvp;
 } vpc;
 
+vec4 srgbToLinear(vec4 srgb)
+{
+    bvec3 cutoff = lessThanEqual(srgb.rgb, vec3(0.04045));
+    vec3 higher = pow((srgb.rgb + vec3(0.055)) / vec3(1.055), vec3(2.4));
+    vec3 lower = srgb.rgb / vec3(12.92);
+    return vec4(mix(higher, lower, cutoff), srgb.a);
+}
+
 void main()
 {
     gl_Position = vpc.mvp * vec4(v_Position, 0.0, 1.0);
-    f_TexCoords = v_TexCoords;
+    f_TexCoords = v_TexCoords.xy;
+    f_Atlas = int(v_TexCoords.z);
+    f_Color = srgbToLinear(vec4(v_Color) * (1.0 / 255.0));
 }

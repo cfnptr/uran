@@ -82,11 +82,10 @@ MAIN_FUNCTION
 #error Unknown operating system
 #endif
 
-	logMessage(logger, INFO_LOG_LEVEL,
-		"CPU: %s.", getCpuName());
-
 	int cpuCount = getCpuCount();
 
+	logMessage(logger, INFO_LOG_LEVEL,
+		"CPU: %s.", getCpuName());
 	logMessage(logger, INFO_LOG_LEVEL,
 		"CPU count: %d.", cpuCount);
 
@@ -104,7 +103,7 @@ MAIN_FUNCTION
 	Program program;
 	Editor editor;
 
-#ifndef NDEBUG
+#if CREATE_EDITOR
 	editor = createEditor(
 		logger,
 		threadPool,
@@ -146,12 +145,15 @@ MAIN_FUNCTION
 	logMessage(logger, INFO_LOG_LEVEL,
 		"GPU: %s.",
 		getWindowGpuName(window));
+	logMessage(logger, INFO_LOG_LEVEL,
+		"GPU driver: %s.",
+		getWindowGpuDriver(window));
 
 	showWindow(window);
 	joinWindow(window);
 
 	destroyProgram(program);
-#ifndef NDEBUG
+#if CREATE_EDITOR
 	destroyEditor(editor);
 #endif
 	destroyThreadPool(threadPool);
