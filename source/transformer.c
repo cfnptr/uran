@@ -60,10 +60,10 @@ inline static void updateTransformModel(
 		if (!parent->isActive)
 			return;
 
-		rotation = normQuat(dotQuat(
-			rotation, parent->rotation));
-		position = addVec3F(parent->position,
-			dotQuatVec3F(rotation, position));
+		position = addVec3F(dotQuatVec3F(
+			parent->rotation, position),
+			parent->position);
+		rotation = dotQuat(rotation, parent->rotation);
 		parent = parent->parent;
 	}
 
@@ -90,6 +90,64 @@ inline static void updateTransformModel(
 
 	transform->model = scaleMat4F(model, transform->scale);
 }
+
+/*
+ * inline static void updateTransformModel(
+	Transform transform,
+	Vec3F cameraPosition)
+{
+	Vec3F position = transform->position;
+	position = addVec3F(position, cameraPosition);
+
+	RotationType rotationType = transform->rotationType;
+
+	Mat4F model;
+
+	if (rotationType == SPIN_ROTATION_TYPE)
+	{
+		model = dotMat4F(translateMat4F(
+			identMat4F, position), getQuatMat4F(
+			normQuat(transform->rotation)));
+	}
+	else if (rotationType == ORBIT_ROTATION_TYPE)
+	{
+		model = translateMat4F(dotMat4F(
+			identMat4F, getQuatMat4F(normQuat(
+			transform->rotation))),position);
+	}
+	else
+	{
+		model = translateMat4F(identMat4F,position);
+	}
+
+	Transform parent = transform->parent;
+
+	while (parent)
+	{
+		if (!parent->isActive)
+			return;
+
+		Mat4F parentModel = parent->model;
+		Vec3F parentScale = parent->scale;
+		parentModel.m00 /= parentScale.x;
+		parentModel.m01 /= parentScale.x;
+		parentModel.m02 /= parentScale.x;
+		parentModel.m03 /= parentScale.x;
+		parentModel.m10 /= parentScale.y;
+		parentModel.m11 /= parentScale.y;
+		parentModel.m12 /= parentScale.y;
+		parentModel.m13 /= parentScale.y;
+		parentModel.m20 /= parentScale.z;
+		parentModel.m21 /= parentScale.z;
+		parentModel.m22 /= parentScale.z;
+		parentModel.m23 /= parentScale.z;
+		model = dotMat4F(model, parentModel);
+		parent = parent->parent;
+	}
+
+	transform->model = scaleMat4F(model, transform->scale);
+}
+ */
 
 Transformer createTransformer(
 	size_t capacity,
@@ -432,6 +490,13 @@ void setTransformRotation(
 {
 	assert(transform);
 	transform->rotation = rotation;
+}
+void setTransformEulerAngles(
+	Transform transform,
+	Vec3F eulerAngles)
+{
+	assert(transform);
+	transform->rotation = eulerQuat(eulerAngles);
 }
 
 RotationType getTransformRotationType(

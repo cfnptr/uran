@@ -28,7 +28,6 @@ struct InterfaceElement_T
 	Box2F bounds;
 	AlignmentType alignment;
 	bool isEnabled;
-	bool isPressed;
 #ifndef NDEBUG
 	uint8_t _alignment[1];
 	const char* name;
@@ -43,6 +42,7 @@ struct Interface_T
 	InterfaceElement lastElement;
 	cmmt_float_t scale;
 	bool isPressed;
+	bool isMoved;
 #ifndef NDEBUG
 	bool isEnumerating;
 #endif
@@ -77,6 +77,7 @@ Interface createInterface(
 	interface->scale = scale;
 	interface->lastElement = NULL;
 	interface->isPressed = false;
+	interface->isMoved = false;
 #ifndef NDEBUG
 	interface->isEnumerating = false;
 #endif
@@ -316,7 +317,6 @@ void updateInterface(Interface interface)
 	{
 		if (lastElement != newElement)
 		{
-			lastElement->isPressed = false;
 			interface->lastElement = newElement;
 
 			if (lastElement->events.onExit)
@@ -328,10 +328,8 @@ void updateInterface(Interface interface)
 		{
 			if (isLeftButtonPressed)
 			{
-				if (!lastElement->isPressed && isChanged)
+				if (isChanged)
 				{
-					lastElement->isPressed = true;
-
 					if (lastElement->events.onPress)
 						lastElement->events.onPress(lastElement);
 				}
@@ -343,11 +341,8 @@ void updateInterface(Interface interface)
 			}
 			else
 			{
-				// TODO: store pressed element instead of bools
-				if (lastElement->isPressed && isChanged)
+				if (isChanged)
 				{
-					lastElement->isPressed = false;
-
 					if (lastElement->events.onRelease)
 						lastElement->events.onRelease(lastElement);
 				}
@@ -501,7 +496,6 @@ InterfaceElement createInterfaceElement(
 	element->bounds = bounds;
 	element->alignment = alignment;
 	element->isEnabled = isEnabled;
-	element->isPressed = false;
 #ifndef NDEBUG
 	element->name = name;
 #endif

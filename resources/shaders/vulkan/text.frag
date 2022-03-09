@@ -15,14 +15,15 @@
 #version 420
 
 layout(location = 0) in vec2 f_TexCoords;
-layout(location = 1) flat in int f_Atlas;
+layout(location = 1) flat in int f_AtlasIndex;
 layout(location = 2) flat in vec4 f_Color;
 
 layout(location = 0) out vec4 o_Color;
-layout(binding = 0) uniform sampler2D u_Atlases[4];
+layout(binding = 0) uniform sampler2D u_Atlas;
 
 void main()
 {
-    float alpha = texture(u_Atlases[f_Atlas], f_TexCoords).r;
+    vec4 atlasAlphas = texture(u_Atlas, f_TexCoords);
+    float alpha = atlasAlphas[f_AtlasIndex];
     o_Color = vec4(f_Color.rgb, f_Color.a * alpha);
 }

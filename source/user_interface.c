@@ -74,6 +74,7 @@ typedef struct UiButtonHandle_T
 	LinearColor pressedColor;
 	GraphicsRender panelRender;
 	GraphicsRender textRender;
+	bool isPressed;
 } UiButtonHandle_T;
 
 typedef UiPanelHandle_T* UiPanelHandle;
@@ -921,7 +922,6 @@ MpgxResult createUiWindow32(
 	handle->onPress = elementEvents.onPress;
 	elementEvents.onUpdate = onUiWindowUpdate;
 	elementEvents.onPress = onUiWindowPress;
-	handle->onUpdate = elementEvents.onPress;
 
 	InterfaceElement element = createInterfaceElement(
 		ui->interface,
@@ -1048,7 +1048,6 @@ GraphicsRender getUiWindowTitleRender(InterfaceElement window)
 static void onUiButtonDisable(InterfaceElement element)
 {
 	assert(element);
-
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
 	setSpriteRenderColor(
@@ -1060,7 +1059,6 @@ static void onUiButtonDisable(InterfaceElement element)
 static void onUiButtonEnable(InterfaceElement element)
 {
 	assert(element);
-
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
 	setSpriteRenderColor(
@@ -1072,7 +1070,6 @@ static void onUiButtonEnable(InterfaceElement element)
 static void onUiButtonEnter(InterfaceElement element)
 {
 	assert(element);
-
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
 	setSpriteRenderColor(
@@ -1084,7 +1081,6 @@ static void onUiButtonEnter(InterfaceElement element)
 static void onUiButtonExit(InterfaceElement element)
 {
 	assert(element);
-
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
 	setSpriteRenderColor(
@@ -1092,11 +1088,11 @@ static void onUiButtonExit(InterfaceElement element)
 		handle->enabledColor);
 	if (handle->onExit)
 		handle->onExit(element);
+	handle->isPressed = false;
 }
 static void onUiButtonPress(InterfaceElement element)
 {
 	assert(element);
-
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
 	setSpriteRenderColor(
@@ -1104,18 +1100,19 @@ static void onUiButtonPress(InterfaceElement element)
 		handle->pressedColor);
 	if (handle->onPress)
 		handle->onPress(element);
+	handle->isPressed = true;
 }
 static void onUiButtonRelease(InterfaceElement element)
 {
 	assert(element);
-
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
 	setSpriteRenderColor(
 		handle->panelRender,
 		handle->hoveredColor);
-	if (handle->onRelease)
+	if (handle->isPressed && handle->onRelease)
 		handle->onRelease(element);
+	handle->isPressed = false;
 }
 static void onUiButtonDestroy(void* _handle)
 {
@@ -1188,6 +1185,7 @@ MpgxResult createUiButton32(
 	handle->enabledColor = enabledColor;
 	handle->hoveredColor = hoveredColor;
 	handle->pressedColor = pressedColor;
+	handle->isPressed = false;
 
 	Transformer transformer = ui->transformer;
 
@@ -1417,5 +1415,3 @@ GraphicsRender getUiButtonTextRender(InterfaceElement button)
 		getInterfaceElementHandle(button);
 	return handle->textRender;
 }
-
-// TODO: return text color value, use SDF instead in text

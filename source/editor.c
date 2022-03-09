@@ -17,6 +17,7 @@
 
 #include "conf/reader.h"
 #include "conf/writer.h"
+#include "cmmt/angle.h"
 
 #include <string.h>
 
@@ -388,12 +389,6 @@ inline static void destroyTextPipelineInstance(
 	destroyShader(vertexShader);
 }
 
-/* TODO:
- * float platformScale = max(
-		(float)framebufferSize.x / (float)windowSize.x,
-		(float)framebufferSize.y / (float)windowSize.y);
- */
-
 inline static FontAtlas createFontAtlasInstance(
 	Logger logger,
 	PackReader packReader,
@@ -596,17 +591,45 @@ inline static void destroyFontAtlasInstance(FontAtlas fontAtlas)
 	destroyFont(regularMainFont);
 }
 
+static void onBaseWindowEnter(InterfaceElement element)
+{
+	assert(element);
+	BaseWindow baseWindow = getUiWindowHandle(element);
+	Transform transform = getGraphicsRenderTransform(
+		getUiButtonTextRender(baseWindow->closeButton));
+	setTransformActive(transform, true);
+}
+static void onBaseWindowExit(InterfaceElement element)
+{
+	assert(element);
+	BaseWindow baseWindow = getUiWindowHandle(element);
+	Transform transform = getGraphicsRenderTransform(
+		getUiButtonTextRender(baseWindow->closeButton));
+	setTransformActive(transform, false);
+}
+static void onBaseWindowCloseEnter(InterfaceElement element)
+{
+	assert(element);
+	BaseWindow baseWindow = getUiButtonHandle(element);
+	Transform transform = getGraphicsRenderTransform(
+		getUiButtonTextRender(baseWindow->closeButton));
+	setTransformActive(transform, true);
+}
+static void onBaseWindowCloseExit(InterfaceElement element)
+{
+	assert(element);
+	BaseWindow baseWindow = getUiButtonHandle(element);
+	Transform transform = getGraphicsRenderTransform(
+		getUiButtonTextRender(baseWindow->closeButton));
+	setTransformActive(transform, false);
+}
 static void onBaseWindowCloseRelease(InterfaceElement element)
 {
 	assert(element);
-
 	BaseWindow baseWindow = getUiButtonHandle(element);
-
 	Transform transform = getInterfaceElementTransform(
 		baseWindow->window);
-	setTransformActive(
-		transform,
-		false);
+	setTransformActive(transform, false);
 }
 inline static void destroyBaseWindow(BaseWindow baseWindow)
 {
@@ -638,6 +661,10 @@ inline static BaseWindow createBaseWindow(
 	if (!baseWindow)
 		return NULL;
 
+	InterfaceElementEvents events = emptyInterfaceElementEvents;
+	events.onEnter = onBaseWindowEnter;
+	events.onExit = onBaseWindowExit;
+
 	InterfaceElement window;
 
 	MpgxResult mpgxResult = createUiWindow32(
@@ -653,8 +680,8 @@ inline static BaseWindow createBaseWindow(
 		srgbToLinearColor(DEFAULT_UI_PANEL_COLOR),
 		DEFAULT_UI_TEXT_COLOR,
 		NULL,
-		NULL,
-		NULL,
+		&events,
+		baseWindow,
 		true,
 		&window);
 
@@ -672,14 +699,13 @@ inline static BaseWindow createBaseWindow(
 	Transform windowTransform =
 		getInterfaceElementTransform(window);
 
-	InterfaceElement closeButton;
+	const uint32_t text[] = { '+' };
 
-	// TODO: make hiding cross,
-
-	const uint32_t text[] = { '+', };
-
-	InterfaceElementEvents events = emptyInterfaceElementEvents;
+	events.onEnter = onBaseWindowCloseEnter;
+	events.onExit = onBaseWindowCloseExit;
 	events.onRelease = onBaseWindowCloseRelease;
+
+	InterfaceElement closeButton;
 
 	mpgxResult = createUiButton32(
 		ui,
@@ -691,7 +717,7 @@ inline static BaseWindow createBaseWindow(
 			(cmmt_float_t)0.0,
 			(cmmt_float_t)-0.01),
 		valVec2F((cmmt_float_t)16.0),
-		(cmmt_float_t)12.0,
+		(cmmt_float_t)16.0,
 		srgbToLinearColor(DEFAULT_UI_DISABLED_BUTTON_COLOR),
 		srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR),
 		srgbToLinearColor(DEFAULT_UI_HOVERED_BUTTON_COLOR),
@@ -712,6 +738,21 @@ inline static BaseWindow createBaseWindow(
 		destroyBaseWindow(baseWindow);
 		return NULL;
 	}
+
+	Transform crossTransform = getGraphicsRenderTransform(
+		getUiButtonTextRender(closeButton));
+	setTransformRotationType(
+		crossTransform,
+		SPIN_ROTATION_TYPE);
+	setTransformEulerAngles(
+		crossTransform,
+		vec3F(
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)0.0,
+			degToRad((cmmt_float_t)45.0)));
+	setTransformActive(
+		crossTransform,
+		false);
 
 	baseWindow->closeButton = closeButton;
 	return baseWindow;

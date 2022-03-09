@@ -61,10 +61,7 @@ struct FontAtlas_T
 	Glyph* italicGlyphs;
 	Glyph* boldItalicGlyphs;
 	size_t glyphCount;
-	Image regularImage;
-	Image boldImage;
-	Image italicImage;
-	Image boldItalicImage;
+	Image atlasImage;
 	uint32_t fontSize;
 	float newLineAdvance;
 	bool isConstant;
@@ -131,10 +128,7 @@ typedef struct GlHandle
 	size_t textCount;
 	Buffer indexBuffer;
 	GLint mvpLocation;
-	GLint regularAtlasLocation;
-	GLint boldAtlasLocation;
-	GLint italicAtlasLocation;
-	GLint boldItalicAtlasLocation;
+	GLint atlasLocation;
 } GlHandle;
 #endif
 typedef union Handle_T
@@ -695,7 +689,7 @@ inline static bool fillAtlasPixels(
 	size_t glyphCount,
 	uint32_t glyphLength,
 	uint32_t pixelLength,
-	uint32_t pixelSquare,
+	uint8_t fontIndex,
 	uint8_t* pixels,
 	Logger logger)
 {
@@ -705,7 +699,6 @@ inline static bool fillAtlasPixels(
 	assert(glyphs);
 	assert(glyphCount > 0);
 	assert(glyphLength > 0);
-	assert(pixelSquare > 0);
 	assert(pixels);
 
 	for (size_t i = 0; i < fontCount; i++)
@@ -797,7 +790,11 @@ inline static bool fillAtlasPixels(
 			for (uint32_t y = 0; y < glyphHeight; y++)
 			{
 				for (uint32_t x = 0; x < glyphWidth; x++)
-					pixels[(x + pixelPosX) + (y + pixelPosY) * pixelLength] = bitmap[x + y * glyphWidth];
+				{
+					pixels[fontIndex + ((x + pixelPosX) +
+						(y + pixelPosY) * pixelLength) * 4] =
+						bitmap[x + y * glyphWidth];
+				}
 			}
 		}
 
@@ -805,63 +802,6 @@ inline static bool fillAtlasPixels(
 	}
 
 	return true;
-}
-inline static MpgxResult createAtlasImage(
-	Window window,
-	bool isConstant,
-	Font* fonts,
-	size_t fontCount,
-	uint32_t fontSize,
-	Glyph* glyphs,
-	size_t glyphCount,
-	uint32_t glyphLength,
-	uint32_t pixelLength,
-	uint32_t pixelSquare,
-	uint8_t* pixels,
-	Logger logger,
-	Image* atlas)
-{
-	assert(window);
-	assert(fonts);
-	assert(fontCount > 0);
-	assert(fontSize > 0);
-	assert(glyphs);
-	assert(glyphCount > 0);
-	assert(glyphLength > 0);
-	assert(pixelSquare > 0);
-	assert(pixels);
-	assert(atlas);
-
-	bool result = fillAtlasPixels(
-		fonts,
-		fontCount,
-		fontSize,
-		glyphs,
-		glyphCount,
-		glyphLength,
-		pixelLength,
-		pixelSquare,
-		pixels,
-		logger);
-
-	if (!result)
-		return UNKNOWN_ERROR_MPGX_RESULT;
-
-	Image atlasInstance;
-
-	return createImage(
-		window,
-		SAMPLED_IMAGE_TYPE,
-		IMAGE_2D,
-		R8_UNORM_IMAGE_FORMAT,
-		pixels,
-		vec3I(
-			(cmmt_int_t)pixelLength,
-			(cmmt_int_t)pixelLength,
-			1),
-		1,
-		isConstant,
-		atlas);
 }
 
 #if MPGX_SUPPORT_VULKAN
@@ -875,7 +815,7 @@ inline static MpgxResult createVkDescriptorPool(
 	VkDescriptorPoolSize descriptorPoolSizes[1] = {
 		{
 			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			4,
+			1,
 		},
 	};
 	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
@@ -906,20 +846,14 @@ inline static MpgxResult createVkDescriptorSet(
 	VkDescriptorSetLayout descriptorSetLayout,
 	VkDescriptorPool descriptorPool,
 	VkSampler sampler,
-	VkImageView regularImageView,
-	VkImageView boldImageView,
-	VkImageView italicImageView,
-	VkImageView boldItalicImageView,
+	VkImageView imageView,
 	VkDescriptorSet* descriptorSet)
 {
 	assert(device);
 	assert(descriptorSetLayout);
 	assert(descriptorPool);
 	assert(sampler);
-	assert(regularImageView);
-	assert(boldImageView);
-	assert(italicImageView);
-	assert(boldItalicImageView);
+	assert(imageView);
 	assert(descriptorSet);
 
 	VkDescriptorSet descriptorSetInstance;
@@ -940,25 +874,10 @@ inline static MpgxResult createVkDescriptorSet(
 	if (vkResult != VK_SUCCESS)
 		return vkToMpgxResult(vkResult);
 
-	VkDescriptorImageInfo descriptorImageInfos[4] = {
+	VkDescriptorImageInfo descriptorImageInfos[1] = {
 		{
 			sampler,
-			regularImageView,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		},
-		{
-			sampler,
-			boldImageView,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		},
-		{
-			sampler,
-			italicImageView,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		},
-		{
-			sampler,
-			boldItalicImageView,
+			imageView,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		},
 	};
@@ -969,7 +888,7 @@ inline static MpgxResult createVkDescriptorSet(
 			descriptorSetInstance,
 			0,
 			0,
-			4,
+			1,
 			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 			descriptorImageInfos,
 			NULL,
@@ -1149,9 +1068,10 @@ MpgxResult createFontAtlas(
 
 	uint32_t glyphLength = (uint32_t)ceil(sqrt((double)glyphCount));
 	uint32_t pixelLength = glyphLength * fontSize;
-	uint32_t pixelSquare = pixelLength * pixelLength;
 
-	uint8_t* pixels = malloc(pixelSquare * sizeof(uint8_t));
+	uint8_t* pixels = malloc(
+		pixelLength * pixelLength *
+		4 * sizeof(uint8_t));
 
 	if (!pixels)
 	{
@@ -1159,13 +1079,7 @@ MpgxResult createFontAtlas(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	Window window = textPipeline->base.framebuffer->base.window;
-
-	Image regularImage;
-
-	mpgxResult = createAtlasImage(
-		window,
-		isConstant,
+	result = fillAtlasPixels(
 		regularFonts,
 		fontCount,
 		fontSize,
@@ -1173,25 +1087,18 @@ MpgxResult createFontAtlas(
 		glyphCount,
 		glyphLength,
 		pixelLength,
-		pixelSquare,
+		0,
 		pixels,
-		logger,
-		&regularImage);
+		logger);
 
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	if (!result)
 	{
 		free(pixels);
 		destroyFontAtlas(fontAtlasInstance);
-		return mpgxResult;
+		return UNKNOWN_ERROR_MPGX_RESULT;
 	}
 
-	fontAtlasInstance->regularImage = regularImage;
-
-	Image boldImage;
-
-	mpgxResult = createAtlasImage(
-		window,
-		isConstant,
+	result = fillAtlasPixels(
 		boldFonts,
 		fontCount,
 		fontSize,
@@ -1199,25 +1106,18 @@ MpgxResult createFontAtlas(
 		glyphCount,
 		glyphLength,
 		pixelLength,
-		pixelSquare,
+		1,
 		pixels,
-		logger,
-		&boldImage);
+		logger);
 
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	if (!result)
 	{
 		free(pixels);
 		destroyFontAtlas(fontAtlasInstance);
-		return mpgxResult;
+		return UNKNOWN_ERROR_MPGX_RESULT;
 	}
 
-	fontAtlasInstance->boldImage = boldImage;
-
-	Image italicImage;
-
-	mpgxResult = createAtlasImage(
-		window,
-		isConstant,
+	result = fillAtlasPixels(
 		italicFonts,
 		fontCount,
 		fontSize,
@@ -1225,25 +1125,18 @@ MpgxResult createFontAtlas(
 		glyphCount,
 		glyphLength,
 		pixelLength,
-		pixelSquare,
+		2,
 		pixels,
-		logger,
-		&italicImage);
+		logger);
 
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	if (!result)
 	{
 		free(pixels);
 		destroyFontAtlas(fontAtlasInstance);
 		return mpgxResult;
 	}
 
-	fontAtlasInstance->italicImage = italicImage;
-
-	Image boldItalicImage;
-
-	mpgxResult = createAtlasImage(
-		window,
-		isConstant,
+	result = fillAtlasPixels(
 		boldItalicFonts,
 		fontCount,
 		fontSize,
@@ -1251,19 +1144,44 @@ MpgxResult createFontAtlas(
 		glyphCount,
 		glyphLength,
 		pixelLength,
-		pixelSquare,
+		3,
 		pixels,
-		logger,
-		&boldItalicImage);
+		logger);
 
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	if (!result)
 	{
 		free(pixels);
 		destroyFontAtlas(fontAtlasInstance);
 		return mpgxResult;
 	}
 
-	fontAtlasInstance->boldItalicImage = boldItalicImage;
+	Window window = textPipeline->base.framebuffer->base.window;
+
+	Image atlasImage;
+
+	mpgxResult = createImage(
+		window,
+		SAMPLED_IMAGE_TYPE,
+		IMAGE_2D,
+		R8G8B8A8_UNORM_IMAGE_FORMAT,
+		pixels,
+		vec3I(
+			(cmmt_int_t)pixelLength,
+			(cmmt_int_t)pixelLength,
+			1),
+		1,
+		isConstant,
+		&atlasImage);
+
+	free(pixels);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		destroyFontAtlas(fontAtlasInstance);
+		return mpgxResult;
+	}
+
+	fontAtlasInstance->atlasImage = atlasImage;
 
 #if MPGX_SUPPORT_VULKAN
 	GraphicsAPI api = getGraphicsAPI();
@@ -1294,10 +1212,7 @@ MpgxResult createFontAtlas(
 			pipelineHandle->vk.descriptorSetLayout,
 			descriptorPool,
 			pipelineHandle->vk.sampler->vk.handle,
-			regularImage->vk.imageView,
-			boldImage->vk.imageView,
-			italicImage->vk.imageView,
-			boldItalicImage->vk.imageView,
+			atlasImage->vk.imageView,
 			&descriptorSet);
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
@@ -1378,10 +1293,7 @@ void destroyFontAtlas(FontAtlas fontAtlas)
 	}
 #endif
 
-	destroyImage(fontAtlas->boldItalicImage);
-	destroyImage(fontAtlas->italicImage);
-	destroyImage(fontAtlas->boldImage);
-	destroyImage(fontAtlas->regularImage);
+	destroyImage(fontAtlas->atlasImage);
 	free(fontAtlas->boldItalicGlyphs);
 	free(fontAtlas->italicGlyphs);
 	free(fontAtlas->boldGlyphs);
@@ -3344,33 +3256,9 @@ size_t drawText(
 				(GLsizei)scissor.w);
 		}
 
-		Handle handle = pipeline->gl.handle;
-		GLuint sampler = handle->gl.sampler->gl.handle;
-
-		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(
 			GL_TEXTURE_2D,
-			fontAtlas->regularImage->gl.handle);
-		glBindSampler(0, sampler);
-
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(
-			GL_TEXTURE_2D,
-			fontAtlas->boldImage->gl.handle);
-		glBindSampler(1, sampler);
-
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(
-			GL_TEXTURE_2D,
-			fontAtlas->italicImage->gl.handle);
-		glBindSampler(2, sampler);
-
-		glActiveTexture(GL_TEXTURE3);
-		glBindTexture(
-			GL_TEXTURE_2D,
-			fontAtlas->boldItalicImage->gl.handle);
-		glBindSampler(3, sampler);
-
+			fontAtlas->atlasImage->gl.handle);
 		assertOpenGL();
 
 		return drawGraphicsMesh(
@@ -3544,7 +3432,7 @@ inline static MpgxResult createVkPipeline(
 		{
 			0,
 			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			4,
+			1,
 			VK_SHADER_STAGE_FRAGMENT_BIT,
 			NULL,
 		},
@@ -3606,10 +3494,9 @@ static void onGlBind(GraphicsPipeline graphicsPipeline)
 	assert(graphicsPipeline);
 	Handle handle = graphicsPipeline->gl.handle;
 
-	glUniform1i(handle->gl.regularAtlasLocation, 0);
-	glUniform1i(handle->gl.boldAtlasLocation, 1);
-	glUniform1i(handle->gl.italicAtlasLocation, 2);
-	glUniform1i(handle->gl.boldItalicAtlasLocation, 3);
+	glUniform1i(handle->gl.atlasLocation, 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindSampler(0, handle->gl.sampler->gl.handle);
 
 	assertOpenGL();
 }
@@ -3729,8 +3616,7 @@ inline static MpgxResult createGlPipeline(
 
 	GLuint glHandle = graphicsPipelineInstance->gl.glHandle;
 
-	GLint mvpLocation, regularAtlasLocation, boldAtlasLocation,
-		italicAtlasLocation, boldItalicAtlasLocation;
+	GLint mvpLocation, atlasLocation;
 
 	bool result = getGlUniformLocation(
 		glHandle,
@@ -3738,20 +3624,8 @@ inline static MpgxResult createGlPipeline(
 		&mvpLocation);
 	result &= getGlUniformLocation(
 		glHandle,
-		"u_RegularAtlas",
-		&regularAtlasLocation);
-	result &= getGlUniformLocation(
-		glHandle,
-		"u_BoldAtlas",
-		&boldAtlasLocation);
-	result &= getGlUniformLocation(
-		glHandle,
-		"u_ItalicAtlas",
-		&italicAtlasLocation);
-	result &= getGlUniformLocation(
-		glHandle,
-		"u_BoldItalicAtlas",
-		&boldItalicAtlasLocation);
+		"u_Atlas",
+		&atlasLocation);
 
 	if (!result)
 	{
@@ -3762,10 +3636,7 @@ inline static MpgxResult createGlPipeline(
 	assertOpenGL();
 
 	handle->gl.mvpLocation = mvpLocation;
-	handle->gl.regularAtlasLocation = regularAtlasLocation;
-	handle->gl.boldAtlasLocation = boldAtlasLocation;
-	handle->gl.italicAtlasLocation = italicAtlasLocation;
-	handle->gl.boldItalicAtlasLocation = boldItalicAtlasLocation;
+	handle->gl.atlasLocation = atlasLocation;
 
 	*graphicsPipeline = graphicsPipelineInstance;
 	return SUCCESS_MPGX_RESULT;
@@ -3845,7 +3716,7 @@ MpgxResult createTextPipeline(
 		true,
 		true,
 		true,
-		true,
+		false,
 		false,
 		false,
 		true,

@@ -201,6 +201,15 @@ Quat getTransformRotation(
 void setTransformRotation(
 	Transform transform,
 	Quat rotation);
+/*
+ * Sets transform euler angles.
+ *
+ * transform - transform instance.
+ * eulerAngles - transform euler angles.
+ */
+void setTransformEulerAngles(
+	Transform transform,
+	Vec3F eulerAngles);
 
 /*
  * Returns transform rotation type.

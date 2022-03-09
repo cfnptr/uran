@@ -18,7 +18,7 @@
 #include "uran/renderers/sprite_renderer.h"
 
 #define DEFAULT_UI_PANEL_COLOR srgbColor(48, 48, 48, 255)
-#define DEFAULT_UI_BAR_COLOR srgbColor(64, 64, 64, 255)
+#define DEFAULT_UI_BAR_COLOR srgbColor(80, 80, 80, 255)
 #define DEFAULT_UI_TEXT_COLOR srgbColor(240, 240, 240, 255)
 #define DEFAULT_UI_ENABLED_BUTTON_COLOR srgbColor(80, 80, 80, 255)
 #define DEFAULT_UI_DISABLED_BUTTON_COLOR srgbColor(64, 64, 64, 255)
