@@ -18,7 +18,19 @@
 
 #define TEXTURE_COLOR_PIPELINE_NAME "TextureColor"
 
-MpgxResult createTextureColorPipelineExt(
+/*
+ * Create a new texture color pipeline instance.
+ * Returns operation MPGX result.
+ *
+ * framebuffer - framebuffer instance.
+ * vertexShader - texture color vertex shader.
+ * fragmentShader - texture color fragment shader.
+ * texture - texture instance.
+ * sampler - texture sampler.
+ * state - pipeline state or NULL.
+ * textureColorPipeline - pointer to the texture color pipeline.
+ */
+MpgxResult createTextureColorPipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
@@ -26,39 +38,80 @@ MpgxResult createTextureColorPipelineExt(
 	Sampler sampler,
 	const GraphicsPipelineState* state,
 	GraphicsPipeline* textureColorPipeline);
-MpgxResult createTextureColorPipeline(
-	Framebuffer framebuffer,
-	Shader vertexShader,
-	Shader fragmentShader,
-	Image texture,
-	Sampler sampler,
-	GraphicsPipeline* textureColorPipeline);
 
+/*
+ * Returns texture color pipeline texture.
+ * textureColorPipeline - texture color pipeline instance.
+ */
 Image getTextureColorPipelineTexture(
 	GraphicsPipeline textureColorPipeline);
+/*
+ * Returns texture color pipeline sampler.
+ * textureColorPipeline - texture color pipeline instance.
+ */
 Sampler getTextureColorPipelineSampler(
 	GraphicsPipeline textureColorPipeline);
 
+/*
+ * Returns texture color pipeline model view projection matrix.
+ * textureColorPipeline - texture color pipeline instance.
+ */
 Mat4F getTextureColorPipelineMvp(
 	GraphicsPipeline textureColorPipeline);
+/*
+ * Returns texture color pipeline model view projection matrix.
+ *
+ * textureColorPipeline - texture color pipeline instance.
+ * mvp - model view projection matrix value.
+ */
 void setTextureColorPipelineMvp(
 	GraphicsPipeline textureColorPipeline,
 	Mat4F mvp);
 
+/*
+ * Returns texture color pipeline size.
+ * textureColorPipeline - texture color pipeline instance.
+ */
 Vec2F getTextureColorPipelineSize(
 	GraphicsPipeline textureColorPipeline);
+/*
+ * Sets texture color pipeline size.
+ *
+ * textureColorPipeline - texture color pipeline instance.
+ * size - texture size value.
+ */
 void setTextureColorPipelineSize(
 	GraphicsPipeline textureColorPipeline,
 	Vec2F size);
 
+/*
+ * Returns texture color pipeline offset.
+ * textureColorPipeline - texture color pipeline instance.
+ */
 Vec2F getTextureColorPipelineOffset(
 	GraphicsPipeline textureColorPipeline);
+/*
+ * Sets texture color pipeline offset.
+ *
+ * textureColorPipeline - texture color pipeline instance.
+ * offset - texture offset value.
+ */
 void setTextureColorPipelineOffset(
 	GraphicsPipeline textureColorPipeline,
 	Vec2F offset);
 
+/*
+ * Returns texture color pipeline color.
+ * textureColorPipeline - texture color pipeline instance.
+ */
 LinearColor getTextureColorPipelineColor(
 	GraphicsPipeline textureColorPipeline);
+/*
+ * Sets texture color pipeline color.
+ *
+ * textureColorPipeline - texture color pipeline instance.
+ * color - color value.
+ */
 void setTextureColorPipelineColor(
 	GraphicsPipeline textureColorPipeline,
 	LinearColor color);

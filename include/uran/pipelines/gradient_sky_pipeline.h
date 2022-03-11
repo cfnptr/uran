@@ -18,45 +18,95 @@
 
 #define GRADIENT_SKY_PIPELINE_NAME "GradientSky"
 
+/*
+ * Create a new gradient sky sampler instance.
+ * Returns operation MPGX result.
+ *
+ * window - window instance.
+ * gradientSkySampler - pointer to the gradient sky sampler.
+ */
 MpgxResult createGradientSkySampler(
 	Window window,
 	Sampler* gradientSkySampler);
 
-MpgxResult createGradientSkyPipelineExt(
-	Framebuffer framebuffer,
-	Shader vertexShader,
-	Shader fragmentShader,
-	Image texture,
-	Sampler sampler,
-	const GraphicsPipelineState* state,
-	GraphicsPipeline* gradientSky);
+/*
+ * Create a new gradient sky pipeline instance.
+ * Returns operation MPGX result.
+ *
+ * framebuffer - framebuffer instance.
+ * vertexShader - gradient sky vertex shader.
+ * fragmentShader - gradient sky fragment shader.
+ * texture - sky texture.
+ * sampler - texture sampler.
+ * state - pipeline state or NULL.
+ * gradientSkyPipeline - pointer to the gradient sky pipeline.
+ */
 MpgxResult createGradientSkyPipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
 	Image texture,
 	Sampler sampler,
-	GraphicsPipeline* gradientSky);
+	const GraphicsPipelineState* state,
+	GraphicsPipeline* gradientSkyPipeline);
 
+/*
+ * Returns gradient sky pipeline texture.
+ * gradientSkyPipeline - gradient sky pipeline instance.
+ */
 Image getGradientSkyPipelineTexture(
 	GraphicsPipeline gradientSkyPipeline);
+/*
+ * Returns gradient sky pipeline sampler.
+ * gradientSkyPipeline - gradient sky pipeline instance.
+ */
 Sampler getGradientSkyPipelineSampler(
 	GraphicsPipeline gradientSkyPipeline);
 
+/*
+ * Returns gradient sky pipeline model view projection matrix.
+ * gradientSkyPipeline - gradient sky pipeline instance.
+ */
 Mat4F getGradientSkyPipelineMvp(
 	GraphicsPipeline gradientSkyPipeline);
+/*
+ * Sets gradient sky pipeline model view projection matrix.
+ *
+ * gradientSkyPipeline - gradient sky pipeline instance.
+ * mvp - model view projection matrix value.
+ */
 void setGradientSkyPipelineMvp(
 	GraphicsPipeline gradientSkyPipeline,
 	Mat4F mvp);
 
-Vec3F getGradientSkyPipelineSunDir(
+/*
+ * Returns gradient sky pipeline sun direction vector.
+ * gradientSkyPipeline - gradient sky pipeline instance.
+ */
+Vec3F getGradientSkyPipelineSunDirection(
 	GraphicsPipeline gradientSkyPipeline);
-void setGradientSkyPipelineSunDir(
+/*
+ * Sets gradient sky pipeline sun direction vector.
+ *
+ * gradientSkyPipeline - gradient sky pipeline instance.
+ * sunDirection - sun direction vector value.
+ */
+void setGradientSkyPipelineSunDirection(
 	GraphicsPipeline gradientSkyPipeline,
-	Vec3F sunDir);
+	Vec3F sunDirection);
 
+/*
+ * Returns gradient sky pipeline sun color.
+ * gradientSkyPipeline - gradient sky pipeline instance.
+ */
 LinearColor getGradientSkyPipelineSunColor(
 	GraphicsPipeline gradientSkyPipeline);
+/*
+ * Sets gradient sky pipeline sun color.
+ *
+ * gradientSkyPipeline - gradient sky pipeline instance.
+ * sunColor - sun color value.
+ */
 void setGradientSkyPipelineSunColor(
 	GraphicsPipeline gradientSkyPipeline,
 	LinearColor sunColor);

@@ -82,7 +82,7 @@ GraphicsRenderer createDiffuseRenderer(
 GraphicsRender createDiffuseRender(
 	GraphicsRenderer diffuseRenderer,
 	Transform transform,
-	Box3F bounding,
+	Box3F bounds,
 	GraphicsMesh mesh)
 {
 	assert(diffuseRenderer);
@@ -108,7 +108,7 @@ GraphicsRender createDiffuseRender(
 	GraphicsRender render = createGraphicsRender(
 		diffuseRenderer,
 		transform,
-		bounding,
+		bounds,
 		handle);
 
 	if (!render)

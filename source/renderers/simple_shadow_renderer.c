@@ -77,7 +77,7 @@ GraphicsRenderer createSimpleShadowRenderer(
 GraphicsRender createSimpleShadowRender(
 	GraphicsRenderer simpleShadowRenderer,
 	Transform transform,
-	Box3F bounding,
+	Box3F bounds,
 	GraphicsMesh mesh)
 {
 	assert(simpleShadowRenderer);
@@ -103,7 +103,7 @@ GraphicsRender createSimpleShadowRender(
 	GraphicsRender render = createGraphicsRender(
 		simpleShadowRenderer,
 		transform,
-		bounding,
+		bounds,
 		handle);
 
 	if (!render)

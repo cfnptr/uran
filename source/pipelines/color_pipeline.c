@@ -160,6 +160,7 @@ static void onVkDestroy(void* handle)
 }
 inline static MpgxResult createVkPipeline(
 	Framebuffer framebuffer,
+	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
 	Shader* shaders,
@@ -186,7 +187,7 @@ inline static MpgxResult createVkPipeline(
 
 	MpgxResult mpgxResult = createGraphicsPipeline(
 		framebuffer,
-		COLOR_PIPELINE_NAME,
+		name,
 		state,
 		NULL,
 		onVkUniformsSet,
@@ -269,6 +270,7 @@ static void onGlDestroy(void* handle)
 }
 inline static MpgxResult createGlPipeline(
 	Framebuffer framebuffer,
+	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
 	Shader* shaders,
@@ -286,7 +288,7 @@ inline static MpgxResult createGlPipeline(
 
 	MpgxResult mpgxResult = createGraphicsPipeline(
 		framebuffer,
-		COLOR_PIPELINE_NAME,
+		name,
 		state,
 		NULL,
 		onGlUniformsSet,
@@ -333,7 +335,7 @@ inline static MpgxResult createGlPipeline(
 }
 #endif
 
-MpgxResult createColorPipelineExt(
+MpgxResult createColorPipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
@@ -343,7 +345,6 @@ MpgxResult createColorPipelineExt(
 	assert(framebuffer);
 	assert(vertexShader);
 	assert(fragmentShader);
-	assert(state);
 	assert(colorPipeline);
 	assert(vertexShader->base.type == VERTEX_SHADER_TYPE);
 	assert(fragmentShader->base.type == FRAGMENT_SHADER_TYPE);
@@ -360,57 +361,11 @@ MpgxResult createColorPipelineExt(
 	handle->base.vpc.mvp = identMat4F;
 	handle->base.fpc.color = whiteLinearColor;
 
-	Shader shaders[2] = {
-		vertexShader,
-		fragmentShader,
-	};
-
-	GraphicsAPI api = getGraphicsAPI();
-
-	if (api == VULKAN_GRAPHICS_API)
-	{
-#if MPGX_SUPPORT_VULKAN
-		return createVkPipeline(
-			framebuffer,
-			state,
-			handle,
-			shaders,
-			2,
-			colorPipeline);
+#ifndef NDEBUG
+	const char* name = COLOR_PIPELINE_NAME;
 #else
-		abort();
+	const char* name = NULL;
 #endif
-	}
-	else if (api == OPENGL_GRAPHICS_API ||
-		api == OPENGL_ES_GRAPHICS_API)
-	{
-#if MPGX_SUPPORT_OPENGL
-		return createGlPipeline(
-			framebuffer,
-			state,
-			handle,
-			shaders,
-			2,
-			colorPipeline);
-#else
-		abort();
-#endif
-	}
-	else
-	{
-		abort();
-	}
-}
-MpgxResult createColorPipeline(
-	Framebuffer framebuffer,
-	Shader vertexShader,
-	Shader fragmentShader,
-	GraphicsPipeline* colorPipeline)
-{
-	assert(framebuffer);
-	assert(vertexShader);
-	assert(fragmentShader);
-	assert(colorPipeline);
 
 	Vec2I framebufferSize =
 		framebuffer->base.size;
@@ -418,7 +373,7 @@ MpgxResult createColorPipeline(
 		framebufferSize.x,
 		framebufferSize.y);
 
-	GraphicsPipelineState state = {
+	GraphicsPipelineState defaultState = {
 		TRIANGLE_LIST_DRAW_MODE,
 		FILL_POLYGON_MODE,
 		BACK_CULL_MODE,
@@ -447,12 +402,48 @@ MpgxResult createColorPipeline(
 		defaultBlendColor,
 	};
 
-	return createColorPipelineExt(
-		framebuffer,
+	Shader shaders[2] = {
 		vertexShader,
 		fragmentShader,
-		&state,
-		colorPipeline);
+	};
+
+	GraphicsAPI api = getGraphicsAPI();
+
+	if (api == VULKAN_GRAPHICS_API)
+	{
+#if MPGX_SUPPORT_VULKAN
+		return createVkPipeline(
+			framebuffer,
+			name,
+			state ? state : &defaultState,
+			handle,
+			shaders,
+			2,
+			colorPipeline);
+#else
+		abort();
+#endif
+	}
+	else if (api == OPENGL_GRAPHICS_API ||
+		api == OPENGL_ES_GRAPHICS_API)
+	{
+#if MPGX_SUPPORT_OPENGL
+		return createGlPipeline(
+			framebuffer,
+			name,
+			state ? state : &defaultState,
+			handle,
+			shaders,
+			2,
+			colorPipeline);
+#else
+		abort();
+#endif
+	}
+	else
+	{
+		abort();
+	}
 }
 
 Mat4F getColorPipelineMvp(

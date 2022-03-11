@@ -17,25 +17,47 @@
 
 #define SIMPLE_SHADOW_PIPELINE_NAME "SimpleShadow"
 
+/*
+ * Create a new simple shadow sampler instance.
+ *
+ * window - window instance.
+ * simpleShadowSampler - pointer to the simple shadow sampler.
+ */
 MpgxResult createSimpleShadowSampler(
 	Window window,
 	Sampler* simpleShadowSampler);
 
-MpgxResult createSimpleShadowPipelineExt(
-	Framebuffer framebuffer,
-	Shader vertexShader,
-	Shader fragmentShader,
-	const GraphicsPipelineState* state,
-	GraphicsPipeline* simpleShadowPipeline);
+/*
+ * Create a new simple shadow pipeline instance.
+ * Returns operation MPGX result.
+ *
+ * framebuffer - framebuffer instance.
+ * vertexShader - simple shadow vertex shader.
+ * fragmentShader - simple shadow fragment shader.
+ * shadowMapLength - shadow map pixel length.
+ * state - pipeline state or NULL.
+ * simpleShadowPipeline - pointer to the simple shadow pipeline.
+ */
 MpgxResult createSimpleShadowPipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
-	int32_t shadowMapLength,
+	cmmt_int_t shadowMapLength,
+	const GraphicsPipelineState* state,
 	GraphicsPipeline* simpleShadowPipeline);
 
+/*
+ * Returns simple shadow pipeline model view projection matrix.
+ * simpleShadowPipeline - simple shadow pipeline instance.
+ */
 Mat4F getSimpleShadowPipelineMvp(
 	GraphicsPipeline simpleShadowPipeline);
+/*
+ * Sets simple shadow pipeline model view projection matrix.
+ *
+ * simpleShadowPipeline - simple shadow pipeline instance.
+ * mvp - model view projection matrix value.
+ */
 void setSimpleShadowPipelineMvp(
 	GraphicsPipeline simpleShadowPipeline,
 	Mat4F mvp);

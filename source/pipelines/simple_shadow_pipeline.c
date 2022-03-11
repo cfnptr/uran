@@ -147,6 +147,7 @@ static void onVkDestroy(void* handle)
 }
 inline static MpgxResult createVkPipeline(
 	Framebuffer framebuffer,
+	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
 	Shader* shaders,
@@ -171,11 +172,9 @@ inline static MpgxResult createVkPipeline(
 		pushConstantRanges,
 	};
 
-	GraphicsPipeline graphicsPipelineInstance;
-
 	MpgxResult mpgxResult = createGraphicsPipeline(
 		framebuffer,
-		SIMPLE_SHADOW_PIPELINE_NAME,
+		name,
 		state,
 		NULL,
 		onVkUniformsSet,
@@ -240,6 +239,7 @@ static void onGlDestroy(void* handle)
 }
 inline static MpgxResult createGlPipeline(
 	Framebuffer framebuffer,
+	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
 	Shader* shaders,
@@ -257,7 +257,7 @@ inline static MpgxResult createGlPipeline(
 
 	MpgxResult mpgxResult = createGraphicsPipeline(
 		framebuffer,
-		SIMPLE_SHADOW_PIPELINE_NAME,
+		name,
 		state,
 		NULL,
 		onGlUniformsSet,
@@ -299,17 +299,18 @@ inline static MpgxResult createGlPipeline(
 }
 #endif
 
-MpgxResult createSimpleShadowPipelineExt(
+MpgxResult createSimpleShadowPipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
+	cmmt_int_t shadowMapLength,
 	const GraphicsPipelineState* state,
 	GraphicsPipeline* simpleShadowPipeline)
 {
 	assert(framebuffer);
 	assert(vertexShader);
 	assert(fragmentShader);
-	assert(state);
+	assert(shadowMapLength > 0);
 	assert(simpleShadowPipeline);
 	assert(vertexShader->base.type == VERTEX_SHADER_TYPE);
 	assert(fragmentShader->base.type == FRAGMENT_SHADER_TYPE);
@@ -325,59 +326,11 @@ MpgxResult createSimpleShadowPipelineExt(
 	handle->base.window = window;
 	handle->base.vpc.mvp = identMat4F;
 
-	Shader shaders[2] = {
-		vertexShader,
-		fragmentShader,
-	};
-
-	GraphicsAPI api = getGraphicsAPI();
-
-	if (api == VULKAN_GRAPHICS_API)
-	{
-#if MPGX_SUPPORT_VULKAN
-		return createVkPipeline(
-			framebuffer,
-			state,
-			handle,
-			shaders,
-			2,
-			simpleShadowPipeline);
+#ifndef NDEBUG
+	const char* name = SIMPLE_SHADOW_PIPELINE_NAME;
 #else
-		abort();
+	const char* name = NULL;
 #endif
-	}
-	else if (api == OPENGL_GRAPHICS_API ||
-		api == OPENGL_ES_GRAPHICS_API)
-	{
-#if MPGX_SUPPORT_OPENGL
-		return createGlPipeline(
-			framebuffer,
-			state,
-			handle,
-			shaders,
-			2,
-			simpleShadowPipeline);
-#else
-		abort();
-#endif
-	}
-	else
-	{
-		abort();
-	}
-}
-MpgxResult createSimpleShadowPipeline(
-	Framebuffer framebuffer,
-	Shader vertexShader,
-	Shader fragmentShader,
-	int32_t shadowMapLength,
-	GraphicsPipeline* simpleShadowPipeline)
-{
-	assert(framebuffer);
-	assert(vertexShader);
-	assert(fragmentShader);
-	assert(shadowMapLength > 0);
-	assert(simpleShadowPipeline);
 
 	Vec4I size = vec4I(0, 0,
 		shadowMapLength,
@@ -385,7 +338,7 @@ MpgxResult createSimpleShadowPipeline(
 	Vec2F depthBias = vec2F(
 		1.1f,4.0f);
 
-	GraphicsPipelineState state = {
+	GraphicsPipelineState defaultState = {
 		TRIANGLE_LIST_DRAW_MODE,
 		FILL_POLYGON_MODE,
 		BACK_CULL_MODE,
@@ -414,12 +367,48 @@ MpgxResult createSimpleShadowPipeline(
 		defaultBlendColor,
 	};
 
-	return createSimpleShadowPipelineExt(
-		framebuffer,
+	Shader shaders[2] = {
 		vertexShader,
 		fragmentShader,
-		&state,
-		simpleShadowPipeline);
+	};
+
+	GraphicsAPI api = getGraphicsAPI();
+
+	if (api == VULKAN_GRAPHICS_API)
+	{
+#if MPGX_SUPPORT_VULKAN
+		return createVkPipeline(
+			framebuffer,
+			name,
+			state ? state : &defaultState,
+			handle,
+			shaders,
+			2,
+			simpleShadowPipeline);
+#else
+		abort();
+#endif
+	}
+	else if (api == OPENGL_GRAPHICS_API ||
+		api == OPENGL_ES_GRAPHICS_API)
+	{
+#if MPGX_SUPPORT_OPENGL
+		return createGlPipeline(
+			framebuffer,
+			name,
+			state ? state : &defaultState,
+			handle,
+			shaders,
+			2,
+			simpleShadowPipeline);
+#else
+		abort();
+#endif
+	}
+	else
+	{
+		abort();
+	}
 }
 
 Mat4F getSimpleShadowPipelineMvp(

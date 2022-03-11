@@ -47,8 +47,25 @@ GraphicsRender createTextRender(
 	GraphicsRenderer textRenderer,
 	Transform transform,
 	Box3F bounds,
+	LinearColor color,
 	Text text,
 	Vec4I scissor);
+
+/*
+ * Returns text render color.
+ * textRender - text render instance.
+ */
+LinearColor getTextRenderColor(
+	GraphicsRender textRender);
+/*
+ * Sets text render color.
+ *
+ * textRender - text render instance.
+ * color - color value.
+ */
+void setTextRenderColor(
+	GraphicsRender textRender,
+	LinearColor color);
 
 /*
  * Returns text render text.
@@ -58,7 +75,9 @@ Text getTextRenderText(
 	GraphicsRender textRender);
 /*
  * Sets text render text.
+ *
  * textRender - text render instance.
+ * text - text instance.
  */
 void setTextRenderText(
 	GraphicsRender textRender,

@@ -45,7 +45,7 @@ GraphicsRenderer createSpriteRenderer(
 GraphicsRender createSpriteRender(
 	GraphicsRenderer spriteRenderer,
 	Transform transform,
-	Box3F bounding,
+	Box3F bounds,
 	LinearColor color,
 	GraphicsMesh mesh);
 
@@ -57,7 +57,9 @@ LinearColor getSpriteRenderColor(
 	GraphicsRender spriteRender);
 /*
  * Sets sprite render color.
+ *
  * spriteRender - sprite render instance.
+ * color - color value.
  */
 void setSpriteRenderColor(
 	GraphicsRender spriteRender,
@@ -71,7 +73,9 @@ GraphicsMesh getSpriteRenderMesh(
 	GraphicsRender spriteRender);
 /*
  * Sets sprite render mesh.
+ *
  * spriteRender - sprite render instance.
+ * mesh - mesh instance.
  */
 void setSpriteRenderMesh(
 	GraphicsRender spriteRender,

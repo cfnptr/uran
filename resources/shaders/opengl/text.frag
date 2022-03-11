@@ -19,10 +19,11 @@ flat in vec4 f_Color;
 layout(location = 0) out vec4 o_Color;
 
 uniform sampler2D u_Atlas;
+uniform vec4 u_Color;
 
 void main()
 {
     vec4 atlasAlphas = texture(u_Atlas, f_TexCoords);
     float alpha = atlasAlphas[f_AtlasIndex];
-    o_Color = vec4(f_Color.rgb, f_Color.a * alpha);
+    o_Color = vec4(f_Color.rgb, f_Color.a * alpha) * u_Color;
 }

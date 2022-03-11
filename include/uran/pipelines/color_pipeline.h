@@ -18,26 +18,51 @@
 
 #define COLOR_PIPELINE_NAME "Color"
 
-MpgxResult createColorPipelineExt(
+/*
+ * Create a new color pipeline instance.
+ * Returns operation MPGX result.
+ *
+ * framebuffer - framebuffer instance.
+ * vertexShader - color vertex shader.
+ * fragmentShader - color fragment shader.
+ * state - pipeline state or NULL.
+ * colorPipeline - pointer to the color pipeline.
+ */
+MpgxResult createColorPipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
 	const GraphicsPipelineState* state,
 	GraphicsPipeline* colorPipeline);
-MpgxResult createColorPipeline(
-	Framebuffer framebuffer,
-	Shader vertexShader,
-	Shader fragmentShader,
-	GraphicsPipeline* colorPipeline);
 
+/*
+ * Returns color pipeline model view projection matrix.
+ * colorPipeline - color pipeline instance.
+ */
 Mat4F getColorPipelineMvp(
 	GraphicsPipeline colorPipeline);
+/*
+ * Sets color pipeline model view projection matrix.
+ *
+ * colorPipeline - color pipeline instance.
+ * mvp - model view projection matrix value.
+ */
 void setColorPipelineMvp(
 	GraphicsPipeline colorPipeline,
 	Mat4F mvp);
 
+/*
+ * Returns color pipeline color.
+ * colorPipeline - color pipeline instance.
+ */
 LinearColor getColorPipelineColor(
 	GraphicsPipeline colorPipeline);
+/*
+ * Sets color pipeline color.
+ *
+ * colorPipeline - color pipeline instance.
+ * color - color value.
+ */
 void setColorPipelineColor(
 	GraphicsPipeline colorPipeline,
 	LinearColor color);

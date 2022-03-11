@@ -18,12 +18,23 @@
 typedef struct GradientSkyAmbient_T GradientSkyAmbient_T;
 typedef GradientSkyAmbient_T* GradientSkyAmbient;
 
-MpgxResult createGradientSkyAmbient(
-	ImageData gradient,
-	GradientSkyAmbient* gradientSkyAmbient);
-void destroyGradientSkyAmbient(
-	GradientSkyAmbient gradientSkyAmbient);
+/*
+ * Creates a new gradient sky ambient instance.
+ * gradient - gradient image data.
+ */
+GradientSkyAmbient createGradientSkyAmbient(ImageData gradient);
+/*
+ * Destroys gradient sky ambient instance.
+ * gradientSkyAmbient - gradient sky ambient instance or NULL.
+ */
+void destroyGradientSkyAmbient(GradientSkyAmbient gradientSkyAmbient);
 
+/*
+ * Returns gradient sky ambient color sample.
+ *
+ * gradientSkyAmbient - gradient sky ambient instance.
+ * dayTime - day time value. (in 0.0 - 1.0 range)
+ */
 LinearColor getGradientSkyAmbientColor(
 	GradientSkyAmbient gradientSkyAmbient,
 	float dayTime);

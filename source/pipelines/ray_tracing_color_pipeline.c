@@ -388,6 +388,7 @@ static void onVkDestroy(void* _handle)
 }
 inline static MpgxResult createVkPipeline(
 	Window window,
+	const char* name,
 	VkAccelerationStructureKHR tlas,
 	VkImageView storageImageView,
 	Handle handle,
@@ -490,7 +491,7 @@ inline static MpgxResult createVkPipeline(
 
 	mpgxResult = createRayTracingPipeline(
 		window,
-		RAY_TRACING_COLOR_PIPELINE_NAME,
+		name,
 		onVkBind,
 		onVkDestroy,
 		handle,
@@ -545,6 +546,12 @@ MpgxResult createRayTracingColorPipeline(
 	handle->base.rgpc.invProj = identMat4F;
 	handle->base.rgpc.invProj = identMat4F;
 
+#ifndef NDEBUG
+	const char* name = RAY_TRACING_COLOR_PIPELINE_NAME;
+#else
+	const char* name = NULL;
+#endif
+
 	Vec2I framebufferSize = getFramebufferSize(
 		getWindowFramebuffer(window));
 	Vec3I size = vec3I(framebufferSize.x, framebufferSize.y, 1);
@@ -577,6 +584,7 @@ MpgxResult createRayTracingColorPipeline(
 #if MPGX_SUPPORT_VULKAN
 		return createVkPipeline(
 			window,
+			name,
 			scene->vk.accelerationStructure,
 			storageImage->vk.imageView,
 			handle,

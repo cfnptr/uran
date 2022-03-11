@@ -94,11 +94,16 @@ typedef struct VertexPushConstants
 {
 	Mat4F mvp;
 } VertexPushConstants;
+typedef struct FragmentPushConstants
+{
+	LinearColor color;
+} FragmentPushConstants;
 typedef struct BaseHandle
 {
 	Window window;
 	Sampler sampler;
 	VertexPushConstants vpc;
+	FragmentPushConstants fpc;
 	Text* texts;
 	size_t textCapacity;
 	size_t textCount;
@@ -110,6 +115,7 @@ typedef struct VkHandle
 	Window window;
 	Sampler sampler;
 	VertexPushConstants vpc;
+	FragmentPushConstants fpc;
 	Text* texts;
 	size_t textCapacity;
 	size_t textCount;
@@ -123,12 +129,14 @@ typedef struct GlHandle
 	Window window;
 	Sampler sampler;
 	VertexPushConstants vpc;
+	FragmentPushConstants fpc;
 	Text* texts;
 	size_t textCapacity;
 	size_t textCount;
 	Buffer indexBuffer;
 	GLint mvpLocation;
 	GLint atlasLocation;
+	GLint colorLocation;
 } GlHandle;
 #endif
 typedef union Handle_T
@@ -3188,6 +3196,7 @@ size_t drawText(
 #if MPGX_SUPPORT_VULKAN
 		VkWindow vkWindow = getVkWindow(window);
 		VkCommandBuffer commandBuffer = vkWindow->currenCommandBuffer;
+		VkPipelineLayout pipelineLayout = pipeline->vk.layout;
 
 		if (dynamicScissor) // TODO: fix
 		{
@@ -3210,16 +3219,23 @@ size_t drawText(
 		const VkDeviceSize offset = 0;
 
 		vkCmdPushConstants(
-			vkWindow->currenCommandBuffer,
-			pipeline->vk.layout,
+			commandBuffer,
+			pipelineLayout,
 			VK_SHADER_STAGE_VERTEX_BIT,
 			0,
 			sizeof(VertexPushConstants),
 			&handle->vk.vpc);
+		vkCmdPushConstants(
+			commandBuffer,
+			pipelineLayout,
+			VK_SHADER_STAGE_FRAGMENT_BIT,
+			sizeof(VertexPushConstants),
+			sizeof(FragmentPushConstants),
+			&handle->vk.fpc);
 		vkCmdBindDescriptorSets(
 			commandBuffer,
 			VK_PIPELINE_BIND_POINT_GRAPHICS,
-			pipeline->vk.layout,
+			pipelineLayout,
 			0,
 			1,
 			&fontAtlas->descriptorSet,
@@ -3325,11 +3341,16 @@ static const VkVertexInputAttributeDescription vertexInputAttributeDescriptions[
 		sizeof(Vec2F) + sizeof(Vec3F),
 	},
 };
-static const VkPushConstantRange pushConstantRanges[1] = {
+static const VkPushConstantRange pushConstantRanges[2] = {
 	{
 		VK_SHADER_STAGE_VERTEX_BIT,
 		0,
 		sizeof(VertexPushConstants),
+	},
+	{
+		VK_SHADER_STAGE_FRAGMENT_BIT,
+		sizeof(VertexPushConstants),
+		sizeof(FragmentPushConstants),
 	},
 };
 
@@ -3382,7 +3403,7 @@ static MpgxResult onVkResize(
 		vertexInputAttributeDescriptions,
 		1,
 		&handle->vk.descriptorSetLayout,
-		1,
+		2,
 		pushConstantRanges,
 	};
 
@@ -3466,7 +3487,7 @@ inline static MpgxResult createVkPipeline(
 		vertexInputAttributeDescriptions,
 		1,
 		&descriptorSetLayout,
-		1,
+		2,
 		pushConstantRanges,
 	};
 
@@ -3510,6 +3531,10 @@ static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 		1,
 		GL_FALSE,
 		(const float*)&handle->gl.vpc.mvp);
+	glUniform4fv(
+		handle->gl.colorLocation,
+		1,
+		(const GLfloat*)&handle->gl.fpc.color);
 
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
@@ -3616,7 +3641,7 @@ inline static MpgxResult createGlPipeline(
 
 	GLuint glHandle = graphicsPipelineInstance->gl.glHandle;
 
-	GLint mvpLocation, atlasLocation;
+	GLint mvpLocation, atlasLocation, colorLocation;
 
 	bool result = getGlUniformLocation(
 		glHandle,
@@ -3626,6 +3651,10 @@ inline static MpgxResult createGlPipeline(
 		glHandle,
 		"u_Atlas",
 		&atlasLocation);
+	result &= getGlUniformLocation(
+		glHandle,
+		"u_Color",
+		&colorLocation);
 
 	if (!result)
 	{
@@ -3637,6 +3666,7 @@ inline static MpgxResult createGlPipeline(
 
 	handle->gl.mvpLocation = mvpLocation;
 	handle->gl.atlasLocation = atlasLocation;
+	handle->gl.colorLocation = colorLocation;
 
 	*graphicsPipeline = graphicsPipelineInstance;
 	return SUCCESS_MPGX_RESULT;
@@ -3684,6 +3714,7 @@ MpgxResult createTextPipeline(
 	handle->base.window = window;
 	handle->base.sampler = sampler;
 	handle->base.vpc.mvp = identMat4F;
+	handle->base.fpc.color = whiteLinearColor;
 	handle->base.texts = texts;
 	handle->base.textCapacity = capacity;
 	handle->base.textCount = 0;

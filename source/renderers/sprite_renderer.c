@@ -81,7 +81,7 @@ GraphicsRenderer createSpriteRenderer(
 GraphicsRender createSpriteRender(
 	GraphicsRenderer spriteRenderer,
 	Transform transform,
-	Box3F bounding,
+	Box3F bounds,
 	LinearColor color,
 	GraphicsMesh mesh)
 {
@@ -109,7 +109,7 @@ GraphicsRender createSpriteRender(
 	GraphicsRender render = createGraphicsRender(
 		spriteRenderer,
 		transform,
-		bounding,
+		bounds,
 		handle);
 
 	if (!render)

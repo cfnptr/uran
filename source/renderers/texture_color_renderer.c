@@ -89,7 +89,7 @@ GraphicsRenderer createTextureColorRenderer(
 GraphicsRender createTextureColorRender(
 	GraphicsRenderer textureColorRenderer,
 	Transform transform,
-	Box3F bounding,
+	Box3F bounds,
 	LinearColor color,
 	Vec2F size,
 	Vec2F offset,
@@ -121,7 +121,7 @@ GraphicsRender createTextureColorRender(
 	GraphicsRender render = createGraphicsRender(
 		textureColorRenderer,
 		transform,
-		bounding,
+		bounds,
 		handle);
 
 	if (!render)

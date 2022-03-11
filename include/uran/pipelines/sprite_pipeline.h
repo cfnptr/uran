@@ -25,9 +25,9 @@
  * Returns operation MPGX result.
  *
  * framebuffer - framebuffer instance.
- * vertexShader - sprite vertex shader instance.
- * fragmentShader - sprite fragment shader instance.
- * state - sprite pipeline state or NULL.
+ * vertexShader - sprite vertex shader.
+ * fragmentShader - sprite fragment shader.
+ * state - pipeline state or NULL.
  * spritePipeline - pointer to the sprite pipeline.
  */
 MpgxResult createSpritePipeline(
@@ -38,14 +38,16 @@ MpgxResult createSpritePipeline(
 	GraphicsPipeline* spritePipeline);
 
 /*
- * Returns sprite pipeline MVP matrix.
+ * Returns sprite pipeline model view projection matrix.
  * spritePipeline - sprite pipeline instance.
  */
 Mat4F getSpritePipelineMvp(
 	GraphicsPipeline spritePipeline);
 /*
- * Sets sprite pipeline MVP matrix.
+ * Sets sprite pipeline model view projection matrix.
+ *
  * spritePipeline - sprite pipeline instance.
+ * mvp - model view projection matrix value.
  */
 void setSpritePipelineMvp(
 	GraphicsPipeline spritePipeline,
@@ -59,10 +61,10 @@ LinearColor getSpritePipelineColor(
 	GraphicsPipeline spritePipeline);
 /*
  * Sets sprite pipeline color.
+ *
  * spritePipeline - sprite pipeline instance.
+ * color - color value.
  */
 void setSpritePipelineColor(
 	GraphicsPipeline spritePipeline,
 	LinearColor color);
-
-// TODO: replace Mat4F, Vec4F with ShaderMat etc.

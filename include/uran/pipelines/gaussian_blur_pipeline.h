@@ -17,7 +17,19 @@
 
 #define GAUSSIAN_BLUR_PIPELINE_NAME "GaussianBlur"
 
-MpgxResult createGaussianBlurPipelineExt(
+/*
+ * Create a new gaussian blur pipeline instance.
+ * Returns operation MPGX result.
+ *
+ * framebuffer - framebuffer instance.
+ * vertexShader - gaussian blur vertex shader.
+ * fragmentShader - gaussian blur fragment shader.
+ * buffer - buffer image.
+ * sampler - image sampler.
+ * state - pipeline state or NULL.
+ * gaussianBlurPipeline - pointer to the gaussian blur pipeline.
+ */
+MpgxResult createGaussianBlurPipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
@@ -25,21 +37,32 @@ MpgxResult createGaussianBlurPipelineExt(
 	Sampler sampler,
 	const GraphicsPipelineState* state,
 	GraphicsPipeline* gaussianBlurPipeline);
-MpgxResult createGaussianBlurPipeline(
-	Framebuffer framebuffer,
-	Shader vertexShader,
-	Shader fragmentShader,
-	Image buffer,
-	Sampler sampler,
-	GraphicsPipeline* gaussianBlurPipeline);
 
+/*
+ * Returns gaussian blur pipeline buffer.
+ * gaussianBlurPipeline - gaussian blur pipeline instance.
+ */
 Image getGaussianBlurPipelineBuffer(
 	GraphicsPipeline gaussianBlurPipeline);
+/*
+ * Returns gaussian blur pipeline sampler.
+ * gaussianBlurPipeline - gaussian blur pipeline instance.
+ */
 Sampler getGaussianBlurPipelineSampler(
 	GraphicsPipeline gaussianBlurPipeline);
 
+/*
+ * Returns gaussian blur pipeline radius.
+ * gaussianBlurPipeline - gaussian blur pipeline instance.
+ */
 int getGaussianBlurPipelineRadius(
 	GraphicsPipeline gaussianBlurPipeline);
+/*
+ * Sets gaussian blur pipeline radius.
+ *
+ * gaussianBlurPipeline - gaussian blur pipeline instance.
+ * radius - blur radius value.
+ */
 void setGaussianBlurPipelineRadius(
 	GraphicsPipeline gaussianBlurPipeline,
 	int radius);

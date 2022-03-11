@@ -17,6 +17,8 @@
 
 #define RAY_TRACING_COLOR_PIPELINE_NAME "RayTracingColor"
 
+// TODO: fix and add comments
+
 MpgxResult createRayTracingColorPipeline(
 	Window window,
 	Shader generationShader,

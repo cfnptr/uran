@@ -16,7 +16,7 @@
 
 layout(location = 0) in vec2 v_Position;
 
-layout(push_constant) uniform  VertexPushConstants
+layout(push_constant) uniform VertexPushConstants
 {
     mat4 mvp;
 } vpc;

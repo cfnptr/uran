@@ -18,7 +18,19 @@
 
 #define TEXTURE_SPRITE_PIPELINE_NAME "TextureSprite"
 
-MpgxResult createTextureSpritePipelineExt(
+/*
+ * Create a new texture sprite pipeline instance.
+ * Returns operation MPGX result.
+ *
+ * framebuffer - framebuffer instance.
+ * vertexShader - texture sprite vertex shader.
+ * fragmentShader - texture sprite fragment shader.
+ * texture - texture instance.
+ * sampler - texture sampler.
+ * state - pipeline state or NULL.
+ * textureSpritePipeline - pointer to the texture sprite pipeline.
+ */
+MpgxResult createTextureSpritePipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
@@ -26,39 +38,80 @@ MpgxResult createTextureSpritePipelineExt(
 	Sampler sampler,
 	const GraphicsPipelineState* state,
 	GraphicsPipeline* textureSpritePipeline);
-MpgxResult createTextureSpritePipeline(
-	Framebuffer framebuffer,
-	Shader vertexShader,
-	Shader fragmentShader,
-	Image texture,
-	Sampler sampler,
-	GraphicsPipeline* textureSpritePipeline);
 
+/*
+ * Returns texture sprite pipeline texture.
+ * textureSpritePipeline - texture sprite pipeline instance.
+ */
 Image getTextureSpritePipelineTexture(
 	GraphicsPipeline textureSpritePipeline);
+/*
+ * Returns texture sprite pipeline sampler.
+ * textureSpritePipeline - texture sprite pipeline instance.
+ */
 Sampler getTextureSpritePipelineSampler(
 	GraphicsPipeline textureSpritePipeline);
 
+/*
+ * Returns texture sprite pipeline model view projection matrix.
+ * textureSpritePipeline - texture sprite pipeline instance.
+ */
 Mat4F getTextureSpritePipelineMvp(
 	GraphicsPipeline textureSpritePipeline);
+/*
+ * Sets texture sprite pipeline model view projection matrix.
+ *
+ * textureSpritePipeline - texture sprite pipeline instance.
+ * mvp - model view projection matrix.
+ */
 void setTextureSpritePipelineMvp(
 	GraphicsPipeline textureSpritePipeline,
 	Mat4F mvp);
 
+/*
+ * Returns texture sprite pipeline size.
+ * textureSpritePipeline - texture sprite pipeline instance.
+ */
 Vec2F getTextureSpritePipelineSize(
 	GraphicsPipeline textureSpritePipeline);
+/*
+ * Sets texture sprite pipeline size.
+ *
+ * textureSpritePipeline - texture sprite pipeline instance.
+ * size - texture size value.
+ */
 void setTextureSpritePipelineSize(
 	GraphicsPipeline textureSpritePipeline,
 	Vec2F size);
 
+/*
+ * Returns texture sprite pipeline offset.
+ * textureSpritePipeline - texture sprite pipeline instance.
+ */
 Vec2F getTextureSpritePipelineOffset(
 	GraphicsPipeline textureSpritePipeline);
+/*
+ * Sets texture sprite pipeline offset.
+ *
+ * textureSpritePipeline - texture sprite pipeline instance.
+ * offset - texture offset value.
+ */
 void setTextureSpritePipelineOffset(
 	GraphicsPipeline textureSpritePipeline,
 	Vec2F offset);
 
+/*
+ * Returns texture sprite pipeline color.
+ * textureSpritePipeline - texture sprite pipeline instance.
+ */
 LinearColor getTextureSpritePipelineColor(
 	GraphicsPipeline textureSpritePipeline);
+/*
+ * Sets texture sprite pipeline color.
+ *
+ * textureSpritePipeline - texture sprite pipeline instance.
+ * color - color value.
+ */
 void setTextureSpritePipelineColor(
 	GraphicsPipeline textureSpritePipeline,
 	LinearColor color);

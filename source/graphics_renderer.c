@@ -453,18 +453,13 @@ GraphicsRendererResult drawGraphicsRenderer(
 
 		size_t threadCount = getThreadPoolThreadCount(threadPool);
 
-		bool addResult = true;
-
 		for (size_t i = 0; i < threadCount; i++)
 		{
-			addResult &= addThreadPoolTask(
+			addThreadPoolTask(
 				threadPool,
 				onRenderUpdate,
 				renderer);
 		}
-
-		if (!addResult)
-			abort();
 
 		waitThreadPool(threadPool);
 		elementCount = renderer->elementIndex;

@@ -25,7 +25,7 @@ typedef struct VertexPushConstants
 } VertexPushConstants;
 typedef struct FragmentPushConstants
 {
-	Vec4F sunDir;
+	Vec4F sunDirection;
 	LinearColor sunColor;
 } FragmentPushConstants;
 typedef struct BaseHandle
@@ -46,8 +46,7 @@ typedef struct VkHandle
 	FragmentPushConstants fpc;
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkDescriptorPool descriptorPool;
-	VkDescriptorSet* descriptorSets;
-	uint32_t bufferCount;
+	VkDescriptorSet descriptorSet;
 } VkHandle;
 #endif
 #if MPGX_SUPPORT_OPENGL
@@ -59,7 +58,7 @@ typedef struct GlHandle
 	VertexPushConstants vpc;
 	FragmentPushConstants fpc;
 	GLint mvpLocation;
-	GLint sunDirLocation;
+	GLint sunDirectionLocation;
 	GLint sunColorLocation;
 	GLint textureLocation;
 } GlHandle;
@@ -131,17 +130,15 @@ static const VkPushConstantRange pushConstantRanges[2] = {
 
 inline static MpgxResult createVkDescriptorPoolInstance(
 	VkDevice device,
-	uint32_t bufferCount,
 	VkDescriptorPool* descriptorPool)
 {
 	assert(device);
-	assert(bufferCount > 0);
 	assert(descriptorPool);
 
 	VkDescriptorPoolSize descriptorPoolSizes[1] = {
 		{
 			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			bufferCount,
+			1,
 		},
 	};
 
@@ -149,7 +146,7 @@ inline static MpgxResult createVkDescriptorPoolInstance(
 		VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 		NULL,
 		0,
-		bufferCount,
+		1,
 		1,
 		descriptorPoolSizes
 	};
@@ -168,38 +165,40 @@ inline static MpgxResult createVkDescriptorPoolInstance(
 	*descriptorPool = descriptorPoolInstance;
 	return SUCCESS_MPGX_RESULT;
 }
-inline static MpgxResult createVkDescriptorSetArray(
+inline static MpgxResult createVkDescriptorSetInstance(
 	VkDevice device,
 	VkDescriptorSetLayout descriptorSetLayout,
 	VkDescriptorPool descriptorPool,
-	uint32_t bufferCount,
-	VkSampler sampler,
 	VkImageView imageView,
-	VkDescriptorSet** descriptorSets)
+	VkSampler sampler,
+	VkDescriptorSet* descriptorSet)
 {
 	assert(device);
 	assert(descriptorSetLayout);
 	assert(descriptorPool);
-	assert(bufferCount > 0);
-	assert(sampler);
 	assert(imageView);
-	assert(descriptorSets);
+	assert(sampler);
+	assert(descriptorSet);
 
-	VkDescriptorSet* descriptorSetArray;
-
-	MpgxResult mpgxResult = allocateVkDescriptorSets(
-		device,
-		descriptorSetLayout,
+	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
+		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+		NULL,
 		descriptorPool,
-		bufferCount,
-		&descriptorSetArray);
+		1,
+		&descriptorSetLayout,
+	};
 
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-		return mpgxResult;
+	VkDescriptorSet descriptorSetInstance;
 
-	for (uint32_t i = 0; i < bufferCount; i++)
-	{
-		VkDescriptorImageInfo descriptorImageInfos[1] =
+	VkResult vkResult = vkAllocateDescriptorSets(
+		device,
+		&descriptorSetAllocateInfo,
+		&descriptorSetInstance);
+
+	if (vkResult != VK_SUCCESS)
+		return vkToMpgxResult(vkResult);
+
+	VkDescriptorImageInfo descriptorImageInfos[1] =
 		{
 			{
 				sampler,
@@ -207,30 +206,29 @@ inline static MpgxResult createVkDescriptorSetArray(
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			},
 		};
-		VkWriteDescriptorSet writeDescriptorSets[1] = {
-			{
-				VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				NULL,
-				descriptorSetArray[i],
-				0,
-				0,
-				1,
-				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				descriptorImageInfos,
-				NULL,
-				NULL,
-			},
-		};
-
-		vkUpdateDescriptorSets(
-			device,
-			1,
-			writeDescriptorSets,
+	VkWriteDescriptorSet writeDescriptorSets[1] = {
+		{
+			VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			NULL,
+			descriptorSetInstance,
 			0,
-			NULL);
-	}
+			0,
+			1,
+			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			descriptorImageInfos,
+			NULL,
+			NULL,
+		},
+	};
 
-	*descriptorSets = descriptorSetArray;
+	vkUpdateDescriptorSets(
+		device,
+		1,
+		writeDescriptorSets,
+		0,
+		NULL);
+
+	*descriptorSet = descriptorSetInstance;
 	return SUCCESS_MPGX_RESULT;
 }
 
@@ -240,7 +238,6 @@ static void onVkBind(GraphicsPipeline graphicsPipeline)
 
 	Handle handle = graphicsPipeline->vk.handle;
 	VkWindow vkWindow = getVkWindow(handle->vk.window);
-	uint32_t bufferIndex = vkWindow->bufferIndex;
 
 	vkCmdBindDescriptorSets(
 		vkWindow->currenCommandBuffer,
@@ -248,7 +245,7 @@ static void onVkBind(GraphicsPipeline graphicsPipeline)
 		graphicsPipeline->vk.layout,
 		0,
 		1,
-		&handle->vk.descriptorSets[bufferIndex],
+		&handle->vk.descriptorSet,
 		0,
 		NULL);
 }
@@ -287,54 +284,6 @@ static MpgxResult onVkResize(
 	assert(createData);
 
 	Handle handle = graphicsPipeline->vk.handle;
-	VkWindow vkWindow = getVkWindow(handle->vk.window);
-	uint32_t bufferCount = vkWindow->swapchain->bufferCount;
-
-	if (bufferCount != handle->vk.bufferCount)
-	{
-		VkDevice device = vkWindow->device;
-
-		VkDescriptorPool descriptorPool;
-
-		MpgxResult mpgxResult = createVkDescriptorPoolInstance(
-			device,
-			bufferCount,
-			&descriptorPool);
-
-		if (mpgxResult != SUCCESS_MPGX_RESULT)
-			return mpgxResult;
-
-		VkDescriptorSet* descriptorSets;
-
-		mpgxResult = createVkDescriptorSetArray(
-			device,
-			handle->vk.descriptorSetLayout,
-			descriptorPool,
-			bufferCount,
-			handle->vk.sampler->vk.handle,
-			handle->vk.texture->vk.imageView,
-			&descriptorSets);
-
-		if (mpgxResult != SUCCESS_MPGX_RESULT)
-		{
-			vkDestroyDescriptorPool(
-				device,
-				descriptorPool,
-				NULL);
-			return mpgxResult;
-		}
-
-		free(handle->vk.descriptorSets);
-
-		vkDestroyDescriptorPool(
-			device,
-			handle->vk.descriptorPool,
-			NULL);
-
-		handle->vk.descriptorPool = descriptorPool;
-		handle->vk.descriptorSets = descriptorSets;
-		handle->vk.bufferCount = bufferCount;
-	}
 
 	Vec4I size = vec4I(0, 0,
 		newSize.x, newSize.y);
@@ -374,7 +323,6 @@ static void onVkDestroy(void* _handle)
 	VkWindow vkWindow = getVkWindow(handle->vk.window);
 	VkDevice device = vkWindow->device;
 
-	free(handle->vk.descriptorSets);
 	vkDestroyDescriptorPool(
 		device,
 		handle->vk.descriptorPool,
@@ -387,6 +335,7 @@ static void onVkDestroy(void* _handle)
 }
 inline static MpgxResult createVkPipeline(
 	Framebuffer framebuffer,
+	const char* name,
 	VkSampler sampler,
 	VkImageView imageView,
 	const GraphicsPipelineState* state,
@@ -452,13 +401,10 @@ inline static MpgxResult createVkPipeline(
 		pushConstantRanges,
 	};
 
-	uint32_t bufferCount = vkWindow->swapchain->bufferCount;
-
 	VkDescriptorPool descriptorPool;
 
 	MpgxResult mpgxResult = createVkDescriptorPoolInstance(
 		device,
-		bufferCount,
 		&descriptorPool);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
@@ -469,16 +415,15 @@ inline static MpgxResult createVkPipeline(
 
 	handle->vk.descriptorPool = descriptorPool;
 
-	VkDescriptorSet* descriptorSets;
+	VkDescriptorSet descriptorSet;
 
-	mpgxResult = createVkDescriptorSetArray(
+	mpgxResult = createVkDescriptorSetInstance(
 		device,
 		descriptorSetLayout,
 		descriptorPool,
-		bufferCount,
-		sampler,
 		imageView,
-		&descriptorSets);
+		sampler,
+		&descriptorSet);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
@@ -486,12 +431,11 @@ inline static MpgxResult createVkPipeline(
 		return mpgxResult;
 	}
 
-	handle->vk.descriptorSets = descriptorSets;
-	handle->vk.bufferCount = bufferCount;
+	handle->vk.descriptorSet = descriptorSet;
 
 	mpgxResult = createGraphicsPipeline(
 		framebuffer,
-		GRADIENT_SKY_PIPELINE_NAME,
+		name,
 		state,
 		onVkBind,
 		onVkUniformsSet,
@@ -539,9 +483,9 @@ static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 		GL_FALSE,
 		(const GLfloat*)&handle->gl.vpc.mvp);
 	glUniform4fv(
-		handle->gl.sunDirLocation,
+		handle->gl.sunDirectionLocation,
 		1,
-		(const GLfloat*)&handle->gl.fpc.sunDir);
+		(const GLfloat*)&handle->gl.fpc.sunDirection);
 	glUniform4fv(
 		handle->gl.sunColorLocation,
 		1,
@@ -590,6 +534,7 @@ static void onGlDestroy(void* handle)
 }
 inline static MpgxResult createGlPipeline(
 	Framebuffer framebuffer,
+	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
 	Shader* shaders,
@@ -607,7 +552,7 @@ inline static MpgxResult createGlPipeline(
 
 	MpgxResult mpgxResult = createGraphicsPipeline(
 		framebuffer,
-		GRADIENT_SKY_PIPELINE_NAME,
+		name,
 		state,
 		onGlBind,
 		onGlUniformsSet,
@@ -627,7 +572,7 @@ inline static MpgxResult createGlPipeline(
 
 	GLuint glHandle = graphicsPipelineInstance->gl.glHandle;
 
-	GLint mvpLocation, sunDirLocation,
+	GLint mvpLocation, sunDirectionLocation,
 		sunColorLocation, textureLocation;
 
 	bool result = getGlUniformLocation(
@@ -636,8 +581,8 @@ inline static MpgxResult createGlPipeline(
 		&mvpLocation);
 	result &= getGlUniformLocation(
 		glHandle,
-		"u_SunDir",
-		&sunDirLocation);
+		"u_SunDirection",
+		&sunDirectionLocation);
 	result &= getGlUniformLocation(
 		glHandle,
 		"u_SunColor",
@@ -656,7 +601,7 @@ inline static MpgxResult createGlPipeline(
 	assertOpenGL();
 
 	handle->gl.mvpLocation = mvpLocation;
-	handle->gl.sunDirLocation = sunDirLocation;
+	handle->gl.sunDirectionLocation = sunDirectionLocation;
 	handle->gl.sunColorLocation = sunColorLocation;
 	handle->gl.textureLocation = textureLocation;
 
@@ -665,7 +610,7 @@ inline static MpgxResult createGlPipeline(
 }
 #endif
 
-MpgxResult createGradientSkyPipelineExt(
+MpgxResult createGradientSkyPipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
@@ -679,7 +624,6 @@ MpgxResult createGradientSkyPipelineExt(
 	assert(fragmentShader);
 	assert(texture);
 	assert(sampler);
-	assert(state);
 	assert(gradientSkyPipeline);
 	assert(vertexShader->base.type == VERTEX_SHADER_TYPE);
 	assert(fragmentShader->base.type == FRAGMENT_SHADER_TYPE);
@@ -698,66 +642,14 @@ MpgxResult createGradientSkyPipelineExt(
 	handle->base.texture = texture;
 	handle->base.sampler = sampler;
 	handle->base.vpc.mvp = identMat4F;
-	handle->base.fpc.sunDir = zeroVec4F;
+	handle->base.fpc.sunDirection = zeroVec4F;
 	handle->base.fpc.sunColor = whiteLinearColor;
 
-	Shader shaders[2] = {
-		vertexShader,
-		fragmentShader,
-	};
-
-	GraphicsAPI api = getGraphicsAPI();
-
-	if (api == VULKAN_GRAPHICS_API)
-	{
-#if MPGX_SUPPORT_VULKAN
-		return createVkPipeline(
-			framebuffer,
-			sampler->vk.handle,
-			texture->vk.imageView,
-			state,
-			handle,
-			shaders,
-			2,
-			gradientSkyPipeline);
+#ifndef NDEBUG
+	const char* name = GRADIENT_SKY_PIPELINE_NAME;
 #else
-		abort();
+	const char* name = NULL;
 #endif
-	}
-	else if (api == OPENGL_GRAPHICS_API ||
-		api == OPENGL_ES_GRAPHICS_API)
-	{
-#if MPGX_SUPPORT_OPENGL
-		return createGlPipeline(
-			framebuffer,
-			state,
-			handle,
-			shaders,
-			2,
-			gradientSkyPipeline);
-#else
-		abort();
-#endif
-	}
-	else
-	{
-		abort();
-	}
-}
-MpgxResult createGradientSkyPipeline(
-	Framebuffer framebuffer,
-	Shader vertexShader,
-	Shader fragmentShader,
-	Image texture,
-	Sampler sampler,
-	GraphicsPipeline* graphicsPipeline)
-{
-	assert(framebuffer);
-	assert(vertexShader);
-	assert(fragmentShader);
-	assert(texture);
-	assert(sampler);
-	assert(graphicsPipeline);
 
 	Vec2I framebufferSize =
 		framebuffer->base.size;
@@ -765,7 +657,7 @@ MpgxResult createGradientSkyPipeline(
 		framebufferSize.x,
 		framebufferSize.y);
 
-	GraphicsPipelineState state = {
+	GraphicsPipelineState defaultState = {
 		TRIANGLE_LIST_DRAW_MODE,
 		FILL_POLYGON_MODE,
 		BACK_CULL_MODE,
@@ -794,14 +686,50 @@ MpgxResult createGradientSkyPipeline(
 		defaultBlendColor,
 	};
 
-	return createGradientSkyPipelineExt(
-		framebuffer,
+	Shader shaders[2] = {
 		vertexShader,
 		fragmentShader,
-		texture,
-		sampler,
-		&state,
-		graphicsPipeline);
+	};
+
+	GraphicsAPI api = getGraphicsAPI();
+
+	if (api == VULKAN_GRAPHICS_API)
+	{
+#if MPGX_SUPPORT_VULKAN
+		return createVkPipeline(
+			framebuffer,
+			name,
+			sampler->vk.handle,
+			texture->vk.imageView,
+			state ? state : &defaultState,
+			handle,
+			shaders,
+			2,
+			gradientSkyPipeline);
+#else
+		abort();
+#endif
+	}
+	else if (api == OPENGL_GRAPHICS_API ||
+		api == OPENGL_ES_GRAPHICS_API)
+	{
+#if MPGX_SUPPORT_OPENGL
+		return createGlPipeline(
+			framebuffer,
+			name,
+			state ? state : &defaultState,
+			handle,
+			shaders,
+			2,
+			gradientSkyPipeline);
+#else
+		abort();
+#endif
+	}
+	else
+	{
+		abort();
+	}
 }
 
 Image getGradientSkyPipelineTexture(
@@ -843,31 +771,31 @@ void setGradientSkyPipelineMvp(
 	handle->base.vpc.mvp = mvp;
 }
 
-Vec3F getGradientSkyPipelineSunDir(
+Vec3F getGradientSkyPipelineSunDirection(
 	GraphicsPipeline gradientSkyPipeline)
 {
 	assert(gradientSkyPipeline);
 	assert(strcmp(gradientSkyPipeline->base.name,
 		GRADIENT_SKY_PIPELINE_NAME) == 0);
 	Handle handle = gradientSkyPipeline->base.handle;
-	Vec4F sunDir = handle->base.fpc.sunDir;
+	Vec4F sunDirection = handle->base.fpc.sunDirection;
 	return vec3F(
-		sunDir.x,
-		sunDir.y,
-		sunDir.z);
+		sunDirection.x,
+		sunDirection.y,
+		sunDirection.z);
 }
-void setGradientSkyPipelineSunDir(
+void setGradientSkyPipelineSunDirection(
 	GraphicsPipeline gradientSkyPipeline,
-	Vec3F sunDir)
+	Vec3F sunDirection)
 {
 	assert(gradientSkyPipeline);
 	assert(strcmp(gradientSkyPipeline->base.name,
 		GRADIENT_SKY_PIPELINE_NAME) == 0);
 	Handle handle = gradientSkyPipeline->base.handle;
-	handle->base.fpc.sunDir = vec4F(
-		sunDir.x,
-		sunDir.y,
-		sunDir.z,
+	handle->base.fpc.sunDirection = vec4F(
+		sunDirection.x,
+		sunDirection.y,
+		sunDirection.z,
 		0.0f);
 }
 

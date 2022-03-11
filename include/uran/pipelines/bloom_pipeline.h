@@ -18,7 +18,19 @@
 
 #define BLOOM_PIPELINE_NAME "Bloom"
 
-MpgxResult createBloomPipelineExt(
+/*
+ * Create a new bloom pipeline instance.
+ * Returns operation MPGX result.
+ *
+ * framebuffer - framebuffer instance.
+ * vertexShader - bloom vertex shader.
+ * fragmentShader - bloom fragment shader.
+ * buffer - buffer image.
+ * sampler - image sampler.
+ * state - pipeline state or NULL.
+ * bloomPipeline - pointer to the bloom pipeline.
+ */
+MpgxResult createBloomPipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
@@ -26,21 +38,32 @@ MpgxResult createBloomPipelineExt(
 	Sampler sampler,
 	const GraphicsPipelineState* state,
 	GraphicsPipeline* bloomPipeline);
-MpgxResult createBloomPipeline(
-	Framebuffer framebuffer,
-	Shader vertexShader,
-	Shader fragmentShader,
-	Image buffer,
-	Sampler sampler,
-	GraphicsPipeline* bloomPipeline);
 
+/*
+ * Returns bloom pipeline buffer.
+ * bloomPipeline - bloom pipeline instance.
+ */
 Image getBloomPipelineBuffer(
 	GraphicsPipeline bloomPipeline);
+/*
+ * Returns bloom pipeline sampler.
+ * bloomPipeline - bloom pipeline instance.
+ */
 Sampler getBloomPipelineSampler(
 	GraphicsPipeline bloomPipeline);
 
+/*
+ * Returns bloom pipeline threshold.
+ * bloomPipeline - bloom pipeline instance.
+ */
 LinearColor getBloomPipelineThreshold(
 	GraphicsPipeline bloomPipeline);
+/*
+ * Returns bloom pipeline threshold.
+ *
+ * bloomPipeline - bloom pipeline instance.
+ * threshold - color threshold value.
+ */
 void setBloomPipelineThreshold(
 	GraphicsPipeline bloomPipeline,
 	LinearColor threshold);

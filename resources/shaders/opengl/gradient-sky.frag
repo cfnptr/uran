@@ -13,11 +13,11 @@
 // limitations under the License.
 
 in vec3 f_FragDir;
-in float f_TexCoord;
+in float f_TexCoords;
 
 layout(location = 0) out vec4 o_Color;
 
-uniform vec4 u_SunDir;
+uniform vec4 u_SunDirection;
 uniform vec4 u_SunColor;
 uniform sampler2D u_Texture;
 
@@ -26,15 +26,15 @@ vec4 calcSkyColor(sampler2D skyTexture, float sunHeight, float texCoord)
     vec2 texCoords = vec2(max(sunHeight, 0.0), texCoord);
     return texture(skyTexture, texCoords);
 }
-float calcSunLight(vec3 fragDir, vec3 sunDir)
+float calcSunLight(vec3 fragDir, vec3 sunDirection)
 {
-    float light = dot(normalize(fragDir), sunDir);
+    float light = dot(normalize(fragDir), sunDirection);
     return max((light - 0.999) * 1000.0, 0.0);
 }
 void main()
 {
-    vec4 skyColor = calcSkyColor(u_Texture, u_SunDir.y, f_TexCoord);
-    float sunLight = calcSunLight(f_FragDir, u_SunDir.xyz);
+    vec4 skyColor = calcSkyColor(u_Texture, u_SunDirection.y, f_TexCoords);
+    float sunLight = calcSunLight(f_FragDir, u_SunDirection.xyz);
     o_Color = (u_SunColor * sunLight) + skyColor;
     gl_FragDepth = 0.9999999;
 }

@@ -16,20 +16,49 @@
 #include "uran/graphics_renderer.h"
 #include "uran/pipelines/simple_shadow_pipeline.h"
 
+/*
+ * Create a new simple shadow renderer instance.
+ * Returns simple shadow renderer instance in success, otherwise NULL.
+ *
+ * simpleShadowPipeline - simple shadow pipeline instance.
+ * sorting - render sorting type.
+ * useCulling - use frustum culling.
+ * capacity - initial render array capacity or 0.
+ * threadPool - thread pool instance or NULL.
+ */
 GraphicsRenderer createSimpleShadowRenderer(
 	GraphicsPipeline simpleShadowPipeline,
 	GraphicsRenderSorting sorting,
 	bool useCulling,
 	size_t capacity,
 	ThreadPool threadPool);
+/*
+ * Create a new simple shadow render instance.
+ * Returns simple shadow render instance on success, otherwise NULL.
+ *
+ * simpleShadowRenderer - simple shadow renderer instance.
+ * transform - transform instance.
+ * bounds - render bounds.
+ * mesh - render mesh.
+ */
 GraphicsRender createSimpleShadowRender(
 	GraphicsRenderer simpleShadowRenderer,
 	Transform transform,
-	Box3F bounding,
+	Box3F bounds,
 	GraphicsMesh mesh);
 
+/*
+ * Returns simple shadow render mesh.
+ * simpleShadowRender - simple shadow render instance.
+ */
 GraphicsMesh getSimpleShadowRenderMesh(
 	GraphicsRender simpleShadowRender);
+/*
+ * Sets simple shadow render mesh.
+ *
+ * simpleShadowRender - simple shadow render instance.
+ * mesh - mesh instance.
+ */
 void setSimpleShadowRenderMesh(
 	GraphicsRender simpleShadowRender,
 	GraphicsMesh mesh);

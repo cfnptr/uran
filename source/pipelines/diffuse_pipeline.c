@@ -433,6 +433,7 @@ static void onVkDestroy(void* _handle)
 }
 inline static MpgxResult createVkPipeline(
 	Framebuffer framebuffer,
+	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
 	Shader* shaders,
@@ -547,7 +548,7 @@ inline static MpgxResult createVkPipeline(
 
 	mpgxResult = createGraphicsPipeline(
 		framebuffer,
-		DIFFUSE_PIPELINE_NAME,
+		name,
 		state,
 		onVkBind,
 		onVkUniformsSet,
@@ -664,6 +665,7 @@ static void onGlDestroy(void* _handle)
 }
 inline static MpgxResult createGlPipeline(
 	Framebuffer framebuffer,
+	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
 	Shader* shaders,
@@ -699,7 +701,7 @@ inline static MpgxResult createGlPipeline(
 
 	mpgxResult = createGraphicsPipeline(
 		framebuffer,
-		DIFFUSE_PIPELINE_NAME,
+		name,
 		state,
 		onGlBind,
 		onGlUniformsSet,
@@ -756,7 +758,7 @@ inline static MpgxResult createGlPipeline(
 }
 #endif
 
-MpgxResult createDiffusePipelineExt(
+MpgxResult createDiffusePipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
@@ -766,7 +768,6 @@ MpgxResult createDiffusePipelineExt(
 	assert(framebuffer);
 	assert(vertexShader);
 	assert(fragmentShader);
-	assert(state);
 	assert(diffusePipeline);
 	assert(vertexShader->base.type == VERTEX_SHADER_TYPE);
 	assert(fragmentShader->base.type == FRAGMENT_SHADER_TYPE);
@@ -798,57 +799,11 @@ MpgxResult createDiffusePipelineExt(
 	handle->base.vpc.normal = identMat4F;
 	handle->base.ub = ub;
 
-	Shader shaders[2] = {
-		vertexShader,
-		fragmentShader,
-	};
-
-	GraphicsAPI api = getGraphicsAPI();
-
-	if (api == VULKAN_GRAPHICS_API)
-	{
-#if MPGX_SUPPORT_VULKAN
-		return createVkPipeline(
-			framebuffer,
-			state,
-			handle,
-			shaders,
-			2,
-			diffusePipeline);
+#ifndef NDEBUG
+	const char* name = DIFFUSE_PIPELINE_NAME;
 #else
-		abort();
+	const char* name = NULL;
 #endif
-	}
-	else if (api == OPENGL_GRAPHICS_API ||
-		api == OPENGL_ES_GRAPHICS_API)
-	{
-#if MPGX_SUPPORT_OPENGL
-		return createGlPipeline(
-			framebuffer,
-			state,
-			handle,
-			shaders,
-			2,
-			diffusePipeline);
-#else
-		abort();
-#endif
-	}
-	else
-	{
-		abort();
-	}
-}
-MpgxResult createDiffusePipeline(
-	Framebuffer framebuffer,
-	Shader vertexShader,
-	Shader fragmentShader,
-	GraphicsPipeline* diffusePipeline)
-{
-	assert(framebuffer);
-	assert(vertexShader);
-	assert(fragmentShader);
-	assert(diffusePipeline);
 
 	Vec2I framebufferSize =
 		framebuffer->base.size;
@@ -856,7 +811,7 @@ MpgxResult createDiffusePipeline(
 		framebufferSize.x,
 		framebufferSize.y);
 
-	GraphicsPipelineState state = {
+	GraphicsPipelineState defaultState = {
 		TRIANGLE_LIST_DRAW_MODE,
 		FILL_POLYGON_MODE,
 		BACK_CULL_MODE,
@@ -885,12 +840,48 @@ MpgxResult createDiffusePipeline(
 		defaultBlendColor,
 	};
 
-	return createDiffusePipelineExt(
-		framebuffer,
+	Shader shaders[2] = {
 		vertexShader,
 		fragmentShader,
-		&state,
-		diffusePipeline);
+	};
+
+	GraphicsAPI api = getGraphicsAPI();
+
+	if (api == VULKAN_GRAPHICS_API)
+	{
+#if MPGX_SUPPORT_VULKAN
+		return createVkPipeline(
+			framebuffer,
+			name,
+			state ? state : &defaultState,
+			handle,
+			shaders,
+			2,
+			diffusePipeline);
+#else
+		abort();
+#endif
+	}
+	else if (api == OPENGL_GRAPHICS_API ||
+		api == OPENGL_ES_GRAPHICS_API)
+	{
+#if MPGX_SUPPORT_OPENGL
+		return createGlPipeline(
+			framebuffer,
+			name,
+			state ? state : &defaultState,
+			handle,
+			shaders,
+			2,
+			diffusePipeline);
+#else
+		abort();
+#endif
+	}
+	else
+	{
+		abort();
+	}
 }
 
 Mat4F getDiffusePipelineMvp(

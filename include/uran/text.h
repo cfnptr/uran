@@ -23,7 +23,6 @@
 #define TEXT_PIPELINE_NAME "Text"
 
 // TODO: create inside texture square for the underline sampling first full symbol.
-// use SDF fot text
 
 /*
  * Font structure.

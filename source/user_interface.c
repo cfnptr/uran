@@ -529,6 +529,7 @@ MpgxResult createUiLabel32(
 		ui->textRenderer,
 		transform,
 		oneSizeBox3F, // TODO:
+		whiteLinearColor,
 		text,
 		zeroVec4I);
 
@@ -897,6 +898,7 @@ MpgxResult createUiWindow32(
 		ui->textRenderer,
 		titleTransform,
 		oneSizeBox3F, // TODO: adjust
+		whiteLinearColor,
 		text,
 		zeroVec4I);
 
@@ -1266,6 +1268,7 @@ MpgxResult createUiButton32(
 		ui->textRenderer,
 		textTransform,
 		oneSizeBox3F, // TODO: adjust
+		whiteLinearColor,
 		textInstance,
 		zeroVec4I);
 

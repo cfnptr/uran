@@ -20,12 +20,9 @@ struct GradientSkyAmbient_T
 	size_t count;
 };
 
-MpgxResult createGradientSkyAmbient(
-	ImageData gradient,
-	GradientSkyAmbient* gradientSkyAmbient)
+GradientSkyAmbient createGradientSkyAmbient(ImageData gradient)
 {
 	assert(gradient);
-	assert(gradientSkyAmbient);
 
 	Vec2I size = getImageDataSize(gradient);
 
@@ -33,7 +30,7 @@ MpgxResult createGradientSkyAmbient(
 		sizeof(Vec4F) * size.x);
 
 	if (!colors)
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+		return NULL;
 
 	const uint8_t* pixels = getImageDataPixels(gradient);
 
@@ -56,23 +53,20 @@ MpgxResult createGradientSkyAmbient(
 		colors[x] = divValLinearColor(color, (float)size.y);
 	}
 
-	GradientSkyAmbient gradientSkyAmbientInstance = malloc(
+	GradientSkyAmbient gradientSkyAmbient = malloc(
 		sizeof(GradientSkyAmbient_T));
 
 	if (!gradientSkyAmbient)
 	{
 		free(colors);
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+		return NULL;
 	}
 
-	gradientSkyAmbientInstance->colors = colors;
-	gradientSkyAmbientInstance->count = size.x;
-
-	*gradientSkyAmbient = gradientSkyAmbientInstance;
-	return SUCCESS_MPGX_RESULT;
+	gradientSkyAmbient->colors = colors;
+	gradientSkyAmbient->count = size.x;
+	return gradientSkyAmbient;
 }
-void destroyGradientSkyAmbient(
-	GradientSkyAmbient gradientSkyAmbient)
+void destroyGradientSkyAmbient(GradientSkyAmbient gradientSkyAmbient)
 {
 	if (!gradientSkyAmbient)
 		return;
