@@ -18,6 +18,10 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#if _WIN32
+#undef interface
+#endif
+
 struct InterfaceElement_T
 {
 	Interface interface;

@@ -287,7 +287,7 @@ inline static bool getImageDataFromPack(
 				"(error: %s, path: %s)",
 				packResultToString(packResult), path);
 		}
-		return NULL;
+		return false;
 	}
 
 	return getImageDataFromData(

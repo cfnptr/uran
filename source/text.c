@@ -1408,7 +1408,7 @@ inline static bool fillVertices(
 	bool isBold,
 	bool isItalic,
 	TextVertex* vertices,
-	size_t* vertexCount,
+	uint32_t* vertexCount,
 	Vec2F* textSize)
 {
 	assert(string);
@@ -1453,7 +1453,7 @@ inline static bool fillVertices(
 
 	float sizeX = 0.0f, sizeY = 0.0f;
 	float vertexOffsetX = 0.0f, vertexOffsetY = -newLineAdvance * 0.5f;
-	size_t vertexIndex = 0, lastNewLineIndex = 0;
+	uint32_t vertexIndex = 0, lastNewLineIndex = 0;
 
 	float offset;
 
@@ -1470,7 +1470,7 @@ inline static bool fillVertices(
 			case CENTER_ALIGNMENT_TYPE:
 				offset = vertexOffsetX * -0.5f;
 
-				for (size_t j = lastNewLineIndex; j < vertexIndex; j++)
+				for (uint32_t j = lastNewLineIndex; j < vertexIndex; j++)
 					vertices[j].position.x += offset;
 				break;
 			case LEFT_ALIGNMENT_TYPE:
@@ -1478,19 +1478,19 @@ inline static bool fillVertices(
 			case RIGHT_ALIGNMENT_TYPE:
 				offset = -vertexOffsetX;
 
-				for (size_t j = lastNewLineIndex; j < vertexIndex; j++)
+				for (uint32_t j = lastNewLineIndex; j < vertexIndex; j++)
 					vertices[j].position.x += offset;
 				break;
 			case BOTTOM_ALIGNMENT_TYPE:
 				offset = vertexOffsetX * -0.5f;
 
-				for (size_t j = lastNewLineIndex; j < vertexIndex; j++)
+				for (uint32_t j = lastNewLineIndex; j < vertexIndex; j++)
 					vertices[j].position.x += offset;
 				break;
 			case TOP_ALIGNMENT_TYPE:
 				offset = vertexOffsetX * -0.5f;
 
-				for (size_t j = lastNewLineIndex; j < vertexIndex; j++)
+				for (uint32_t j = lastNewLineIndex; j < vertexIndex; j++)
 					vertices[j].position.x += offset;
 				break;
 			case LEFT_BOTTOM_ALIGNMENT_TYPE:
@@ -1499,13 +1499,13 @@ inline static bool fillVertices(
 			case RIGHT_BOTTOM_ALIGNMENT_TYPE:
 				offset = -vertexOffsetX;
 
-				for (size_t j = lastNewLineIndex; j < vertexIndex; j++)
+				for (uint32_t j = lastNewLineIndex; j < vertexIndex; j++)
 					vertices[j].position.x += offset;
 				break;
 			case RIGHT_TOP_ALIGNMENT_TYPE:
 				offset = -vertexOffsetX;
 
-				for (size_t j = lastNewLineIndex; j < vertexIndex; j++)
+				for (uint32_t j = lastNewLineIndex; j < vertexIndex; j++)
 					vertices[j].position.x += offset;
 				break;
 			}
@@ -1538,7 +1538,7 @@ inline static bool fillVertices(
 		}
 		else if ((value == '<') & useTags) // TODO: parse color
 		{
-			if (i + 2 < stringLength & string[i + 2] == '>')
+			if (i + 2 < stringLength && string[i + 2] == '>')
 			{
 				if (string[i + 1] == 'b')
 				{
@@ -1575,7 +1575,7 @@ inline static bool fillVertices(
 					continue;
 				}
 			}
-			else if (i + 3 < stringLength & string[i + 1] == '/' & string[i + 3] == '>')
+			else if (i + 3 < stringLength && string[i + 1] == '/' && string[i + 3] == '>')
 			{
 				if (string[i + 2] == 'b')
 				{
@@ -1682,52 +1682,52 @@ inline static bool fillVertices(
 	case CENTER_ALIGNMENT_TYPE:
 		offset = vertexOffsetX * -0.5f;
 
-		for (size_t i = lastNewLineIndex; i < vertexIndex; i++)
+		for (uint32_t i = lastNewLineIndex; i < vertexIndex; i++)
 			vertices[i].position.x += offset;
 
 		offset = sizeY * 0.5f;
 
-		for (size_t i = 0; i < vertexIndex; i++)
+		for (uint32_t i = 0; i < vertexIndex; i++)
 			vertices[i].position.y += offset;
 		break;
 	case LEFT_ALIGNMENT_TYPE:
 		offset = sizeY * 0.5f;
 
-		for (size_t i = 0; i < vertexIndex; i++)
+		for (uint32_t i = 0; i < vertexIndex; i++)
 			vertices[i].position.y += offset;
 		break;
 	case RIGHT_ALIGNMENT_TYPE:
 		offset = -vertexOffsetX;
 
-		for (size_t i = lastNewLineIndex; i < vertexIndex; i++)
+		for (uint32_t i = lastNewLineIndex; i < vertexIndex; i++)
 			vertices[i].position.x += offset;
 
 		offset = sizeY * 0.5f;
 
-		for (size_t i = 0; i < vertexIndex; i++)
+		for (uint32_t i = 0; i < vertexIndex; i++)
 			vertices[i].position.y += offset;
 		break;
 	case BOTTOM_ALIGNMENT_TYPE:
 		offset = vertexOffsetX * -0.5f;
 
-		for (size_t i = lastNewLineIndex; i < vertexIndex; i++)
+		for (uint32_t i = lastNewLineIndex; i < vertexIndex; i++)
 			vertices[i].position.x += offset;
 
 		offset = sizeY;
 
-		for (size_t i = 0; i < vertexIndex; i++)
+		for (uint32_t i = 0; i < vertexIndex; i++)
 			vertices[i].position.y += offset;
 		break;
 	case TOP_ALIGNMENT_TYPE:
 		offset = vertexOffsetX * -0.5f;
 
-		for (size_t i = lastNewLineIndex; i < vertexIndex; i++)
+		for (uint32_t i = lastNewLineIndex; i < vertexIndex; i++)
 			vertices[i].position.x += offset;
 		break;
 	case LEFT_BOTTOM_ALIGNMENT_TYPE:
 		offset = sizeY;
 
-		for (size_t i = 0; i < vertexIndex; i++)
+		for (uint32_t i = 0; i < vertexIndex; i++)
 			vertices[i].position.y += offset;
 		break;
 	case LEFT_TOP_ALIGNMENT_TYPE:
@@ -1735,18 +1735,18 @@ inline static bool fillVertices(
 	case RIGHT_BOTTOM_ALIGNMENT_TYPE:
 		offset = -vertexOffsetX;
 
-		for (size_t i = lastNewLineIndex; i < vertexIndex; i++)
+		for (uint32_t i = lastNewLineIndex; i < vertexIndex; i++)
 			vertices[i].position.x += offset;
 
 		offset = sizeY;
 
-		for (size_t i = 0; i < vertexIndex; i++)
+		for (uint32_t i = 0; i < vertexIndex; i++)
 			vertices[i].position.y += offset;
 		break;
 	case RIGHT_TOP_ALIGNMENT_TYPE:
 		offset = -vertexOffsetX;
 
-		for (size_t i = lastNewLineIndex; i < vertexIndex; i++)
+		for (uint32_t i = lastNewLineIndex; i < vertexIndex; i++)
 			vertices[i].position.x += offset;
 		break;
 	}
@@ -1855,7 +1855,7 @@ MpgxResult createAtlasText32(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	size_t vertexCount;
+	uint32_t vertexCount;
 
 	bool result = fillVertices(
 		string,
@@ -1943,11 +1943,15 @@ MpgxResult createAtlasText32(
 		if (api == OPENGL_GRAPHICS_API ||
 			api == OPENGL_ES_GRAPHICS_API)
 		{
+#if MPGX_SUPPORT_OPENGL
 			for (size_t i = 0; i < textCount; i++)
 			{
 				GraphicsMesh textMesh = texts[i]->gl.mesh;
-				textMesh->base.indexBuffer = newIndexBuffer;
+				textMesh->gl.indexBuffer = newIndexBuffer;
 			}
+#else
+			abort();
+#endif
 		}
 
 		handle->base.indexBuffer = newIndexBuffer;
@@ -1956,12 +1960,17 @@ MpgxResult createAtlasText32(
 
 	if (api == VULKAN_GRAPHICS_API)
 	{
+#if MPGX_SUPPORT_VULKAN
 		textInstance->vk.vertexBuffer = vertexBuffer;
 		textInstance->vk.indexCount = indexCount;
+#else
+		abort();
+#endif
 	}
 	else if (api == OPENGL_GRAPHICS_API ||
 		api == OPENGL_ES_GRAPHICS_API)
 	{
+#if MPGX_SUPPORT_OPENGL
 		GraphicsMesh mesh;
 
 		mpgxResult = createGraphicsMesh(
@@ -1981,6 +1990,9 @@ MpgxResult createAtlasText32(
 		}
 
 		textInstance->gl.mesh = mesh;
+#else
+		abort();
+#endif
 	}
 	else
 	{
