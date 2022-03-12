@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "uran/interface.h"
+#include "mpmt/atomic.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -36,10 +37,12 @@ struct InterfaceElement_T
 struct Interface_T
 {
 	Window window;
+	ThreadPool threadPool;
 	InterfaceElement* elements;
 	size_t elementCapacity;
 	size_t elementCount;
 	InterfaceElement lastElement;
+	atomic_int64 threadIndex;
 	cmmt_float_t scale;
 	bool isPressed;
 	bool isMoved;
@@ -48,21 +51,11 @@ struct Interface_T
 #endif
 };
 
-void destroyInterface(Interface interface)
-{
-	if (!interface)
-		return;
-
-	assert(interface->elementCount == 0);
-	assert(!interface->isEnumerating);
-
-	free(interface->elements);
-	free(interface);
-}
 Interface createInterface(
 	Window window,
 	cmmt_float_t scale,
-	size_t capacity)
+	size_t capacity,
+	ThreadPool threadPool)
 {
 	assert(window);
 	assert(scale > 0.0f);
@@ -74,8 +67,10 @@ Interface createInterface(
 		return NULL;
 
 	interface->window = window;
+	interface->threadPool = threadPool;
 	interface->scale = scale;
 	interface->lastElement = NULL;
+	interface->threadIndex = 0;
 	interface->isPressed = false;
 	interface->isMoved = false;
 #ifndef NDEBUG
@@ -99,11 +94,27 @@ Interface createInterface(
 	interface->elementCount = 0;
 	return interface;
 }
+void destroyInterface(Interface interface)
+{
+	if (!interface)
+		return;
+
+	assert(interface->elementCount == 0);
+	assert(!interface->isEnumerating);
+
+	free(interface->elements);
+	free(interface);
+}
 
 Window getInterfaceWindow(Interface interface)
 {
 	assert(interface);
 	return interface->window;
+}
+ThreadPool getInterfaceThreadPool(Interface interface)
+{
+	assert(interface);
+	return interface->threadPool;
 }
 size_t getInterfaceElementCount(Interface interface)
 {
@@ -196,6 +207,133 @@ Camera createInterfaceCamera(
 		1.0f);
 }
 
+inline static void updateInterfacePositions(
+	InterfaceElement element,
+	Transform transform,
+	Vec2F halfSize)
+{
+	assert(element);
+	assert(transform);
+
+	Vec2F offset;
+	Transform parent = getTransformParent(transform);
+
+	if (parent)
+	{
+		Vec3F scale = getTransformScale(parent);
+		offset.x = scale.x * (cmmt_float_t)0.5;
+		offset.y = scale.y * (cmmt_float_t)0.5;
+	}
+	else
+	{
+		offset = halfSize;
+	}
+
+	while (parent)
+	{
+		if (!isTransformActive(parent))
+			return;
+		parent = getTransformParent(parent);
+	}
+
+	AlignmentType alignment = element->alignment;
+	Vec3F position = element->position;
+
+	switch (alignment)
+	{
+	default:
+		abort();
+	case CENTER_ALIGNMENT_TYPE:
+		break;
+	case LEFT_ALIGNMENT_TYPE:
+		position = vec3F(
+			position.x - offset.x,
+			position.y,
+			position.z);
+		break;
+	case RIGHT_ALIGNMENT_TYPE:
+		position = vec3F(
+			position.x + offset.x,
+			position.y,
+			position.z);
+		break;
+	case BOTTOM_ALIGNMENT_TYPE:
+		position = vec3F(
+			position.x,
+			position.y - offset.y,
+			position.z);
+		break;
+	case TOP_ALIGNMENT_TYPE:
+		position = vec3F(
+			position.x,
+			position.y + offset.y,
+			position.z);
+		break;
+	case LEFT_BOTTOM_ALIGNMENT_TYPE:
+		position = vec3F(
+			position.x - offset.x,
+			position.y - offset.y,
+			position.z);
+		break;
+	case LEFT_TOP_ALIGNMENT_TYPE:
+		position = vec3F(
+			position.x - offset.x,
+			position.y + offset.y,
+			position.z);
+		break;
+	case RIGHT_BOTTOM_ALIGNMENT_TYPE:
+		position = vec3F(
+			position.x + offset.x,
+			position.y - offset.y,
+			position.z);
+		break;
+	case RIGHT_TOP_ALIGNMENT_TYPE:
+		position = vec3F(
+			position.x + offset.x,
+			position.y + offset.y,
+			position.z);
+		break;
+	}
+
+	setTransformPosition(
+		transform,
+		position);
+}
+static void onInterfacePositionsUpdate(void* argument)
+{
+	assert(argument);
+
+	Interface interface = (Interface)argument;
+	InterfaceElement* elements = interface->elements;
+	size_t elementCount = interface->elementCount;
+
+	cmmt_float_t interfaceScale = interface->scale;
+	Vec2I windowSize = getWindowSize(interface->window);
+
+	Vec2F size = vec2F(
+		(cmmt_float_t)windowSize.x / interfaceScale,
+		(cmmt_float_t)windowSize.y / interfaceScale);
+	Vec2F halfSize = mulValVec2F(size, (cmmt_float_t)0.5);
+
+	size_t threadCount = getThreadPoolThreadCount(
+		interface->threadPool);
+	atomic_int64 threadIndex = atomicFetchAdd64(
+		&interface->threadIndex, 1);
+
+	for (size_t i = threadIndex; i < elementCount; i += threadCount)
+	{
+		InterfaceElement element = elements[i];
+		Transform transform = element->transform;
+
+		if (!isTransformActive(transform))
+			continue;
+
+		updateInterfacePositions(
+			element,
+			transform,
+			halfSize);
+	}
+}
 void updateInterface(Interface interface)
 {
 	assert(interface);
@@ -204,7 +342,7 @@ void updateInterface(Interface interface)
 	size_t elementCount = interface->elementCount;
 	Window window = interface->window;
 
-	if (elementCount == 0 || !isWindowFocused(window))
+	if (!elementCount || !isWindowFocused(window))
 		return;
 
 	cmmt_float_t interfaceScale = interface->scale;
@@ -365,100 +503,38 @@ void updateInterface(Interface interface)
 		}
 	}
 
-	for (size_t i = 0; i < elementCount; i++)
+	ThreadPool threadPool = interface->threadPool;
+
+	if (threadPool && elementCount >= getThreadPoolThreadCount(threadPool))
 	{
-		InterfaceElement element = elements[i];
-		Transform transform = element->transform;
+		size_t threadCount = getThreadPoolThreadCount(threadPool);
+		interface->threadIndex = 0;
 
-		if (!isTransformActive(transform))
-			continue;
-
-		Vec2F offset;
-		Transform parent = getTransformParent(transform);
-
-		if (parent)
+		for (size_t i = 0; i < threadCount; i++)
 		{
-			Vec3F scale = getTransformScale(parent);
-			offset.x = scale.x * (cmmt_float_t)0.5;
-			offset.y = scale.y * (cmmt_float_t)0.5;
-		}
-		else
-		{
-			offset = halfSize;
+			addThreadPoolTask(
+				threadPool,
+				onInterfacePositionsUpdate,
+				interface);
 		}
 
-		while (parent)
+		waitThreadPool(threadPool);
+	}
+	else
+	{
+		for (size_t i = 0; i < elementCount; i++)
 		{
-			if (!isTransformActive(parent))
-				goto CONTINUE_2;
-			parent = getTransformParent(parent);
+			InterfaceElement element = elements[i];
+			Transform transform = element->transform;
+
+			if (!isTransformActive(transform))
+				continue;
+
+			updateInterfacePositions(
+				element,
+				transform,
+				halfSize);
 		}
-
-		AlignmentType alignment = element->alignment;
-		Vec3F position = element->position;
-
-		switch (alignment)
-		{
-		default:
-			abort();
-		case CENTER_ALIGNMENT_TYPE:
-			break;
-		case LEFT_ALIGNMENT_TYPE:
-			position = vec3F(
-				position.x - offset.x,
-				position.y,
-				position.z);
-			break;
-		case RIGHT_ALIGNMENT_TYPE:
-			position = vec3F(
-				position.x + offset.x,
-				position.y,
-				position.z);
-			break;
-		case BOTTOM_ALIGNMENT_TYPE:
-			position = vec3F(
-				position.x,
-				position.y - offset.y,
-				position.z);
-			break;
-		case TOP_ALIGNMENT_TYPE:
-			position = vec3F(
-				position.x,
-				position.y + offset.y,
-				position.z);
-			break;
-		case LEFT_BOTTOM_ALIGNMENT_TYPE:
-			position = vec3F(
-				position.x - offset.x,
-				position.y - offset.y,
-				position.z);
-			break;
-		case LEFT_TOP_ALIGNMENT_TYPE:
-			position = vec3F(
-				position.x - offset.x,
-				position.y + offset.y,
-				position.z);
-			break;
-		case RIGHT_BOTTOM_ALIGNMENT_TYPE:
-			position = vec3F(
-				position.x + offset.x,
-				position.y - offset.y,
-				position.z);
-			break;
-		case RIGHT_TOP_ALIGNMENT_TYPE:
-			position = vec3F(
-				position.x + offset.x,
-				position.y + offset.y,
-				position.z);
-			break;
-		}
-
-		setTransformPosition(
-			transform,
-			position);
-
-	CONTINUE_2:
-		continue;
 	}
 }
 
@@ -499,6 +575,19 @@ InterfaceElement createInterfaceElement(
 #ifndef NDEBUG
 	element->name = name;
 #endif
+
+	cmmt_float_t interfaceScale = interface->scale;
+	Vec2I windowSize = getWindowSize(interface->window);
+
+	Vec2F size = vec2F(
+		(cmmt_float_t)windowSize.x / interfaceScale,
+		(cmmt_float_t)windowSize.y / interfaceScale);
+	Vec2F halfSize = mulValVec2F(size, (cmmt_float_t)0.5);
+
+	updateInterfacePositions(
+		element,
+		transform,
+		halfSize);
 
 	size_t count = interface->elementCount;
 

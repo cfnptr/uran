@@ -29,7 +29,6 @@ typedef struct RayGenPushConstants
 } RayGenPushConstants;
 typedef struct BaseHandle
 {
-	Window window;
 	RayTracingScene scene;
 	RayGenPushConstants rgpc;
 	Image storageImage;
@@ -37,7 +36,6 @@ typedef struct BaseHandle
 #if MPGX_SUPPORT_VULKAN
 typedef struct VkHandle
 {
-	Window window;
 	RayTracingScene scene;
 	RayGenPushConstants rgpc;
 	Image storageImage;
@@ -199,7 +197,7 @@ static void onVkBind(RayTracingPipeline rayTracingPipeline)
 	assert(rayTracingPipeline);
 
 	Handle handle = rayTracingPipeline->vk.handle;
-	VkWindow vkWindow = getVkWindow(handle->vk.window);
+	VkWindow vkWindow = getVkWindow(rayTracingPipeline->vk.window);
 	VkCommandBuffer commandBuffer = vkWindow->currenCommandBuffer;
 
 	// TODO: create storage image in the rayTracing struct or base pipeline
@@ -365,14 +363,17 @@ static void onVkBind(RayTracingPipeline rayTracingPipeline)
 		sizeof(RayGenPushConstants),
 		&handle->vk.rgpc);
 }
-static void onVkDestroy(void* _handle)
+static void onVkDestroy(
+	Window window,
+	void* _handle)
 {
+	assert(window);
 	Handle handle = _handle;
 
 	if (!handle)
 		return;
 
-	VkWindow vkWindow = getVkWindow(handle->vk.window);
+	VkWindow vkWindow = getVkWindow(window);
 	VkDevice device = vkWindow->device;
 
 	vkDestroyDescriptorPool(
@@ -444,7 +445,7 @@ inline static MpgxResult createVkPipeline(
 
 	if(vkResult != VK_SUCCESS)
 	{
-		onVkDestroy(handle);
+		onVkDestroy(window, handle);
 		return vkToMpgxResult(vkResult);
 	}
 
@@ -465,7 +466,7 @@ inline static MpgxResult createVkPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onVkDestroy(handle);
+		onVkDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -483,7 +484,7 @@ inline static MpgxResult createVkPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onVkDestroy(handle);
+		onVkDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -506,7 +507,7 @@ inline static MpgxResult createVkPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onVkDestroy(handle);
+		onVkDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -541,7 +542,6 @@ MpgxResult createRayTracingColorPipeline(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
-	handle->base.window = window;
 	handle->base.scene = scene;
 	handle->base.rgpc.invProj = identMat4F;
 	handle->base.rgpc.invProj = identMat4F;

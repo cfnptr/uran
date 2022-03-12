@@ -28,7 +28,7 @@
  */
 GraphicsRenderer createSpriteRenderer(
 	GraphicsPipeline spritePipeline,
-	GraphicsRenderSorting sorting,
+	GraphicsRenderSorting sortingType,
 	bool useCulling,
 	size_t capacity,
 	ThreadPool threadPool);
@@ -40,6 +40,8 @@ GraphicsRenderer createSpriteRenderer(
  * transform - transform instance.
  * bounds - render bounds.
  * color - render color.
+ * size - texture size.
+ * offset - texture offset.
  * mesh - render mesh.
  */
 GraphicsRender createSpriteRender(
@@ -47,6 +49,8 @@ GraphicsRender createSpriteRender(
 	Transform transform,
 	Box3F bounds,
 	LinearColor color,
+	Vec2F size,
+	Vec2F offset,
 	GraphicsMesh mesh);
 
 /*
@@ -64,6 +68,38 @@ LinearColor getSpriteRenderColor(
 void setSpriteRenderColor(
 	GraphicsRender spriteRender,
 	LinearColor color);
+
+/*
+ * Returns sprite render size.
+ * spriteRender - sprite render instance.
+ */
+Vec2F getSpriteRenderSize(
+	GraphicsRender spriteRender);
+/*
+ * Sets sprite render size.
+ *
+ * spriteRender - sprite render instance.
+ * size - texture size value.
+ */
+void setSpriteRenderSize(
+	GraphicsRender spriteRender,
+	Vec2F size);
+
+/*
+ * Returns sprite render offset.
+ * spriteRender - sprite render instance.
+ */
+Vec2F getSpriteRenderOffset(
+	GraphicsRender spriteRender);
+/*
+ * Sets sprite render offset.
+ *
+ * spriteRender - sprite render instance.
+ * offset - texture offset value.
+ */
+void setSpriteRenderOffset(
+	GraphicsRender spriteRender,
+	Vec2F offset);
 
 /*
  * Returns sprite render mesh.

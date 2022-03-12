@@ -81,13 +81,47 @@ typedef struct TextVertex
 	Vec3F texCoords;
 	SrgbColor color;
 } TextVertex;
-struct Text_T
+
+typedef struct BaseText
 {
 	FontAtlas fontAtlas;
-	GraphicsMesh mesh;
 	Vec2F textSize;
 	AlignmentType alignment;
 	bool isConstant;
+} BaseText;
+#if MPGX_SUPPORT_VULKAN
+typedef struct VkText
+{
+	FontAtlas fontAtlas;
+	Vec2F textSize;
+	AlignmentType alignment;
+	bool isConstant;
+	uint8_t _alignment[2];
+	uint32_t indexCount;
+	Buffer vertexBuffer;
+} VkText;
+#endif
+#if MPGX_SUPPORT_OPENGL
+typedef struct GlText
+{
+	FontAtlas fontAtlas;
+	Vec2F textSize;
+	AlignmentType alignment;
+	bool isConstant;
+	uint8_t _alignment[6];
+	GraphicsMesh mesh;
+} GlText;
+#endif
+
+union Text_T
+{
+	BaseText base;
+#if MPGX_SUPPORT_VULKAN
+	VkText vk;
+#endif
+#if MPGX_SUPPORT_OPENGL
+	GlText gl;
+#endif
 };
 
 typedef struct VertexPushConstants
@@ -100,7 +134,6 @@ typedef struct FragmentPushConstants
 } FragmentPushConstants;
 typedef struct BaseHandle
 {
-	Window window;
 	Sampler sampler;
 	VertexPushConstants vpc;
 	FragmentPushConstants fpc;
@@ -112,7 +145,6 @@ typedef struct BaseHandle
 #if MPGX_SUPPORT_VULKAN
 typedef struct VkHandle
 {
-	Window window;
 	Sampler sampler;
 	VertexPushConstants vpc;
 	FragmentPushConstants fpc;
@@ -126,7 +158,6 @@ typedef struct VkHandle
 #if MPGX_SUPPORT_OPENGL
 typedef struct GlHandle
 {
-	Window window;
 	Sampler sampler;
 	VertexPushConstants vpc;
 	FragmentPushConstants fpc;
@@ -1163,7 +1194,7 @@ MpgxResult createFontAtlas(
 		return mpgxResult;
 	}
 
-	Window window = textPipeline->base.framebuffer->base.window;
+	Window window = textPipeline->base.window;
 
 	Image atlasImage;
 
@@ -1292,7 +1323,7 @@ void destroyFontAtlas(FontAtlas fontAtlas)
 	if (api == VULKAN_GRAPHICS_API)
 	{
 		VkWindow vkWindow = getVkWindow(
-			fontAtlas->pipeline->base.framebuffer->base.window);
+			fontAtlas->pipeline->base.window);
 
 		vkDestroyDescriptorPool(
 			vkWindow->device,
@@ -1724,7 +1755,7 @@ inline static bool fillVertices(
 	*textSize = vec2F(sizeX, sizeY);
 	return true;
 }
-inline static uint32_t* createIndices(size_t indexCount)
+inline static uint32_t* createIndices(uint32_t indexCount)
 {
 	assert(indexCount > 0);
 
@@ -1734,7 +1765,7 @@ inline static uint32_t* createIndices(size_t indexCount)
 	if (!indices)
 		return NULL;
 
-	for (size_t i = 0, j = 0; i < indexCount; i += 6, j += 4)
+	for (uint32_t i = 0, j = 0; i < indexCount; i += 6, j += 4)
 	{
 		indices[i + 0] = (uint32_t)j + 0;
 		indices[i + 1] = (uint32_t)j + 1;
@@ -1752,13 +1783,27 @@ inline static void internalDestroyText(Text text)
 	if (!text)
 		return;
 
-	GraphicsMesh mesh = text->mesh;
+	GraphicsAPI api = getGraphicsAPI();
 
-	if (mesh)
+	if (api == VULKAN_GRAPHICS_API)
 	{
-		Buffer vertexBuffer = getGraphicsMeshVertexBuffer(mesh);
-		destroyGraphicsMesh(mesh);
-		destroyBuffer(vertexBuffer);
+		destroyBuffer(text->vk.vertexBuffer);
+	}
+	else if (api == OPENGL_GRAPHICS_API ||
+		api == OPENGL_ES_GRAPHICS_API)
+	{
+		GraphicsMesh mesh = text->gl.mesh;
+
+		if (mesh)
+		{
+			Buffer vertexBuffer = getGraphicsMeshVertexBuffer(mesh);
+			destroyGraphicsMesh(mesh);
+			destroyBuffer(vertexBuffer);
+		}
+	}
+	else
+	{
+		abort();
 	}
 
 	free(text);
@@ -1789,9 +1834,9 @@ MpgxResult createAtlasText32(
 	if (!textInstance)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
-	textInstance->fontAtlas = fontAtlas;
-	textInstance->alignment = alignment;
-	textInstance->isConstant = isConstant;
+	textInstance->base.fontAtlas = fontAtlas;
+	textInstance->base.alignment = alignment;
+	textInstance->base.isConstant = isConstant;
 
 	TextVertex* vertices = malloc(
 		stringLength * 4 * sizeof(TextVertex));
@@ -1820,7 +1865,7 @@ MpgxResult createAtlasText32(
 		isItalic,
 		vertices,
 		&vertexCount,
-		&textInstance->textSize);
+		&textInstance->base.textSize);
 
 	if (!result)
 	{
@@ -1830,7 +1875,7 @@ MpgxResult createAtlasText32(
 	}
 
 	GraphicsPipeline pipeline = fontAtlas->pipeline;
-	Window window = pipeline->base.framebuffer->base.window;
+	Window window = pipeline->base.window;
 	Handle handle = pipeline->base.handle;
 
 	Buffer vertexBuffer;
@@ -1851,12 +1896,11 @@ MpgxResult createAtlasText32(
 		return mpgxResult;
 	}
 
-	size_t textCount = handle->base.textCount;
+	GraphicsAPI api = getGraphicsAPI();
 	Buffer indexBuffer = handle->base.indexBuffer;
 	Text* texts = handle->base.texts;
-
-	GraphicsAPI api = getGraphicsAPI();
-	size_t indexCount = (vertexCount / 4) * 6;
+	size_t textCount = handle->base.textCount;
+	uint32_t indexCount = (vertexCount / 4) * 6;
 
 	if (indexBuffer == NULL || indexBuffer->base.size <
 		indexCount * sizeof(uint32_t))
@@ -1893,7 +1937,7 @@ MpgxResult createAtlasText32(
 		{
 			for (size_t i = 0; i < textCount; i++)
 			{
-				GraphicsMesh textMesh = texts[i]->mesh;
+				GraphicsMesh textMesh = texts[i]->gl.mesh;
 				textMesh->base.indexBuffer = newIndexBuffer;
 			}
 		}
@@ -1902,27 +1946,38 @@ MpgxResult createAtlasText32(
 		destroyBuffer(indexBuffer);
 	}
 
-	GraphicsMesh mesh;
-
-	mpgxResult = createGraphicsMesh(
-		window,
-		UINT32_INDEX_TYPE,
-		indexCount,
-		0,
-		vertexBuffer,
-		api == OPENGL_GRAPHICS_API ||
-			api == OPENGL_ES_GRAPHICS_API ?
-			handle->base.indexBuffer : NULL,
-		&mesh);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	if (api == VULKAN_GRAPHICS_API)
 	{
-		destroyBuffer(vertexBuffer);
-		internalDestroyText(textInstance);
-		return mpgxResult;
+		textInstance->vk.vertexBuffer = vertexBuffer;
+		textInstance->vk.indexCount = indexCount;
 	}
+	else if (api == OPENGL_GRAPHICS_API ||
+		api == OPENGL_ES_GRAPHICS_API)
+	{
+		GraphicsMesh mesh;
 
-	textInstance->mesh = mesh;
+		mpgxResult = createGraphicsMesh(
+			window,
+			UINT32_INDEX_TYPE,
+			indexCount,
+			0,
+			vertexBuffer,
+			handle->base.indexBuffer,
+			&mesh);
+
+		if (mpgxResult != SUCCESS_MPGX_RESULT)
+		{
+			destroyBuffer(vertexBuffer);
+			internalDestroyText(textInstance);
+			return mpgxResult;
+		}
+
+		textInstance->gl.mesh = mesh;
+	}
+	else
+	{
+		abort();
+	}
 
 	if (textCount == handle->base.textCapacity)
 	{
@@ -2380,7 +2435,8 @@ void destroyText(Text text)
 	if (!text)
 		return;
 
-	Handle handle = text->fontAtlas->pipeline->base.handle;
+	FontAtlas fontAtlas = text->base.fontAtlas;
+	Handle handle = fontAtlas->pipeline->base.handle;
 	Text* texts = handle->base.texts;
 	size_t textCount = handle->base.textCount;
 
@@ -2404,19 +2460,19 @@ FontAtlas getTextFontAtlas(Text text)
 {
 	assert(text);
 	assert(textInitialized);
-	return text->fontAtlas;
+	return text->base.fontAtlas;
 }
 Vec2F getTextSize(Text text)
 {
 	assert(text);
 	assert(textInitialized);
-	return text->textSize;
+	return text->base.textSize;
 }
 bool isTextConstant(Text text)
 {
 	assert(text);
 	assert(textInitialized);
-	return text->isConstant;
+	return text->base.isConstant;
 }
 
 // TODO: inspect cmmt float vectors \/
@@ -2426,8 +2482,8 @@ Vec2F getTextOffset(Text text)
 	assert(text);
 	assert(textInitialized);
 
-	AlignmentType alignment = text->alignment;
-	Vec2F textSize = text->textSize;
+	AlignmentType alignment = text->base.alignment;
+	Vec2F textSize = text->base.textSize;
 
 	switch (alignment)
 	{
@@ -2577,17 +2633,17 @@ AlignmentType getTextAlignment(
 {
 	assert(text);
 	assert(textInitialized);
-	return text->alignment;
+	return text->base.alignment;
 }
 void setTextAlignment(
 	Text text,
 	AlignmentType alignment)
 {
 	assert(text);
-	assert(!text->isConstant);
+	assert(!text->base.isConstant);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(textInitialized);
-	text->alignment = alignment;
+	text->base.alignment = alignment;
 }
 
 /*size_t getTextStringLength(Text text)
@@ -3183,12 +3239,12 @@ size_t drawText(
 	assert(scissor.w >= 0);
 	assert(textInitialized);
 
-	FontAtlas fontAtlas = text->fontAtlas;
+	FontAtlas fontAtlas = text->base.fontAtlas;
 	GraphicsPipeline pipeline = fontAtlas->pipeline;
 
 	bool dynamicScissor = scissor.z + scissor.w != 0;
 
-	Window window = pipeline->base.framebuffer->base.window;
+	Window window = pipeline->base.window;
 	GraphicsAPI api = getGraphicsAPI();
 
 	if (api == VULKAN_GRAPHICS_API)
@@ -3214,8 +3270,7 @@ size_t drawText(
 		}
 
 		Handle handle = pipeline->vk.handle;
-		GraphicsMesh mesh = text->mesh;
-		uint32_t indexCount = mesh->vk.indexCount;
+		uint32_t indexCount = text->vk.indexCount;
 		const VkDeviceSize offset = 0;
 
 		vkCmdPushConstants(
@@ -3245,7 +3300,7 @@ size_t drawText(
 			commandBuffer,
 			0,
 			1,
-			&mesh->vk.vertexBuffer->vk.handle,
+			&text->vk.vertexBuffer->vk.handle,
 			&offset);
 		vkCmdDrawIndexed(
 			commandBuffer,
@@ -3279,7 +3334,7 @@ size_t drawText(
 
 		return drawGraphicsMesh(
 			pipeline,
-			text->mesh);
+			text->gl.mesh);
 #else
 		abort();
 #endif
@@ -3359,7 +3414,7 @@ static void onVkBind(GraphicsPipeline graphicsPipeline)
 	assert(graphicsPipeline);
 
 	Handle handle = graphicsPipeline->vk.handle;
-	VkWindow vkWindow = getVkWindow(handle->vk.window);
+	VkWindow vkWindow = getVkWindow(graphicsPipeline->vk.window);
 
 	if (handle->vk.indexBuffer)
 	{
@@ -3410,8 +3465,11 @@ static MpgxResult onVkResize(
 	*(VkGraphicsPipelineCreateData*)createData = _createData;
 	return SUCCESS_MPGX_RESULT;
 }
-static void onVkDestroy(void* _handle)
+static void onVkDestroy(
+	Window window,
+	void* _handle)
 {
+	assert(window);
 	Handle handle = (Handle)_handle;
 
 	if (!handle)
@@ -3419,7 +3477,7 @@ static void onVkDestroy(void* _handle)
 
 	assert(handle->vk.textCount == 0);
 
-	VkWindow vkWindow = getVkWindow(handle->vk.window);
+	VkWindow vkWindow = getVkWindow(window);
 	VkDevice device = vkWindow->device;
 
 	destroyBuffer(handle->vk.indexBuffer);
@@ -3432,6 +3490,7 @@ static void onVkDestroy(void* _handle)
 }
 inline static MpgxResult createVkPipeline(
 	Framebuffer framebuffer,
+	Window window,
 	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
@@ -3440,6 +3499,7 @@ inline static MpgxResult createVkPipeline(
 	GraphicsPipeline* graphicsPipeline)
 {
 	assert(framebuffer);
+	assert(window);
 	assert(state);
 	assert(handle);
 	assert(shaders);
@@ -3476,7 +3536,7 @@ inline static MpgxResult createVkPipeline(
 
 	if(vkResult != VK_SUCCESS)
 	{
-		onVkDestroy(handle);
+		onVkDestroy(window, handle);
 		return vkToMpgxResult(vkResult);
 	}
 
@@ -3588,8 +3648,11 @@ static MpgxResult onGlResize(
 
 	return SUCCESS_MPGX_RESULT;
 }
-static void onGlDestroy(void* _handle)
+static void onGlDestroy(
+	Window window,
+	void* _handle)
 {
+	assert(window);
 	Handle handle = (Handle)_handle;
 
 	if (!handle)
@@ -3603,6 +3666,7 @@ static void onGlDestroy(void* _handle)
 }
 inline static MpgxResult createGlPipeline(
 	Framebuffer framebuffer,
+	Window window,
 	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
@@ -3611,6 +3675,7 @@ inline static MpgxResult createGlPipeline(
 	GraphicsPipeline* graphicsPipeline)
 {
 	assert(framebuffer);
+	assert(window);
 	assert(state);
 	assert(handle);
 	assert(shaders);
@@ -3635,7 +3700,7 @@ inline static MpgxResult createGlPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onGlDestroy(handle);
+		onGlDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -3710,8 +3775,6 @@ MpgxResult createTextPipeline(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	Window window = framebuffer->base.window;
-	handle->base.window = window;
 	handle->base.sampler = sampler;
 	handle->base.vpc.mvp = identMat4F;
 	handle->base.fpc.color = whiteLinearColor;
@@ -3766,6 +3829,7 @@ MpgxResult createTextPipeline(
 		fragmentShader,
 	};
 
+	Window window = framebuffer->base.window;
 	GraphicsAPI api = getGraphicsAPI();
 
 	if (api == VULKAN_GRAPHICS_API)
@@ -3773,6 +3837,7 @@ MpgxResult createTextPipeline(
 #if MPGX_SUPPORT_VULKAN
 		return createVkPipeline(
 			framebuffer,
+			window,
 			name,
 			state ? state : &defaultState,
 			handle,
@@ -3789,6 +3854,7 @@ MpgxResult createTextPipeline(
 #if MPGX_SUPPORT_OPENGL
 		return createGlPipeline(
 			framebuffer,
+			window,
 			name,
 			state ? state : &defaultState,
 			handle,

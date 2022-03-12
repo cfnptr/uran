@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #pragma once
-#include "mpmt/thread_pool.h"
 #include "cmmt/quaternion.h"
+#include "mpmt/thread_pool.h"
 
 /*
  * Transformer structure.

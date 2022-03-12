@@ -45,7 +45,7 @@ typedef FontAtlas_T* FontAtlas;
 /*
  * Text structure.
  */
-typedef struct Text_T Text_T;
+typedef union Text_T Text_T;
 /*
  * Text instance.
  */

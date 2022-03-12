@@ -14,6 +14,7 @@
 
 #include "uran/editor.h"
 #include "uran/shader_data.h"
+#include "uran/primitives/square_primitive.h"
 
 #include "conf/reader.h"
 #include "conf/writer.h"
@@ -59,7 +60,7 @@ struct Editor_T
 	Logger logger;
 	Transformer transformer;
 	Window window;
-	GraphicsPipeline spritePipeline;
+	GraphicsPipeline panelPipeline;
 	GraphicsPipeline textPipeline;
 	FontAtlas fontAtlas;
 	UserInterface ui;
@@ -108,15 +109,15 @@ inline static void loadSettings(
 	}
 	else
 	{
-		if (strcmp(stringValue, "Vulkan") == 0)
+		if (strcmp(stringValue, "vulkan") == 0)
 		{
 			settings.graphicsAPI = VULKAN_GRAPHICS_API;
 		}
-		else if (strcmp(stringValue, "OpenGL") == 0)
+		else if (strcmp(stringValue, "opengl") == 0)
 		{
 			settings.graphicsAPI = OPENGL_GRAPHICS_API;
 		}
-		else if (strcmp(stringValue, "OpenGLES") == 0)
+		else if (strcmp(stringValue, "opengles") == 0)
 		{
 			settings.graphicsAPI = OPENGL_ES_GRAPHICS_API;
 		}
@@ -163,11 +164,11 @@ inline static void storeSettings(
 	const char* stringValue;
 
 	if (settings.graphicsAPI == VULKAN_GRAPHICS_API)
-		stringValue = "Vulkan";
+		stringValue = "vulkan";
 	else if (settings.graphicsAPI == OPENGL_GRAPHICS_API)
-		stringValue = "OpenGL";
+		stringValue = "opengl";
 	else if (settings.graphicsAPI == OPENGL_ES_GRAPHICS_API)
-		stringValue = "OpenGLES";
+		stringValue = "opengles";
 	else
 		abort();
 
@@ -188,7 +189,7 @@ inline static void storeSettings(
 		"Stored settings.");
 }
 
-inline static GraphicsPipeline createSpritePipelineInstance(
+inline static GraphicsPipeline createPanelPipelineInstance(
 	Logger logger,
 	PackReader packReader,
 	Framebuffer framebuffer)
@@ -204,14 +205,14 @@ inline static GraphicsPipeline createSpritePipelineInstance(
 
 	if (api == VULKAN_GRAPHICS_API)
 	{
-		vertexPath = "shaders/vulkan/sprite.vert.spv";
-		fragmentPath = "shaders/vulkan/sprite.frag.spv";
+		vertexPath = "shaders/vulkan/panel.vert.spv";
+		fragmentPath = "shaders/vulkan/panel.frag.spv";
 	}
 	else if (api == OPENGL_GRAPHICS_API ||
 		api == OPENGL_ES_GRAPHICS_API)
 	{
-		vertexPath = "shaders/opengl/sprite.vert";
-		fragmentPath = "shaders/opengl/sprite.frag";
+		vertexPath = "shaders/opengl/panel.vert";
+		fragmentPath = "shaders/opengl/panel.frag";
 	}
 	else
 	{
@@ -243,20 +244,88 @@ inline static GraphicsPipeline createSpritePipelineInstance(
 		return NULL;
 	}
 
+	Buffer vertexBuffer;
+
+	MpgxResult mpgxResult = createBuffer(
+		window,
+		VERTEX_BUFFER_TYPE,
+		GPU_ONLY_BUFFER_USAGE,
+		oneSquareVertices2D,
+		sizeof(oneSquareVertices2D),
+		&vertexBuffer);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		logMessage(logger, ERROR_LOG_LEVEL,
+			"Failed to create panel vertex buffer. "
+			"(error: %s)", mpgxResultToString(mpgxResult));
+		destroyShader(fragmentShader);
+		destroyShader(vertexShader);
+		return NULL;
+	}
+
+	Buffer indexBuffer;
+
+	mpgxResult = createBuffer(
+		window,
+		INDEX_BUFFER_TYPE,
+		GPU_ONLY_BUFFER_USAGE,
+		triangleSquareIndices,
+		sizeof(triangleSquareIndices),
+		&indexBuffer);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		logMessage(logger, ERROR_LOG_LEVEL,
+			"Failed to create panel index buffer. "
+			"(error: %s)", mpgxResultToString(mpgxResult));
+		destroyBuffer(vertexBuffer);
+		destroyShader(fragmentShader);
+		destroyShader(vertexShader);
+		return NULL;
+	}
+
+	GraphicsMesh mesh;
+
+	mpgxResult = createGraphicsMesh(
+		window,
+		UINT16_INDEX_TYPE,
+		sizeof(triangleSquareIndices) / sizeof(uint16_t),
+		0,
+		vertexBuffer,
+		indexBuffer,
+		&mesh);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		logMessage(logger, ERROR_LOG_LEVEL,
+			"Failed to create panel mesh. "
+			"(error: %s)", mpgxResultToString(mpgxResult));
+		destroyBuffer(indexBuffer);
+		destroyBuffer(vertexBuffer);
+		destroyShader(fragmentShader);
+		destroyShader(vertexShader);
+		return NULL;
+	}
+
 	GraphicsPipeline pipeline;
 
-	MpgxResult mpgxResult = createSpritePipeline(
+	mpgxResult = createPanelPipeline(
 		framebuffer,
 		vertexShader,
 		fragmentShader,
+		mesh,
 		NULL,
 		&pipeline);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
 		logMessage(logger, ERROR_LOG_LEVEL,
-			"Failed to create sprite pipeline. "
+			"Failed to create panel pipeline. "
 			"(error: %s)", mpgxResultToString(mpgxResult));
+		destroyGraphicsMesh(mesh);
+		destroyBuffer(indexBuffer);
+		destroyBuffer(vertexBuffer);
 		destroyShader(fragmentShader);
 		destroyShader(vertexShader);
 		return NULL;
@@ -264,16 +333,22 @@ inline static GraphicsPipeline createSpritePipelineInstance(
 
 	return pipeline;
 }
-inline static void destroySpritePipelineInstance(
-	GraphicsPipeline spritePipeline)
+inline static void destroyPanelPipelineInstance(
+	GraphicsPipeline panelPipeline)
 {
-	if (!spritePipeline)
+	if (!panelPipeline)
 		return;
 
-	Shader* shaders = getGraphicsPipelineShaders(spritePipeline);
+	GraphicsMesh mesh = getPanelPipelineMesh(panelPipeline);
+	Buffer vertexBuffer = getGraphicsMeshVertexBuffer(mesh);
+	Buffer indexBuffer = getGraphicsMeshIndexBuffer(mesh);
+	Shader* shaders = getGraphicsPipelineShaders(panelPipeline);
 	Shader vertexShader = shaders[0];
 	Shader fragmentShader = shaders[1];
-	destroyGraphicsPipeline(spritePipeline);
+	destroyGraphicsPipeline(panelPipeline);
+	destroyGraphicsMesh(mesh);
+	destroyBuffer(indexBuffer);
+	destroyBuffer(vertexBuffer);
 	destroyShader(fragmentShader);
 	destroyShader(vertexShader);
 }
@@ -674,10 +749,6 @@ inline static BaseWindow createBaseWindow(
 		CENTER_ALIGNMENT_TYPE,
 		position,
 		scale,
-		(cmmt_float_t)24.0,
-		(cmmt_float_t)12.0,
-		srgbToLinearColor(DEFAULT_UI_BAR_COLOR),
-		srgbToLinearColor(DEFAULT_UI_PANEL_COLOR),
 		DEFAULT_UI_TEXT_COLOR,
 		NULL,
 		&events,
@@ -717,7 +788,6 @@ inline static BaseWindow createBaseWindow(
 			(cmmt_float_t)0.0,
 			(cmmt_float_t)-0.01),
 		valVec2F((cmmt_float_t)16.0),
-		(cmmt_float_t)16.0,
 		srgbToLinearColor(DEFAULT_UI_DISABLED_BUTTON_COLOR),
 		srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR),
 		srgbToLinearColor(DEFAULT_UI_HOVERED_BUTTON_COLOR),
@@ -741,6 +811,12 @@ inline static BaseWindow createBaseWindow(
 
 	Transform crossTransform = getGraphicsRenderTransform(
 		getUiButtonTextRender(closeButton));
+	setTransformScale(
+		crossTransform,
+		vec3F(
+			(cmmt_float_t)16.0,
+			(cmmt_float_t)16.0,
+			(cmmt_float_t)0.0));
 	setTransformRotationType(
 		crossTransform,
 		SPIN_ROTATION_TYPE);
@@ -954,19 +1030,19 @@ Editor createEditor(
 
 	Framebuffer framebuffer = getWindowFramebuffer(window);
 
-	GraphicsPipeline spritePipeline = createSpritePipelineInstance(
+	GraphicsPipeline panelPipeline = createPanelPipelineInstance(
 		logger,
 		packReader,
 		framebuffer);
 
-	if (!spritePipeline)
+	if (!panelPipeline)
 	{
 		destroyEditor(editorInstance);
 		destroyPackReader(packReader);
 		return NULL;
 	}
 
-	editorInstance->spritePipeline = spritePipeline;
+	editorInstance->panelPipeline = panelPipeline;
 
 	GraphicsPipeline textPipeline = createTextPipelineInstance(
 		logger,
@@ -1004,7 +1080,7 @@ Editor createEditor(
 
 	mpgxResult = createUserInterface(
 		transformer,
-		spritePipeline,
+		panelPipeline,
 		textPipeline,
 		fontAtlas,
 		1.0f,
@@ -1051,7 +1127,7 @@ void destroyEditor(Editor editor)
 	destroyUserInterface(editor->ui);
 	destroyFontAtlasInstance(editor->fontAtlas);
 	destroyTextPipelineInstance(editor->textPipeline);
-	destroySpritePipelineInstance(editor->spritePipeline);
+	destroyPanelPipelineInstance(editor->panelPipeline);
 	destroyWindow(editor->window);
 	destroyTransformer(editor->transformer);
 	terminateText(editor->logger);

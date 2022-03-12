@@ -14,8 +14,6 @@
 
 #pragma once
 #include "mpgx/window.h"
-#include "pack/reader.h"
-#include "logy/logger.h"
 #include "cmmt/color.h"
 
 #define SPRITE_PIPELINE_NAME "Sprite"
@@ -27,6 +25,8 @@
  * framebuffer - framebuffer instance.
  * vertexShader - sprite vertex shader.
  * fragmentShader - sprite fragment shader.
+ * texture - texture instance.
+ * sampler - texture sampler.
  * state - pipeline state or NULL.
  * spritePipeline - pointer to the sprite pipeline.
  */
@@ -34,8 +34,23 @@ MpgxResult createSpritePipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
+	Image texture,
+	Sampler sampler,
 	const GraphicsPipelineState* state,
 	GraphicsPipeline* spritePipeline);
+
+/*
+ * Returns sprite pipeline texture.
+ * spritePipeline - sprite pipeline instance.
+ */
+Image getSpritePipelineTexture(
+	GraphicsPipeline spritePipeline);
+/*
+ * Returns sprite pipeline sampler.
+ * spritePipeline - sprite pipeline instance.
+ */
+Sampler getSpritePipelineSampler(
+	GraphicsPipeline spritePipeline);
 
 /*
  * Returns sprite pipeline model view projection matrix.
@@ -47,11 +62,43 @@ Mat4F getSpritePipelineMvp(
  * Sets sprite pipeline model view projection matrix.
  *
  * spritePipeline - sprite pipeline instance.
- * mvp - model view projection matrix value.
+ * mvp - model view projection matrix.
  */
 void setSpritePipelineMvp(
 	GraphicsPipeline spritePipeline,
 	Mat4F mvp);
+
+/*
+ * Returns sprite pipeline size.
+ * spritePipeline - sprite pipeline instance.
+ */
+Vec2F getSpritePipelineSize(
+	GraphicsPipeline spritePipeline);
+/*
+ * Sets sprite pipeline size.
+ *
+ * spritePipeline - sprite pipeline instance.
+ * size - texture size value.
+ */
+void setSpritePipelineSize(
+	GraphicsPipeline spritePipeline,
+	Vec2F size);
+
+/*
+ * Returns sprite pipeline offset.
+ * spritePipeline - sprite pipeline instance.
+ */
+Vec2F getSpritePipelineOffset(
+	GraphicsPipeline spritePipeline);
+/*
+ * Sets sprite pipeline offset.
+ *
+ * spritePipeline - sprite pipeline instance.
+ * offset - texture offset value.
+ */
+void setSpritePipelineOffset(
+	GraphicsPipeline spritePipeline,
+	Vec2F offset);
 
 /*
  * Returns sprite pipeline color.

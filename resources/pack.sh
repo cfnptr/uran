@@ -15,10 +15,10 @@ fonts/noto-sans-bold-italic.ttf \
 fonts/noto-sans-bold.ttf \
 fonts/noto-sans-italic.ttf \
 fonts/noto-sans-regular.ttf \
-shaders/opengl/sprite.frag \
-shaders/opengl/sprite.vert \
-shaders/vulkan/sprite.frag.spv \
-shaders/vulkan/sprite.vert.spv \
+shaders/opengl/panel.frag \
+shaders/opengl/panel.vert \
+shaders/vulkan/panel.frag.spv \
+shaders/vulkan/panel.vert.spv \
 shaders/opengl/text.frag \
 shaders/opengl/text.vert \
 shaders/vulkan/text.frag.spv \

@@ -32,14 +32,12 @@ typedef struct UniformBuffer
 } UniformBuffer;
 typedef struct BaseHandle
 {
-	Window window;
 	VertexPushConstants vpc;
 	UniformBuffer ub;
 } BaseHandle;
 #if MPGX_SUPPORT_VULKAN
 typedef struct VkHandle
 {
-	Window window;
 	VertexPushConstants vpc;
 	UniformBuffer ub;
 	VkDescriptorSetLayout descriptorSetLayout;
@@ -52,7 +50,6 @@ typedef struct VkHandle
 #if MPGX_SUPPORT_OPENGL
 typedef struct GlHandle
 {
-	Window window;
 	VertexPushConstants vpc;
 	UniformBuffer ub;
 	GLint mvpLocation;
@@ -259,9 +256,8 @@ inline static MpgxResult createVkDescriptorSetArray(
 static void onVkBind(GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
-
 	Handle handle = graphicsPipeline->vk.handle;
-	VkWindow vkWindow = getVkWindow(handle->vk.window);
+	VkWindow vkWindow = getVkWindow(graphicsPipeline->vk.window);
 	uint32_t bufferIndex = vkWindow->bufferIndex;
 	Buffer buffer = handle->vk.uniformBuffers[bufferIndex];
 
@@ -284,9 +280,8 @@ static void onVkBind(GraphicsPipeline graphicsPipeline)
 static void onVkUniformsSet(GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
-
 	Handle handle = graphicsPipeline->vk.handle;
-	VkWindow vkWindow = getVkWindow(handle->vk.window);
+	VkWindow vkWindow = getVkWindow(graphicsPipeline->vk.window);
 
 	vkCmdPushConstants(
 		vkWindow->currenCommandBuffer,
@@ -307,7 +302,7 @@ static MpgxResult onVkResize(
 	assert(createData);
 
 	Handle handle = graphicsPipeline->vk.handle;
-	Window window = handle->vk.window;
+	Window window = graphicsPipeline->vk.window;
 	VkWindow vkWindow = getVkWindow(window);
 	uint32_t bufferCount = vkWindow->swapchain->bufferCount;
 
@@ -407,14 +402,17 @@ static MpgxResult onVkResize(
 	*(VkGraphicsPipelineCreateData*)createData = _createData;
 	return SUCCESS_MPGX_RESULT;
 }
-static void onVkDestroy(void* _handle)
+static void onVkDestroy(
+	Window window,
+	void* _handle)
 {
+	assert(window);
 	Handle handle = _handle;
 
 	if (!handle)
 		return;
 
-	VkWindow vkWindow = getVkWindow(handle->vk.window);
+	VkWindow vkWindow = getVkWindow(window);
 	VkDevice device = vkWindow->device;
 
 	free(handle->vk.descriptorSets);
@@ -433,6 +431,7 @@ static void onVkDestroy(void* _handle)
 }
 inline static MpgxResult createVkPipeline(
 	Framebuffer framebuffer,
+	Window window,
 	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
@@ -441,13 +440,13 @@ inline static MpgxResult createVkPipeline(
 	GraphicsPipeline* graphicsPipeline)
 {
 	assert(framebuffer);
+	assert(window);
 	assert(state);
 	assert(handle);
 	assert(shaders);
 	assert(shaderCount > 0);
 	assert(graphicsPipeline);
 
-	Window window = framebuffer->vk.window;
 	VkWindow vkWindow = getVkWindow(window);
 	VkDevice device = vkWindow->device;
 
@@ -478,7 +477,7 @@ inline static MpgxResult createVkPipeline(
 
 	if(vkResult != VK_SUCCESS)
 	{
-		onVkDestroy(handle);
+		onVkDestroy(window, handle);
 		return vkToMpgxResult(vkResult);
 	}
 
@@ -506,7 +505,7 @@ inline static MpgxResult createVkPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onVkDestroy(handle);
+		onVkDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -521,7 +520,7 @@ inline static MpgxResult createVkPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onVkDestroy(handle);
+		onVkDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -540,7 +539,7 @@ inline static MpgxResult createVkPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onVkDestroy(handle);
+		onVkDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -562,7 +561,7 @@ inline static MpgxResult createVkPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onVkDestroy(handle);
+		onVkDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -574,7 +573,6 @@ inline static MpgxResult createVkPipeline(
 static void onGlBind(GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
-
 	Handle handle = graphicsPipeline->gl.handle;
 	Buffer uniformBuffer = handle->gl.uniformBuffer;
 
@@ -594,7 +592,6 @@ static void onGlBind(GraphicsPipeline graphicsPipeline)
 static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
-
 	Handle handle = graphicsPipeline->gl.handle;
 
 	glUniformMatrix4fv(
@@ -653,8 +650,11 @@ static MpgxResult onGlResize(
 	}
 	return SUCCESS_MPGX_RESULT;
 }
-static void onGlDestroy(void* _handle)
+static void onGlDestroy(
+	Window window,
+	void* _handle)
 {
+	assert(window);
 	Handle handle = _handle;
 
 	if (!handle)
@@ -665,6 +665,7 @@ static void onGlDestroy(void* _handle)
 }
 inline static MpgxResult createGlPipeline(
 	Framebuffer framebuffer,
+	Window window,
 	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
@@ -673,6 +674,7 @@ inline static MpgxResult createGlPipeline(
 	GraphicsPipeline* graphicsPipeline)
 {
 	assert(framebuffer);
+	assert(window);
 	assert(state);
 	assert(handle);
 	assert(shaders);
@@ -682,7 +684,7 @@ inline static MpgxResult createGlPipeline(
 	Buffer uniformBuffer;
 
 	MpgxResult mpgxResult = createBuffer(
-		framebuffer->gl.window,
+		window,
 		UNIFORM_BUFFER_TYPE,
 		CPU_TO_GPU_BUFFER_USAGE,
 		NULL,
@@ -691,7 +693,7 @@ inline static MpgxResult createGlPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onGlDestroy(handle);
+		onGlDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -715,7 +717,7 @@ inline static MpgxResult createGlPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onGlDestroy(handle);
+		onGlDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -793,8 +795,6 @@ MpgxResult createDiffusePipeline(
 			0.0f),
 	};
 
-	Window window = framebuffer->base.window;
-	handle->base.window = window;
 	handle->base.vpc.mvp = identMat4F;
 	handle->base.vpc.normal = identMat4F;
 	handle->base.ub = ub;
@@ -845,6 +845,7 @@ MpgxResult createDiffusePipeline(
 		fragmentShader,
 	};
 
+	Window window = framebuffer->base.window;
 	GraphicsAPI api = getGraphicsAPI();
 
 	if (api == VULKAN_GRAPHICS_API)
@@ -852,6 +853,7 @@ MpgxResult createDiffusePipeline(
 #if MPGX_SUPPORT_VULKAN
 		return createVkPipeline(
 			framebuffer,
+			window,
 			name,
 			state ? state : &defaultState,
 			handle,
@@ -868,6 +870,7 @@ MpgxResult createDiffusePipeline(
 #if MPGX_SUPPORT_OPENGL
 		return createGlPipeline(
 			framebuffer,
+			window,
 			name,
 			state ? state : &defaultState,
 			handle,

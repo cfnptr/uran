@@ -49,6 +49,8 @@ inline static void updateTransformModel(
 	Transform transform,
 	Vec3F cameraPosition)
 {
+	assert(transform);
+
 	Vec3F position = transform->position;
 	Quat rotation = transform->rotation;
 	Transform parent = transform->parent;
@@ -203,7 +205,9 @@ void destroyAllTransformerTransforms(Transformer transformer)
 
 static void onTransformUpdate(void* argument)
 {
-	Transformer transformer = argument;
+	assert(argument);
+
+	Transformer transformer = (Transformer)argument;
 	Transform* transforms = transformer->transforms;
 	size_t transformCount = transformer->transformCount;
 	Transform cameraTransform = transformer->camera;
@@ -247,12 +251,10 @@ void updateTransformer(Transformer transformer)
 
 	ThreadPool threadPool = transformer->threadPool;
 
-	if (threadPool && transformCount > getThreadPoolThreadCount(threadPool))
+	if (threadPool && transformCount >= getThreadPoolThreadCount(threadPool))
 	{
-		waitThreadPool(threadPool);
-		transformer->threadIndex = 0;
-
 		size_t threadCount = getThreadPoolThreadCount(threadPool);
+		transformer->threadIndex = 0;
 
 		for (size_t i = 0; i < threadCount; i++)
 		{

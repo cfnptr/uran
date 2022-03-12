@@ -24,20 +24,17 @@ typedef struct VertexPushConstants
 } VertexPushConstants;
 typedef struct BaseHandle
 {
-	Window window;
 	VertexPushConstants vpc;
 } BaseHandle;
 #if MPGX_SUPPORT_VULKAN
 typedef struct VkHandle
 {
-	Window window;
 	VertexPushConstants vpc;
 } VkHandle;
 #endif
 #if MPGX_SUPPORT_OPENGL
 typedef struct GlHandle
 {
-	Window window;
 	VertexPushConstants vpc;
 	GLint mvpLocation;
 } GlHandle;
@@ -105,9 +102,8 @@ static const VkPushConstantRange pushConstantRanges[1] = {
 static void onVkUniformsSet(GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
-
 	Handle handle = graphicsPipeline->vk.handle;
-	VkWindow vkWindow = getVkWindow(handle->vk.window);
+	VkWindow vkWindow = getVkWindow(graphicsPipeline->vk.window);
 
 	vkCmdPushConstants(
 		vkWindow->currenCommandBuffer,
@@ -141,12 +137,16 @@ static MpgxResult onVkResize(
 	*(VkGraphicsPipelineCreateData*)createData = _createData;
 	return SUCCESS_MPGX_RESULT;
 }
-static void onVkDestroy(void* handle)
+static void onVkDestroy(
+	Window window,
+	void* handle)
 {
+	assert(window);
 	free((Handle)handle);
 }
 inline static MpgxResult createVkPipeline(
 	Framebuffer framebuffer,
+	Window window,
 	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
@@ -155,6 +155,7 @@ inline static MpgxResult createVkPipeline(
 	GraphicsPipeline* graphicsPipeline)
 {
 	assert(framebuffer);
+	assert(window);
 	assert(state);
 	assert(handle);
 	assert(shaders);
@@ -188,7 +189,7 @@ inline static MpgxResult createVkPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onVkDestroy(handle);
+		onVkDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -201,7 +202,6 @@ static void onGlUniformsSet(
 	GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
-
 	Handle handle = graphicsPipeline->gl.handle;
 
 	glUniformMatrix4fv(
@@ -233,12 +233,16 @@ static MpgxResult onGlResize(
 	assert(!createData);
 	return SUCCESS_MPGX_RESULT;
 }
-static void onGlDestroy(void* handle)
+static void onGlDestroy(
+	Window window,
+	void* handle)
 {
+	assert(window);
 	free((Handle)handle);
 }
 inline static MpgxResult createGlPipeline(
 	Framebuffer framebuffer,
+	Window window,
 	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
@@ -247,6 +251,7 @@ inline static MpgxResult createGlPipeline(
 	GraphicsPipeline* graphicsPipeline)
 {
 	assert(framebuffer);
+	assert(window);
 	assert(state);
 	assert(handle);
 	assert(shaders);
@@ -271,7 +276,7 @@ inline static MpgxResult createGlPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onGlDestroy(handle);
+		onGlDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -322,8 +327,6 @@ MpgxResult createSimpleShadowPipeline(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
-	Window window = framebuffer->base.window;
-	handle->base.window = window;
 	handle->base.vpc.mvp = identMat4F;
 
 #ifndef NDEBUG
@@ -372,6 +375,7 @@ MpgxResult createSimpleShadowPipeline(
 		fragmentShader,
 	};
 
+	Window window = framebuffer->base.window;
 	GraphicsAPI api = getGraphicsAPI();
 
 	if (api == VULKAN_GRAPHICS_API)
@@ -379,6 +383,7 @@ MpgxResult createSimpleShadowPipeline(
 #if MPGX_SUPPORT_VULKAN
 		return createVkPipeline(
 			framebuffer,
+			window,
 			name,
 			state ? state : &defaultState,
 			handle,
@@ -395,6 +400,7 @@ MpgxResult createSimpleShadowPipeline(
 #if MPGX_SUPPORT_OPENGL
 		return createGlPipeline(
 			framebuffer,
+			window,
 			name,
 			state ? state : &defaultState,
 			handle,

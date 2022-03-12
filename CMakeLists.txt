@@ -69,20 +69,20 @@ set(URAN_SOURCES
 	source/pipelines/diffuse_pipeline.c
 	source/pipelines/gaussian_blur_pipeline.c
 	source/pipelines/gradient_sky_pipeline.c
+	source/pipelines/panel_pipeline.c
 	source/pipelines/ray_tracing_color_pipeline.c
 	source/pipelines/simple_shadow_pipeline.c
 	source/pipelines/sprite_pipeline.c
-	source/pipelines/texture_color_pipeline.c
-	source/pipelines/texture_sprite_pipeline.c
+	source/pipelines/texture_pipeline.c
 
 	source/renderers/color_renderer.c
 	source/renderers/diffuse_renderer.c
 	source/renderers/gradient_sky_renderer.c
+	source/renderers/panel_renderer.c
 	source/renderers/simple_shadow_renderer.c
 	source/renderers/sprite_renderer.c
-	source/renderers/texture_color_renderer.c
-	source/renderers/texture_sprite_renderer.c
 	source/renderers/text_renderer.c
+	source/renderers/texture_renderer.c
 
 	source/editor.c
 	source/free_camera.c

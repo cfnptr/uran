@@ -12,20 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#version 420
+#version 410
 
-layout(location = 0) in vec2 f_TexCoords;
 layout(location = 0) out vec4 o_Color;
 
 layout(push_constant) uniform FragmentPushConstants
 {
-    layout(offset = 80) vec4 color;
+    layout(offset = 64) vec4 color;
 } fpc;
-
-layout(binding = 0) uniform sampler2D u_Texture;
 
 void main()
 {
-    vec4 color = texture(u_Texture, f_TexCoords);
-    o_Color = color * fpc.color;
+    o_Color = fpc.color;
 }

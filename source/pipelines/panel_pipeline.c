@@ -12,42 +12,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "uran/pipelines/bloom_pipeline.h"
+#include "uran/pipelines/panel_pipeline.h"
+
 #include "mpgx/_source/window.h"
+#include "mpgx/_source/graphics_mesh.h"
 #include "mpgx/_source/graphics_pipeline.h"
-#include "mpgx/_source/sampler.h"
 
 #include <string.h>
 
+typedef struct VertexPushConstants
+{
+	Mat4F mvp;
+} VertexPushConstants;
 typedef struct FragmentPushConstants
 {
-	LinearColor threshold;
+	LinearColor color;
 } FragmentPushConstants;
 typedef struct BaseHandle
 {
-	Image buffer;
-	Sampler sampler;
+	GraphicsMesh mesh;
+	VertexPushConstants vpc;
 	FragmentPushConstants fpc;
 } BaseHandle;
 #if MPGX_SUPPORT_VULKAN
 typedef struct VkHandle
 {
-	Image buffer;
-	Sampler sampler;
+	GraphicsMesh mesh;
+	VertexPushConstants vpc;
 	FragmentPushConstants fpc;
-	VkDescriptorSetLayout descriptorSetLayout;
-	VkDescriptorPool descriptorPool;
-	VkDescriptorSet descriptorSet;
 } VkHandle;
 #endif
 #if MPGX_SUPPORT_OPENGL
 typedef struct GlHandle
 {
-	Image buffer;
-	Sampler sampler;
+	GraphicsMesh mesh;
+	VertexPushConstants vpc;
 	FragmentPushConstants fpc;
-	GLint thresholdLocation;
-	GLint bufferLocation;
+	GLint mvpLocation;
+	GLint colorLocation;
 } GlHandle;
 #endif
 typedef union Handle_T
@@ -67,162 +69,77 @@ typedef Handle_T* Handle;
 static const VkVertexInputBindingDescription vertexInputBindingDescriptions[1] = {
 	{
 		0,
-		sizeof(Vec2F) * 2,
+		sizeof(Vec2F),
 		VK_VERTEX_INPUT_RATE_VERTEX,
 	},
 };
-static const VkVertexInputAttributeDescription vertexInputAttributeDescriptions[2] = {
+static const VkVertexInputAttributeDescription vertexInputAttributeDescriptions[1] = {
 	{
 		0,
 		0,
 		VK_FORMAT_R32G32_SFLOAT,
 		0,
-	},
-	{
-		1,
-		0,
-		VK_FORMAT_R32G32_SFLOAT,
-		sizeof(Vec2F),
 	},
 };
-static const VkPushConstantRange pushConstantRanges[1] = {
+static const VkPushConstantRange pushConstantRanges[2] = {
+	{
+		VK_SHADER_STAGE_VERTEX_BIT,
+		0,
+		sizeof(VertexPushConstants),
+	},
 	{
 		VK_SHADER_STAGE_FRAGMENT_BIT,
-		0,
+		sizeof(VertexPushConstants),
 		sizeof(FragmentPushConstants),
 	},
 };
-
-inline static MpgxResult createVkDescriptorPoolInstance(
-	VkDevice device,
-	VkDescriptorPool* descriptorPool)
-{
-	assert(device);
-	assert(descriptorPool);
-
-	VkDescriptorPoolSize descriptorPoolSizes[1] = {
-		{
-			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			1,
-		},
-	};
-	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
-		VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-		NULL,
-		0,
-		1,
-		1,
-		descriptorPoolSizes
-	};
-
-	VkDescriptorPool descriptorPoolInstance;
-
-	VkResult vkResult = vkCreateDescriptorPool(
-		device,
-		&descriptorPoolCreateInfo,
-		NULL,
-		&descriptorPoolInstance);
-
-	if (vkResult != VK_SUCCESS)
-		return vkToMpgxResult(vkResult);
-
-	*descriptorPool = descriptorPoolInstance;
-	return SUCCESS_MPGX_RESULT;
-}
-inline static MpgxResult createVkDescriptorSetInstance(
-	VkDevice device,
-	VkDescriptorSetLayout descriptorSetLayout,
-	VkDescriptorPool descriptorPool,
-	VkImageView imageView,
-	VkSampler sampler,
-	VkDescriptorSet* descriptorSet)
-{
-	assert(device);
-	assert(descriptorSetLayout);
-	assert(descriptorPool);
-	assert(imageView);
-	assert(sampler);
-	assert(descriptorSet);
-
-	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
-		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-		NULL,
-		descriptorPool,
-		1,
-		&descriptorSetLayout,
-	};
-
-	VkDescriptorSet descriptorSetInstance;
-
-	VkResult vkResult = vkAllocateDescriptorSets(
-		device,
-		&descriptorSetAllocateInfo,
-		&descriptorSetInstance);
-
-	if (vkResult != VK_SUCCESS)
-		return vkToMpgxResult(vkResult);
-
-	VkDescriptorImageInfo bufferDescriptorImageInfos[1] = {
-		{
-			sampler,
-			imageView,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		},
-	};
-
-	VkWriteDescriptorSet writeDescriptorSets[1] = {
-		{
-			VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			NULL,
-			descriptorSetInstance,
-			0,
-			0,
-			1,
-			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			bufferDescriptorImageInfos,
-			NULL,
-			NULL,
-		},
-	};
-
-	vkUpdateDescriptorSets(
-		device,
-		1,
-		writeDescriptorSets,
-		0,
-		NULL);
-
-	*descriptorSet = descriptorSetInstance;
-	return SUCCESS_MPGX_RESULT;
-}
 
 static void onVkBind(GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
 	Handle handle = graphicsPipeline->vk.handle;
-	VkWindow vkWindow = getVkWindow(graphicsPipeline->vk.window);
+	GraphicsMesh mesh = handle->vk.mesh;
 
-	vkCmdBindDescriptorSets(
-		vkWindow->currenCommandBuffer,
-		VK_PIPELINE_BIND_POINT_GRAPHICS,
-		graphicsPipeline->vk.layout,
+	assert(mesh->vk.vertexBuffer);
+	assert(mesh->vk.indexBuffer);
+
+	VkWindow vkWindow = getVkWindow(graphicsPipeline->vk.window);
+	VkCommandBuffer commandBuffer = vkWindow->currenCommandBuffer;
+
+	const VkDeviceSize offset = 0;
+
+	vkCmdBindVertexBuffers(
+		commandBuffer,
 		0,
 		1,
-		&handle->vk.descriptorSet,
-		0,
-		NULL);
+		&mesh->vk.vertexBuffer->vk.handle,
+		&offset);
+	vkCmdBindIndexBuffer(
+		commandBuffer,
+		mesh->vk.indexBuffer->vk.handle,
+		mesh->vk.vkIndexOffset,
+		mesh->vk.vkIndexType);
 }
 static void onVkUniformsSet(GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
 	Handle handle = graphicsPipeline->vk.handle;
 	VkWindow vkWindow = getVkWindow(graphicsPipeline->vk.window);
+	VkCommandBuffer commandBuffer = vkWindow->currenCommandBuffer;
+	VkPipelineLayout layout = graphicsPipeline->vk.layout;
 
 	vkCmdPushConstants(
-		vkWindow->currenCommandBuffer,
-		graphicsPipeline->vk.layout,
-		VK_SHADER_STAGE_FRAGMENT_BIT,
+		commandBuffer,
+		layout,
+		VK_SHADER_STAGE_VERTEX_BIT,
 		0,
+		sizeof(VertexPushConstants),
+		&handle->vk.vpc);
+	vkCmdPushConstants(
+		commandBuffer,
+		layout,
+		VK_SHADER_STAGE_FRAGMENT_BIT,
+		sizeof(VertexPushConstants),
 		sizeof(FragmentPushConstants),
 		&handle->vk.fpc);
 }
@@ -231,12 +148,10 @@ static MpgxResult onVkResize(
 	Vec2I newSize,
 	void* createData)
 {
-	assert(graphicsPipeline );
+	assert(graphicsPipeline);
 	assert(newSize.x > 0);
 	assert(newSize.y > 0);
 	assert(createData);
-
-	Handle handle = graphicsPipeline->vk.handle;
 
 	Vec4I size = vec4I(0, 0,
 		newSize.x, newSize.y);
@@ -255,11 +170,11 @@ static MpgxResult onVkResize(
 	VkGraphicsPipelineCreateData _createData = {
 		1,
 		vertexInputBindingDescriptions,
-		2,
+		1,
 		vertexInputAttributeDescriptions,
-		1,
-		&handle->vk.descriptorSetLayout,
-		1,
+		0,
+		NULL,
+		2,
 		pushConstantRanges,
 	};
 
@@ -268,33 +183,15 @@ static MpgxResult onVkResize(
 }
 static void onVkDestroy(
 	Window window,
-	void* _handle)
+	void* handle)
 {
 	assert(window);
-	Handle handle = _handle;
-
-	if (!handle)
-		return;
-
-	VkWindow vkWindow = getVkWindow(window);
-	VkDevice device = vkWindow->device;
-
-	vkDestroyDescriptorPool(
-		device,
-		handle->vk.descriptorPool,
-		NULL);
-	vkDestroyDescriptorSetLayout(
-		device,
-		handle->vk.descriptorSetLayout,
-		NULL);
-	free(handle);
+	free((Handle)handle);
 }
 inline static MpgxResult createVkPipeline(
 	Framebuffer framebuffer,
 	Window window,
 	const char* name,
-	VkImageView imageView,
-	VkSampler sampler,
 	const GraphicsPipelineState* state,
 	Handle handle,
 	Shader* shaders,
@@ -303,94 +200,24 @@ inline static MpgxResult createVkPipeline(
 {
 	assert(framebuffer);
 	assert(window);
-	assert(imageView);
-	assert(sampler);
 	assert(state);
 	assert(handle);
 	assert(shaders);
 	assert(shaderCount > 0);
 	assert(graphicsPipeline);
 
-	VkWindow vkWindow = getVkWindow(window);
-	VkDevice device = vkWindow->device;
-
-	VkDescriptorSetLayoutBinding descriptorSetLayoutBindings[1] = {
-		{
-			0,
-			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			1,
-			VK_SHADER_STAGE_FRAGMENT_BIT,
-			NULL,
-		},
-	};
-	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
-		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-		NULL,
-		0,
-		1,
-		descriptorSetLayoutBindings
-	};
-
-	VkDescriptorSetLayout descriptorSetLayout;
-
-	VkResult vkResult = vkCreateDescriptorSetLayout(
-		device,
-		&descriptorSetLayoutCreateInfo,
-		NULL,
-		&descriptorSetLayout);
-
-	if(vkResult != VK_SUCCESS)
-	{
-		onVkDestroy(window, handle);
-		return vkToMpgxResult(vkResult);
-	}
-
-	handle->vk.descriptorSetLayout = descriptorSetLayout;
-
 	VkGraphicsPipelineCreateData createData = {
 		1,
 		vertexInputBindingDescriptions,
-		2,
+		1,
 		vertexInputAttributeDescriptions,
-		1,
-		&descriptorSetLayout,
-		1,
+		0,
+		NULL,
+		2,
 		pushConstantRanges,
 	};
 
-	VkDescriptorPool descriptorPool;
-
-	MpgxResult mpgxResult = createVkDescriptorPoolInstance(
-		device,
-		&descriptorPool);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-	{
-		onVkDestroy(window, handle);
-		return mpgxResult;
-	}
-
-	handle->vk.descriptorPool = descriptorPool;
-
-	VkDescriptorSet descriptorSet;
-
-	mpgxResult = createVkDescriptorSetInstance(
-		device,
-		descriptorSetLayout,
-		descriptorPool,
-		imageView,
-		sampler,
-		&descriptorSet);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-	{
-		onVkDestroy(window, handle);
-		return mpgxResult;
-	}
-
-	handle->vk.descriptorSet = descriptorSet;
-
-	mpgxResult = createGraphicsPipeline(
+	MpgxResult mpgxResult = createGraphicsPipeline(
 		framebuffer,
 		name,
 		state,
@@ -419,12 +246,18 @@ static void onGlBind(GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
 	Handle handle = graphicsPipeline->gl.handle;
+	GraphicsMesh mesh = handle->gl.mesh;
 
-	glUniform1i(handle->gl.bufferLocation, 0);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, handle->gl.buffer->gl.handle);
-	glBindSampler(0, handle->gl.sampler->gl.handle);
+	assert(mesh->gl.vertexBuffer);
+	assert(mesh->gl.indexBuffer);
 
+	glBindVertexArray(mesh->gl.handle);
+	glBindBuffer(
+		GL_ARRAY_BUFFER,
+		mesh->gl.vertexBuffer->gl.handle);
+	glBindBuffer(
+		GL_ELEMENT_ARRAY_BUFFER,
+		mesh->gl.indexBuffer->gl.handle);
 	assertOpenGL();
 }
 static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
@@ -432,29 +265,25 @@ static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 	assert(graphicsPipeline);
 	Handle handle = graphicsPipeline->gl.handle;
 
-	glUniform4fv(
-		handle->gl.thresholdLocation,
+	glUniformMatrix4fv(
+		handle->gl.mvpLocation,
 		1,
-		(const GLfloat*)&handle->gl.fpc.threshold);
+		GL_FALSE,
+		(const GLfloat*)&handle->gl.vpc.mvp);
+	glUniform4fv(
+		handle->gl.colorLocation,
+		1,
+		(const GLfloat*)&handle->gl.fpc.color);
 
 	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
 
 	glVertexAttribPointer(
 		0,
 		2,
 		GL_FLOAT,
 		GL_FALSE,
-		sizeof(Vec2F) * 2,
+		sizeof(Vec2F),
 		0);
-	glVertexAttribPointer(
-		1,
-		2,
-		GL_FLOAT,
-		GL_FALSE,
-		sizeof(Vec2F) * 2,
-		(const void*)sizeof(Vec2F));
-
 	assertOpenGL();
 }
 static MpgxResult onGlResize(
@@ -513,7 +342,7 @@ inline static MpgxResult createGlPipeline(
 		framebuffer,
 		name,
 		state,
-		NULL,
+		onGlBind,
 		onGlUniformsSet,
 		onGlResize,
 		onGlDestroy,
@@ -531,16 +360,16 @@ inline static MpgxResult createGlPipeline(
 
 	GLuint glHandle = graphicsPipelineInstance->gl.glHandle;
 
-	GLint thresholdLocation, bufferLocation;
+	GLint mvpLocation, colorLocation;
 
 	bool result = getGlUniformLocation(
 		glHandle,
-		"u_Threshold",
-		&thresholdLocation);
+		"u_MVP",
+		&mvpLocation);
 	result &= getGlUniformLocation(
 		glHandle,
-		"u_Buffer",
-		&bufferLocation);
+		"u_Color",
+		&colorLocation);
 
 	if (!result)
 	{
@@ -550,47 +379,45 @@ inline static MpgxResult createGlPipeline(
 
 	assertOpenGL();
 
-	handle->gl.thresholdLocation = thresholdLocation;
-	handle->gl.bufferLocation = bufferLocation;
+	handle->gl.mvpLocation = mvpLocation;
+	handle->gl.colorLocation = colorLocation;
 
 	*graphicsPipeline = graphicsPipelineInstance;
 	return SUCCESS_MPGX_RESULT;
 }
 #endif
 
-MpgxResult createBloomPipeline(
+MpgxResult createPanelPipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
-	Image buffer,
-	Sampler sampler,
+	GraphicsMesh mesh,
 	const GraphicsPipelineState* state,
-	GraphicsPipeline* bloomPipeline)
+	GraphicsPipeline* panelPipeline)
 {
 	assert(framebuffer);
 	assert(vertexShader);
 	assert(fragmentShader);
-	assert(buffer);
-	assert(sampler);
-	assert(bloomPipeline);
+	assert(mesh);
+	assert(panelPipeline);
 	assert(vertexShader->base.type == VERTEX_SHADER_TYPE);
 	assert(fragmentShader->base.type == FRAGMENT_SHADER_TYPE);
 	assert(vertexShader->base.window == framebuffer->base.window);
 	assert(fragmentShader->base.window == framebuffer->base.window);
-	assert(buffer->base.window == framebuffer->base.window);
-	assert(sampler->base.window == framebuffer->base.window);
+	assert(mesh->base.vertexBuffer);
+	assert(mesh->base.indexBuffer);
 
 	Handle handle = calloc(1, sizeof(Handle_T));
 
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
-	handle->base.buffer = buffer;
-	handle->base.sampler = sampler;
-	handle->base.fpc.threshold = whiteLinearColor;
+	handle->base.mesh = mesh;
+	handle->base.vpc.mvp = identMat4F;
+	handle->base.fpc.color = whiteLinearColor;
 
 #ifndef NDEBUG
-	const char* name = BLOOM_PIPELINE_NAME;
+	const char* name = PANEL_PIPELINE_NAME;
 #else
 	const char* name = NULL;
 #endif
@@ -607,19 +434,19 @@ MpgxResult createBloomPipeline(
 		BACK_CULL_MODE,
 		LESS_COMPARE_OPERATOR,
 		ALL_COLOR_COMPONENT,
-		ZERO_BLEND_FACTOR,
-		ZERO_BLEND_FACTOR,
-		ZERO_BLEND_FACTOR,
+		SOURCE_ALPHA_BLEND_FACTOR,
+		ONE_MINUS_SOURCE_ALPHA_BLEND_FACTOR,
+		ONE_BLEND_FACTOR,
 		ZERO_BLEND_FACTOR,
 		ADD_BLEND_OPERATOR,
 		ADD_BLEND_OPERATOR,
+		true,
+		true,
+		true,
+		true,
 		false,
 		false,
-		false,
-		false,
-		false,
-		false,
-		false,
+		true,
 		false,
 		false,
 		DEFAULT_LINE_WIDTH,
@@ -645,13 +472,11 @@ MpgxResult createBloomPipeline(
 			framebuffer,
 			window,
 			name,
-			buffer->vk.imageView,
-			sampler->vk.handle,
 			state ? state : &defaultState,
 			handle,
 			shaders,
 			2,
-			bloomPipeline);
+			panelPipeline);
 #else
 		abort();
 #endif
@@ -668,7 +493,7 @@ MpgxResult createBloomPipeline(
 			handle,
 			shaders,
 			2,
-			bloomPipeline);
+			panelPipeline);
 #else
 		abort();
 #endif
@@ -679,41 +504,65 @@ MpgxResult createBloomPipeline(
 	}
 }
 
-Image getBloomPipelineBuffer(
-	GraphicsPipeline bloomPipeline)
+GraphicsMesh getPanelPipelineMesh(
+	GraphicsPipeline panelPipeline)
 {
-	assert(bloomPipeline);
-	assert(strcmp(bloomPipeline->base.name,
-		BLOOM_PIPELINE_NAME) == 0);
-	Handle handle = bloomPipeline->base.handle;
-	return handle->base.buffer;
+	assert(panelPipeline);
+	assert(strcmp(panelPipeline->base.name,
+		PANEL_PIPELINE_NAME) == 0);
+	Handle handle = panelPipeline->base.handle;
+	return handle->base.mesh;
 }
-Sampler getBloomPipelineSampler(
-	GraphicsPipeline bloomPipeline)
+void setPanelPipelineMesh(
+	GraphicsPipeline panelPipeline,
+	GraphicsMesh mesh)
 {
-	assert(bloomPipeline);
-	assert(strcmp(bloomPipeline->base.name,
-		BLOOM_PIPELINE_NAME) == 0);
-	Handle handle = bloomPipeline->base.handle;
-	return handle->base.sampler;
+	assert(panelPipeline);
+	assert(mesh);
+	assert(mesh->base.vertexBuffer);
+	assert(mesh->base.indexBuffer);
+	assert(strcmp(panelPipeline->base.name,
+		PANEL_PIPELINE_NAME) == 0);
+	Handle handle = panelPipeline->base.handle;
+	handle->base.mesh = mesh;
 }
 
-LinearColor getBloomPipelineThreshold(
-	GraphicsPipeline bloomPipeline)
+Mat4F getPanelPipelineMvp(
+	GraphicsPipeline panelPipeline)
 {
-	assert(bloomPipeline);
-	assert(strcmp(bloomPipeline->base.name,
-		BLOOM_PIPELINE_NAME) == 0);
-	Handle handle = bloomPipeline->base.handle;
-	return handle->base.fpc.threshold;
+	assert(panelPipeline);
+	assert(strcmp(panelPipeline->base.name,
+		PANEL_PIPELINE_NAME) == 0);
+	Handle handle = panelPipeline->base.handle;
+	return handle->base.vpc.mvp;
 }
-void setBloomPipelineThreshold(
-	GraphicsPipeline bloomPipeline,
-	LinearColor threshold)
+void setPanelPipelineMvp(
+	GraphicsPipeline panelPipeline,
+	Mat4F mvp)
 {
-	assert(bloomPipeline);
-	assert(strcmp(bloomPipeline->base.name,
-		BLOOM_PIPELINE_NAME) == 0);
-	Handle handle = bloomPipeline->base.handle;
-	handle->base.fpc.threshold = threshold;
+	assert(panelPipeline);
+	assert(strcmp(panelPipeline->base.name,
+		PANEL_PIPELINE_NAME) == 0);
+	Handle handle = panelPipeline->base.handle;
+	handle->base.vpc.mvp = mvp;
+}
+
+LinearColor getPanelPipelineColor(
+	GraphicsPipeline panelPipeline)
+{
+	assert(panelPipeline);
+	assert(strcmp(panelPipeline->base.name,
+		PANEL_PIPELINE_NAME) == 0);
+	Handle handle = panelPipeline->base.handle;
+	return handle->base.fpc.color;
+}
+void setPanelPipelineColor(
+	GraphicsPipeline panelPipeline,
+	LinearColor color)
+{
+	assert(panelPipeline);
+	assert(strcmp(panelPipeline->base.name,
+		PANEL_PIPELINE_NAME) == 0);
+	Handle handle = panelPipeline->base.handle;
+	handle->base.fpc.color = color;
 }

@@ -15,7 +15,10 @@
 #pragma once
 #include "uran/interface.h"
 #include "uran/renderers/text_renderer.h"
-#include "uran/renderers/sprite_renderer.h"
+#include "uran/renderers/panel_renderer.h"
+
+#define DEFAULT_UI_BAR_HEIGHT 24
+#define DEFAULT_UI_TEXT_HEIGHT 12
 
 #define DEFAULT_UI_PANEL_COLOR srgbColor(48, 48, 48, 255)
 #define DEFAULT_UI_BAR_COLOR srgbColor(80, 80, 80, 255)
@@ -39,7 +42,7 @@ typedef UserInterface_T* UserInterface;
  * Returns operation MPGX result.
  *
  * transformer - transformer instance.
- * spritePipeline - sprite pipeline instance.
+ * panelPipeline - panel pipeline instance.
  * textPipeline - text pipeline instance.
  * fontAtlas - font atlas instance.
  * scale - interface scale.
@@ -49,7 +52,7 @@ typedef UserInterface_T* UserInterface;
  */
 MpgxResult createUserInterface(
 	Transformer transformer,
-	GraphicsPipeline spritePipeline,
+	GraphicsPipeline panelPipeline,
 	GraphicsPipeline textPipeline,
 	FontAtlas fontAtlas,
 	cmmt_float_t scale,
@@ -68,10 +71,10 @@ void destroyUserInterface(UserInterface ui);
  */
 Transformer getUserInterfaceTransformer(UserInterface ui);
 /*
- * Returns user interface sprite pipeline.
+ * Returns user interface panel pipeline.
  * ui - user interface instance.
  */
-GraphicsPipeline getUserInterfaceSpritePipeline(UserInterface ui);
+GraphicsPipeline getUserInterfacePanelPipeline(UserInterface ui);
 /*
  * Returns user interface text pipeline.
  * ui - user interface instance.
@@ -107,7 +110,6 @@ GraphicsRendererResult drawUserInterface(UserInterface ui);
  * alignment - alignment type.
  * position - panel position.
  * scale - panel scale.
- * color - panel color.
  * parent - parent instance or NULL.
  * events - interface events or NULL.
  * handle - panel handle or NULL.
@@ -119,19 +121,19 @@ MpgxResult createUiPanel(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	LinearColor color,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
 	bool isActive,
 	InterfaceElement* uiPanel);
+
 /*
  * Returns UI panel handle.
  * panel - UI panel instance.
  */
 void* getUiPanelHandle(InterfaceElement panel);
 /*
- * Returns UI panel sprite render instance.
+ * Returns UI panel panel render instance.
  * panel - UI panel instance.
  */
 GraphicsRender getUiPanelRender(InterfaceElement panel);
@@ -208,6 +210,7 @@ MpgxResult createUiLabel(
 	void* handle,
 	bool isActive,
 	InterfaceElement* uiLabel);
+
 /*
  * Returns UI label handle.
  * label - UI label instance.
@@ -229,10 +232,6 @@ GraphicsRender getUiLabelRender(InterfaceElement label);
  * alignment - alignment type.
  * position - window position.
  * scale - window scale.
- * barHeight - window bar height.
- * titleHeight - window title height.
- * barColor - window bar color.
- * panelColor - window panel color.
  * titleColor - window title color.
  * parent - parent instance or NULL.
  * isActive - is window active.
@@ -247,10 +246,6 @@ MpgxResult createUiWindow32(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	cmmt_float_t barHeight,
-	cmmt_float_t titleHeight,
-	LinearColor barColor,
-	LinearColor panelColor,
 	SrgbColor titleColor,
 	Transform parent,
 	const InterfaceElementEvents* events,
@@ -267,10 +262,6 @@ MpgxResult createUiWindow32(
  * alignment - alignment type.
  * position - window position.
  * scale - window scale.
- * barHeight - window bar height.
- * titleHeight - window title height.
- * barColor - window bar color.
- * panelColor - window panel color.
  * titleColor - window title color.
  * parent - parent instance or NULL.
  * events - interface events or NULL.
@@ -285,28 +276,25 @@ MpgxResult createUiWindow(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	cmmt_float_t barHeight,
-	cmmt_float_t titleHeight,
-	LinearColor barColor,
-	LinearColor panelColor,
 	SrgbColor titleColor,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
 	bool isActive,
 	InterfaceElement* uiWindow);
+
 /*
  * Returns UI window handle.
  * window - UI window instance.
  */
 void* getUiWindowHandle(InterfaceElement window);
 /*
- * Returns UI window panel sprite render instance.
+ * Returns UI window panel panel render instance.
  * window - UI window instance.
  */
 GraphicsRender getUiWindowPanelRender(InterfaceElement window);
 /*
- * Returns UI window bar sprite render instance.
+ * Returns UI window bar panel render instance.
  * window - UI window instance.
  */
 GraphicsRender getUiWindowBarRender(InterfaceElement window);
@@ -315,8 +303,16 @@ GraphicsRender getUiWindowBarRender(InterfaceElement window);
  * window - UI window instance.
  */
 GraphicsRender getUiWindowTitleRender(InterfaceElement window);
-
-// TODO: window event getters
+/*
+ * Returns UI window on update event function.
+ * window - UI window instance.
+ */
+OnInterfaceElementEvent getUiWindowOnUpdateEvent(InterfaceElement window);
+/*
+ * Returns UI window on press event function.
+ * window - UI window instance.
+ */
+OnInterfaceElementEvent getUiWindowOnPressEvent(InterfaceElement window);
 
 MpgxResult createUiButton32(
 	UserInterface ui,
@@ -325,8 +321,7 @@ MpgxResult createUiButton32(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	cmmt_float_t textHeight,
-	LinearColor disabledColor,
+	LinearColor disabledColor, // TODO: set defautl, use getters/setters instead, also add events setters (for window too)
 	LinearColor enabledColor,
 	LinearColor hoveredColor,
 	LinearColor pressedColor,
@@ -344,7 +339,6 @@ MpgxResult createUiButton(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	cmmt_float_t textHeight,
 	LinearColor disabledColor,
 	LinearColor enabledColor,
 	LinearColor hoveredColor,
@@ -362,7 +356,7 @@ MpgxResult createUiButton(
  */
 void* getUiButtonHandle(InterfaceElement button);
 /*
- * Returns UI button panel sprite render instance.
+ * Returns UI button panel panel render instance.
  * button - UI button instance.
  */
 GraphicsRender getUiButtonPanelRender(InterfaceElement button);
@@ -371,3 +365,33 @@ GraphicsRender getUiButtonPanelRender(InterfaceElement button);
  * button - UI button instance.
  */
 GraphicsRender getUiButtonTextRender(InterfaceElement button);
+/*
+ * Returns UI button on enable event function.
+ * button - UI button instance.
+ */
+OnInterfaceElementEvent getUiButtonOnEnableEvent(InterfaceElement button);
+/*
+ * Returns UI button on disable event function.
+ * button - UI button instance.
+ */
+OnInterfaceElementEvent getUiButtonOnDisableEvent(InterfaceElement button);
+/*
+ * Returns UI button on enter event function.
+ * button - UI button instance.
+ */
+OnInterfaceElementEvent getUiButtonOnEnterEvent(InterfaceElement button);
+/*
+ * Returns UI button on exit event function.
+ * button - UI button instance.
+ */
+OnInterfaceElementEvent getUiButtonOnExitEvent(InterfaceElement button);
+/*
+ * Returns UI button on press event function.
+ * button - UI button instance.
+ */
+OnInterfaceElementEvent getUiButtonOnPressEvent(InterfaceElement button);
+/*
+ * Returns UI button on release event function.
+ * button - UI button instance.
+ */
+OnInterfaceElementEvent getUiButtonOnReleaseEvent(InterfaceElement button);

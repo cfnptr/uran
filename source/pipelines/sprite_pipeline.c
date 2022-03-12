@@ -13,16 +13,17 @@
 // limitations under the License.
 
 #include "uran/pipelines/sprite_pipeline.h"
-#include "uran/shader_data.h"
-
 #include "mpgx/_source/window.h"
 #include "mpgx/_source/graphics_pipeline.h"
+#include "mpgx/_source/sampler.h"
 
 #include <string.h>
 
 typedef struct VertexPushConstants
 {
 	Mat4F mvp;
+	Vec2F size;
+	Vec2F offset;
 } VertexPushConstants;
 typedef struct FragmentPushConstants
 {
@@ -30,26 +31,35 @@ typedef struct FragmentPushConstants
 } FragmentPushConstants;
 typedef struct BaseHandle
 {
-	Window window;
+	Image texture;
+	Sampler sampler;
 	VertexPushConstants vpc;
 	FragmentPushConstants fpc;
 } BaseHandle;
 #if MPGX_SUPPORT_VULKAN
 typedef struct VkHandle
 {
-	Window window;
+	Image texture;
+	Sampler sampler;
 	VertexPushConstants vpc;
 	FragmentPushConstants fpc;
+	VkDescriptorSetLayout descriptorSetLayout;
+	VkDescriptorPool descriptorPool;
+	VkDescriptorSet descriptorSet;
 } VkHandle;
 #endif
 #if MPGX_SUPPORT_OPENGL
 typedef struct GlHandle
 {
-	Window window;
+	Image texture;
+	Sampler sampler;
 	VertexPushConstants vpc;
 	FragmentPushConstants fpc;
 	GLint mvpLocation;
+	GLint sizeLocation;
+	GLint offsetLocation;
 	GLint colorLocation;
+	GLint textureLocation;
 } GlHandle;
 #endif
 typedef union Handle_T
@@ -69,16 +79,22 @@ typedef Handle_T* Handle;
 static const VkVertexInputBindingDescription vertexInputBindingDescriptions[1] = {
 	{
 		0,
-		sizeof(Vec2F),
+		sizeof(Vec2F) * 2,
 		VK_VERTEX_INPUT_RATE_VERTEX,
 	},
 };
-static const VkVertexInputAttributeDescription vertexInputAttributeDescriptions[1] = {
+static const VkVertexInputAttributeDescription vertexInputAttributeDescriptions[2] = {
 	{
 		0,
 		0,
 		VK_FORMAT_R32G32_SFLOAT,
 		0,
+	},
+	{
+		1,
+		0,
+		VK_FORMAT_R32G32_SFLOAT,
+		sizeof(Vec2F),
 	},
 };
 static const VkPushConstantRange pushConstantRanges[2] = {
@@ -94,12 +110,130 @@ static const VkPushConstantRange pushConstantRanges[2] = {
 	},
 };
 
+inline static MpgxResult createVkDescriptorPoolInstance(
+	VkDevice device,
+	VkDescriptorPool* descriptorPool)
+{
+	assert(device);
+	assert(descriptorPool);
+
+	VkDescriptorPoolSize descriptorPoolSizes[1] = {
+		{
+			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			1,
+		},
+	};
+
+	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
+		VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+		NULL,
+		0,
+		1,
+		1,
+		descriptorPoolSizes
+	};
+
+	VkDescriptorPool descriptorPoolInstance;
+
+	VkResult vkResult = vkCreateDescriptorPool(
+		device,
+		&descriptorPoolCreateInfo,
+		NULL,
+		&descriptorPoolInstance);
+
+	if (vkResult != VK_SUCCESS)
+		return vkToMpgxResult(vkResult);
+
+	*descriptorPool = descriptorPoolInstance;
+	return SUCCESS_MPGX_RESULT;
+}
+inline static MpgxResult createVkDescriptorSetInstance(
+	VkDevice device,
+	VkDescriptorSetLayout descriptorSetLayout,
+	VkDescriptorPool descriptorPool,
+	VkImageView imageView,
+	VkSampler sampler,
+	VkDescriptorSet* descriptorSet)
+{
+	assert(device);
+	assert(descriptorSetLayout);
+	assert(descriptorPool);
+	assert(imageView);
+	assert(sampler);
+	assert(descriptorSet);
+
+	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
+		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+		NULL,
+		descriptorPool,
+		1,
+		&descriptorSetLayout,
+	};
+
+	VkDescriptorSet descriptorSetInstance;
+
+	VkResult vkResult = vkAllocateDescriptorSets(
+		device,
+		&descriptorSetAllocateInfo,
+		&descriptorSetInstance);
+
+	if (vkResult != VK_SUCCESS)
+		return vkToMpgxResult(vkResult);
+
+	VkDescriptorImageInfo descriptorImageInfos[1] = {
+		{
+			sampler,
+			imageView,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		},
+	};
+	VkWriteDescriptorSet writeDescriptorSets[1] = {
+		{
+			VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			NULL,
+			descriptorSetInstance,
+			0,
+			0,
+			1,
+			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			descriptorImageInfos,
+			NULL,
+			NULL,
+		},
+	};
+
+	vkUpdateDescriptorSets(
+		device,
+		1,
+		writeDescriptorSets,
+		0,
+		NULL);
+
+	*descriptorSet = descriptorSetInstance;
+	return SUCCESS_MPGX_RESULT;
+}
+
+static void onVkBind(GraphicsPipeline graphicsPipeline)
+{
+	assert(graphicsPipeline);
+	Handle handle = graphicsPipeline->vk.handle;
+	VkWindow vkWindow = getVkWindow(graphicsPipeline->vk.window);
+
+	vkCmdBindDescriptorSets(
+		vkWindow->currenCommandBuffer,
+		VK_PIPELINE_BIND_POINT_GRAPHICS,
+		graphicsPipeline->vk.layout,
+		0,
+		1,
+		&handle->vk.descriptorSet,
+		0,
+		NULL);
+}
 static void onVkUniformsSet(GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
-
 	Handle handle = graphicsPipeline->vk.handle;
-	VkWindow vkWindow = getVkWindow(handle->vk.window);
+	VkWindow vkWindow = getVkWindow(graphicsPipeline->vk.window);
 	VkCommandBuffer commandBuffer = vkWindow->currenCommandBuffer;
 	VkPipelineLayout layout = graphicsPipeline->vk.layout;
 
@@ -128,6 +262,8 @@ static MpgxResult onVkResize(
 	assert(newSize.y > 0);
 	assert(createData);
 
+	Handle handle = graphicsPipeline->vk.handle;
+
 	Vec4I size = vec4I(0, 0,
 		newSize.x, newSize.y);
 
@@ -145,10 +281,10 @@ static MpgxResult onVkResize(
 	VkGraphicsPipelineCreateData _createData = {
 		1,
 		vertexInputBindingDescriptions,
-		1,
+		2,
 		vertexInputAttributeDescriptions,
-		0,
-		NULL,
+		1,
+		&handle->vk.descriptorSetLayout,
 		2,
 		pushConstantRanges,
 	};
@@ -156,13 +292,35 @@ static MpgxResult onVkResize(
 	*(VkGraphicsPipelineCreateData*)createData = _createData;
 	return SUCCESS_MPGX_RESULT;
 }
-static void onVkDestroy(void* handle)
+static void onVkDestroy(
+	Window window,
+	void* _handle)
 {
-	free((Handle)handle);
+	assert(window);
+	Handle handle = _handle;
+
+	if (!handle)
+		return;
+
+	VkWindow vkWindow = getVkWindow(window);
+	VkDevice device = vkWindow->device;
+
+	vkDestroyDescriptorPool(
+		device,
+		handle->vk.descriptorPool,
+		NULL);
+	vkDestroyDescriptorSetLayout(
+		device,
+		handle->vk.descriptorSetLayout,
+		NULL);
+	free(handle);
 }
 inline static MpgxResult createVkPipeline(
 	Framebuffer framebuffer,
+	Window window,
 	const char* name,
+	VkSampler sampler,
+	VkImageView imageView,
 	const GraphicsPipelineState* state,
 	Handle handle,
 	Shader* shaders,
@@ -170,28 +328,99 @@ inline static MpgxResult createVkPipeline(
 	GraphicsPipeline* graphicsPipeline)
 {
 	assert(framebuffer);
+	assert(window);
+	assert(sampler);
+	assert(imageView);
 	assert(state);
 	assert(handle);
 	assert(shaders);
 	assert(shaderCount > 0);
 	assert(graphicsPipeline);
 
+	VkWindow vkWindow = getVkWindow(framebuffer->vk.window);
+	VkDevice device = vkWindow->device;
+
+	VkDescriptorSetLayoutBinding descriptorSetLayoutBindings[1] = {
+		{
+			0,
+			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			1,
+			VK_SHADER_STAGE_FRAGMENT_BIT,
+			NULL,
+		},
+	};
+	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
+		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+		NULL,
+		0,
+		1,
+		descriptorSetLayoutBindings
+	};
+
+	VkDescriptorSetLayout descriptorSetLayout;
+
+	VkResult vkResult = vkCreateDescriptorSetLayout(
+		device,
+		&descriptorSetLayoutCreateInfo,
+		NULL,
+		&descriptorSetLayout);
+
+	if(vkResult != VK_SUCCESS)
+	{
+		onVkDestroy(window, handle);
+		return vkToMpgxResult(vkResult);
+	}
+
+	handle->vk.descriptorSetLayout = descriptorSetLayout;
+
 	VkGraphicsPipelineCreateData createData = {
 		1,
 		vertexInputBindingDescriptions,
-		1,
+		2,
 		vertexInputAttributeDescriptions,
-		0,
-		NULL,
+		1,
+		&descriptorSetLayout,
 		2,
 		pushConstantRanges,
 	};
 
-	MpgxResult mpgxResult = createGraphicsPipeline(
+	VkDescriptorPool descriptorPool;
+
+	MpgxResult mpgxResult = createVkDescriptorPoolInstance(
+		device,
+		&descriptorPool);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		onVkDestroy(window, handle);
+		return mpgxResult;
+	}
+
+	handle->vk.descriptorPool = descriptorPool;
+
+	VkDescriptorSet descriptorSet;
+
+	mpgxResult = createVkDescriptorSetInstance(
+		device,
+		descriptorSetLayout,
+		descriptorPool,
+		imageView,
+		sampler,
+		&descriptorSet);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		onVkDestroy(window, handle);
+		return mpgxResult;
+	}
+
+	handle->vk.descriptorSet = descriptorSet;
+
+	mpgxResult = createGraphicsPipeline(
 		framebuffer,
 		name,
 		state,
-		NULL,
+		onVkBind,
 		onVkUniformsSet,
 		onVkResize,
 		onVkDestroy,
@@ -203,7 +432,7 @@ inline static MpgxResult createVkPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onVkDestroy(handle);
+		onVkDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -212,10 +441,21 @@ inline static MpgxResult createVkPipeline(
 #endif
 
 #if MPGX_SUPPORT_OPENGL
+static void onGlBind(GraphicsPipeline graphicsPipeline)
+{
+	assert(graphicsPipeline);
+	Handle handle = graphicsPipeline->gl.handle;
+
+	glUniform1i(handle->gl.textureLocation, 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, handle->gl.texture->gl.handle);
+	glBindSampler(0, handle->gl.sampler->gl.handle);
+
+	assertOpenGL();
+}
 static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
-
 	Handle handle = graphicsPipeline->gl.handle;
 
 	glUniformMatrix4fv(
@@ -223,20 +463,37 @@ static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 		1,
 		GL_FALSE,
 		(const GLfloat*)&handle->gl.vpc.mvp);
+	glUniform2fv(
+		handle->gl.sizeLocation,
+		1,
+		(const GLfloat*)&handle->gl.vpc.size);
+	glUniform2fv(
+		handle->gl.offsetLocation,
+		1,
+		(const GLfloat*)&handle->gl.vpc.offset);
 	glUniform4fv(
 		handle->gl.colorLocation,
 		1,
 		(const GLfloat*)&handle->gl.fpc.color);
 
 	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
 
 	glVertexAttribPointer(
 		0,
 		2,
 		GL_FLOAT,
 		GL_FALSE,
-		sizeof(Vec2F),
+		sizeof(Vec2F) * 2,
 		0);
+	glVertexAttribPointer(
+		1,
+		2,
+		GL_FLOAT,
+		GL_FALSE,
+		sizeof(Vec2F) * 2,
+		(const void*)sizeof(Vec2F));
+
 	assertOpenGL();
 }
 static MpgxResult onGlResize(
@@ -264,12 +521,16 @@ static MpgxResult onGlResize(
 	}
 	return SUCCESS_MPGX_RESULT;
 }
-static void onGlDestroy(void* handle)
+static void onGlDestroy(
+	Window window,
+	void* handle)
 {
+	assert(window);
 	free((Handle)handle);
 }
 inline static MpgxResult createGlPipeline(
 	Framebuffer framebuffer,
+	Window window,
 	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
@@ -278,6 +539,7 @@ inline static MpgxResult createGlPipeline(
 	GraphicsPipeline* graphicsPipeline)
 {
 	assert(framebuffer);
+	assert(window);
 	assert(state);
 	assert(handle);
 	assert(shaders);
@@ -290,7 +552,7 @@ inline static MpgxResult createGlPipeline(
 		framebuffer,
 		name,
 		state,
-		NULL,
+		onGlBind,
 		onGlUniformsSet,
 		onGlResize,
 		onGlDestroy,
@@ -302,13 +564,14 @@ inline static MpgxResult createGlPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onGlDestroy(handle);
+		onGlDestroy(window, handle);
 		return mpgxResult;
 	}
 
 	GLuint glHandle = graphicsPipelineInstance->gl.glHandle;
 
-	GLint mvpLocation, colorLocation;
+	GLint mvpLocation, sizeLocation, offsetLocation,
+		colorLocation, textureLocation;
 
 	bool result = getGlUniformLocation(
 		glHandle,
@@ -316,8 +579,20 @@ inline static MpgxResult createGlPipeline(
 		&mvpLocation);
 	result &= getGlUniformLocation(
 		glHandle,
+		"u_Size",
+		&sizeLocation);
+	result &= getGlUniformLocation(
+		glHandle,
+		"u_Offset",
+		&offsetLocation);
+	result &= getGlUniformLocation(
+		glHandle,
 		"u_Color",
 		&colorLocation);
+	result &= getGlUniformLocation(
+		glHandle,
+		"u_Texture",
+		&textureLocation);
 
 	if (!result)
 	{
@@ -328,7 +603,10 @@ inline static MpgxResult createGlPipeline(
 	assertOpenGL();
 
 	handle->gl.mvpLocation = mvpLocation;
+	handle->gl.sizeLocation = sizeLocation;
+	handle->gl.offsetLocation = offsetLocation;
 	handle->gl.colorLocation = colorLocation;
+	handle->gl.textureLocation = textureLocation;
 
 	*graphicsPipeline = graphicsPipelineInstance;
 	return SUCCESS_MPGX_RESULT;
@@ -339,26 +617,34 @@ MpgxResult createSpritePipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
+	Image texture,
+	Sampler sampler,
 	const GraphicsPipelineState* state,
 	GraphicsPipeline* spritePipeline)
 {
 	assert(framebuffer);
 	assert(vertexShader);
 	assert(fragmentShader);
+	assert(texture);
+	assert(sampler);
 	assert(spritePipeline);
 	assert(vertexShader->base.type == VERTEX_SHADER_TYPE);
 	assert(fragmentShader->base.type == FRAGMENT_SHADER_TYPE);
 	assert(vertexShader->base.window == framebuffer->base.window);
 	assert(fragmentShader->base.window == framebuffer->base.window);
+	assert(texture->base.window == framebuffer->base.window);
+	assert(sampler->base.window == framebuffer->base.window);
 
 	Handle handle = calloc(1, sizeof(Handle_T));
 
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
-	Window window = framebuffer->base.window;
-	handle->base.window = window;
+	handle->base.texture = texture;
+	handle->base.sampler = sampler;
 	handle->base.vpc.mvp = identMat4F;
+	handle->base.vpc.size = oneVec2F;
+	handle->base.vpc.offset = zeroVec2F;
 	handle->base.fpc.color = whiteLinearColor;
 
 #ifndef NDEBUG
@@ -407,6 +693,7 @@ MpgxResult createSpritePipeline(
 		fragmentShader,
 	};
 
+	Window window = framebuffer->base.window;
 	GraphicsAPI api = getGraphicsAPI();
 
 	if (api == VULKAN_GRAPHICS_API)
@@ -414,7 +701,10 @@ MpgxResult createSpritePipeline(
 #if MPGX_SUPPORT_VULKAN
 		return createVkPipeline(
 			framebuffer,
+			window,
 			name,
+			sampler->vk.handle,
+			texture->vk.imageView,
 			state ? state : &defaultState,
 			handle,
 			shaders,
@@ -430,6 +720,7 @@ MpgxResult createSpritePipeline(
 #if MPGX_SUPPORT_OPENGL
 		return createGlPipeline(
 			framebuffer,
+			window,
 			name,
 			state ? state : &defaultState,
 			handle,
@@ -444,6 +735,25 @@ MpgxResult createSpritePipeline(
 	{
 		abort();
 	}
+}
+
+Image getSpritePipelineTexture(
+	GraphicsPipeline spritePipeline)
+{
+	assert(spritePipeline);
+	assert(strcmp(spritePipeline->base.name,
+		SPRITE_PIPELINE_NAME) == 0);
+	Handle handle = spritePipeline->base.handle;
+	return handle->base.texture;
+}
+Sampler getSpritePipelineSampler(
+	GraphicsPipeline spritePipeline)
+{
+	assert(spritePipeline);
+	assert(strcmp(spritePipeline->base.name,
+		SPRITE_PIPELINE_NAME) == 0);
+	Handle handle = spritePipeline->base.handle;
+	return handle->base.sampler;
 }
 
 Mat4F getSpritePipelineMvp(
@@ -464,6 +774,46 @@ void setSpritePipelineMvp(
 		SPRITE_PIPELINE_NAME) == 0);
 	Handle handle = spritePipeline->base.handle;
 	handle->base.vpc.mvp = mvp;
+}
+
+Vec2F getSpritePipelineSize(
+	GraphicsPipeline spritePipeline)
+{
+	assert(spritePipeline);
+	assert(strcmp(spritePipeline->base.name,
+		SPRITE_PIPELINE_NAME) == 0);
+	Handle handle = spritePipeline->base.handle;
+	return handle->base.vpc.size;
+}
+void setSpritePipelineSize(
+	GraphicsPipeline spritePipeline,
+	Vec2F size)
+{
+	assert(spritePipeline);
+	assert(strcmp(spritePipeline->base.name,
+		SPRITE_PIPELINE_NAME) == 0);
+	Handle handle = spritePipeline->base.handle;
+	handle->base.vpc.size = size;
+}
+
+Vec2F getSpritePipelineOffset(
+	GraphicsPipeline spritePipeline)
+{
+	assert(spritePipeline);
+	assert(strcmp(spritePipeline->base.name,
+		SPRITE_PIPELINE_NAME) == 0);
+	Handle handle = spritePipeline->base.handle;
+	return handle->base.vpc.offset;
+}
+void setSpritePipelineOffset(
+	GraphicsPipeline spritePipeline,
+	Vec2F offset)
+{
+	assert(spritePipeline);
+	assert(strcmp(spritePipeline->base.name,
+		SPRITE_PIPELINE_NAME) == 0);
+	Handle handle = spritePipeline->base.handle;
+	handle->base.vpc.offset = offset;
 }
 
 LinearColor getSpritePipelineColor(

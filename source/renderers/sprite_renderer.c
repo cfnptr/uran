@@ -20,6 +20,8 @@
 typedef struct Handle_T
 {
 	LinearColor color;
+	Vec2F size;
+	Vec2F offset;
 	GraphicsMesh mesh;
 } Handle_T;
 
@@ -51,6 +53,12 @@ static size_t onDraw(
 	setSpritePipelineColor(
 		graphicsPipeline,
 		handle->color);
+	setSpritePipelineSize(
+		graphicsPipeline,
+		handle->size);
+	setSpritePipelineOffset(
+		graphicsPipeline,
+		handle->offset);
 	return drawGraphicsMesh(
 		graphicsPipeline,
 		handle->mesh);
@@ -83,6 +91,8 @@ GraphicsRender createSpriteRender(
 	Transform transform,
 	Box3F bounds,
 	LinearColor color,
+	Vec2F size,
+	Vec2F offset,
 	GraphicsMesh mesh)
 {
 	assert(spriteRenderer);
@@ -104,6 +114,8 @@ GraphicsRender createSpriteRender(
 		return NULL;
 
 	handle->color = color;
+	handle->size = size;
+	handle->offset = offset;
 	handle->mesh = mesh;
 
 	GraphicsRender render = createGraphicsRender(
@@ -147,6 +159,62 @@ void setSpriteRenderColor(
 	Handle handle = getGraphicsRenderHandle(
 		spriteRender);
 	handle->color = color;
+}
+
+Vec2F getSpriteRenderSize(
+	GraphicsRender spriteRender)
+{
+	assert(spriteRender);
+	assert(strcmp(getGraphicsPipelineName(
+		getGraphicsRendererPipeline(
+		getGraphicsRenderRenderer(
+		spriteRender))),
+		SPRITE_PIPELINE_NAME) == 0);
+	Handle handle = getGraphicsRenderHandle(
+		spriteRender);
+	return handle->size;
+}
+void setSpriteRenderSize(
+	GraphicsRender spriteRender,
+	Vec2F size)
+{
+	assert(spriteRender);
+	assert(strcmp(getGraphicsPipelineName(
+		getGraphicsRendererPipeline(
+		getGraphicsRenderRenderer(
+		spriteRender))),
+		SPRITE_PIPELINE_NAME) == 0);
+	Handle handle = getGraphicsRenderHandle(
+		spriteRender);
+	handle->size = size;
+}
+
+Vec2F getSpriteRenderOffset(
+	GraphicsRender spriteRender)
+{
+	assert(spriteRender);
+	assert(strcmp(getGraphicsPipelineName(
+		getGraphicsRendererPipeline(
+		getGraphicsRenderRenderer(
+		spriteRender))),
+		SPRITE_PIPELINE_NAME) == 0);
+	Handle handle = getGraphicsRenderHandle(
+		spriteRender);
+	return handle->offset;
+}
+void setSpriteRenderOffset(
+	GraphicsRender spriteRender,
+	Vec2F offset)
+{
+	assert(spriteRender);
+	assert(strcmp(getGraphicsPipelineName(
+		getGraphicsRendererPipeline(
+		getGraphicsRenderRenderer(
+		spriteRender))),
+		SPRITE_PIPELINE_NAME) == 0);
+	Handle handle = getGraphicsRenderHandle(
+		spriteRender);
+	handle->offset = offset;
 }
 
 GraphicsMesh getSpriteRenderMesh(

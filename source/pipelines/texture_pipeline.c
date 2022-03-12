@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "uran/pipelines/texture_color_pipeline.h"
+#include "uran/pipelines/texture_pipeline.h"
 #include "mpgx/_source/window.h"
 #include "mpgx/_source/graphics_pipeline.h"
 #include "mpgx/_source/sampler.h"
@@ -31,7 +31,6 @@ typedef struct FragmentPushConstants
 } FragmentPushConstants;
 typedef struct BaseHandle
 {
-	Window window;
 	Image texture;
 	Sampler sampler;
 	VertexPushConstants vpc;
@@ -40,7 +39,6 @@ typedef struct BaseHandle
 #if MPGX_SUPPORT_VULKAN
 typedef struct VkHandle
 {
-	Window window;
 	Image texture;
 	Sampler sampler;
 	VertexPushConstants vpc;
@@ -53,7 +51,6 @@ typedef struct VkHandle
 #if MPGX_SUPPORT_OPENGL
 typedef struct GlHandle
 {
-	Window window;
 	Image texture;
 	Sampler sampler;
 	VertexPushConstants vpc;
@@ -219,9 +216,8 @@ inline static MpgxResult createVkDescriptorSetInstance(
 static void onVkBind(GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
-
 	Handle handle = graphicsPipeline->vk.handle;
-	VkWindow vkWindow = getVkWindow(handle->vk.window);
+	VkWindow vkWindow = getVkWindow(graphicsPipeline->vk.window);
 
 	vkCmdBindDescriptorSets(
 		vkWindow->currenCommandBuffer,
@@ -236,9 +232,8 @@ static void onVkBind(GraphicsPipeline graphicsPipeline)
 static void onVkUniformsSet(GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
-
 	Handle handle = graphicsPipeline->vk.handle;
-	VkWindow vkWindow = getVkWindow(handle->vk.window);
+	VkWindow vkWindow = getVkWindow(graphicsPipeline->vk.window);
 	VkCommandBuffer commandBuffer = vkWindow->currenCommandBuffer;
 	VkPipelineLayout layout = graphicsPipeline->vk.layout;
 
@@ -297,14 +292,17 @@ static MpgxResult onVkResize(
 	*(VkGraphicsPipelineCreateData*)createData = _createData;
 	return SUCCESS_MPGX_RESULT;
 }
-static void onVkDestroy(void* _handle)
+static void onVkDestroy(
+	Window window,
+	void* _handle)
 {
+	assert(window);
 	Handle handle = _handle;
 
 	if (!handle)
 		return;
 
-	VkWindow vkWindow = getVkWindow(handle->vk.window);
+	VkWindow vkWindow = getVkWindow(window);
 	VkDevice device = vkWindow->device;
 
 	vkDestroyDescriptorPool(
@@ -319,6 +317,7 @@ static void onVkDestroy(void* _handle)
 }
 inline static MpgxResult createVkPipeline(
 	Framebuffer framebuffer,
+	Window window,
 	const char* name,
 	VkSampler sampler,
 	VkImageView imageView,
@@ -329,6 +328,7 @@ inline static MpgxResult createVkPipeline(
 	GraphicsPipeline* graphicsPipeline)
 {
 	assert(framebuffer);
+	assert(window);
 	assert(sampler);
 	assert(imageView);
 	assert(state);
@@ -367,7 +367,7 @@ inline static MpgxResult createVkPipeline(
 
 	if(vkResult != VK_SUCCESS)
 	{
-		onVkDestroy(handle);
+		onVkDestroy(window, handle);
 		return vkToMpgxResult(vkResult);
 	}
 
@@ -392,7 +392,7 @@ inline static MpgxResult createVkPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onVkDestroy(handle);
+		onVkDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -410,7 +410,7 @@ inline static MpgxResult createVkPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onVkDestroy(handle);
+		onVkDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -432,7 +432,7 @@ inline static MpgxResult createVkPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onVkDestroy(handle);
+		onVkDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -444,7 +444,6 @@ inline static MpgxResult createVkPipeline(
 static void onGlBind(GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
-
 	Handle handle = graphicsPipeline->gl.handle;
 
 	glUniform1i(handle->gl.textureLocation, 0);
@@ -457,7 +456,6 @@ static void onGlBind(GraphicsPipeline graphicsPipeline)
 static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 {
 	assert(graphicsPipeline);
-
 	Handle handle = graphicsPipeline->gl.handle;
 
 	glUniformMatrix4fv(
@@ -523,12 +521,16 @@ static MpgxResult onGlResize(
 	}
 	return SUCCESS_MPGX_RESULT;
 }
-static void onGlDestroy(void* handle)
+static void onGlDestroy(
+	Window window,
+	void* handle)
 {
+	assert(window);
 	free((Handle)handle);
 }
 inline static MpgxResult createGlPipeline(
 	Framebuffer framebuffer,
+	Window window,
 	const char* name,
 	const GraphicsPipelineState* state,
 	Handle handle,
@@ -537,6 +539,7 @@ inline static MpgxResult createGlPipeline(
 	GraphicsPipeline* graphicsPipeline)
 {
 	assert(framebuffer);
+	assert(window);
 	assert(state);
 	assert(handle);
 	assert(shaders);
@@ -561,7 +564,7 @@ inline static MpgxResult createGlPipeline(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
-		onGlDestroy(handle);
+		onGlDestroy(window, handle);
 		return mpgxResult;
 	}
 
@@ -610,21 +613,21 @@ inline static MpgxResult createGlPipeline(
 }
 #endif
 
-MpgxResult createTextureColorPipeline(
+MpgxResult createTexturePipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
 	Image texture,
 	Sampler sampler,
 	const GraphicsPipelineState* state,
-	GraphicsPipeline* textureColorPipeline)
+	GraphicsPipeline* texturePipeline)
 {
 	assert(framebuffer);
 	assert(vertexShader);
 	assert(fragmentShader);
 	assert(texture);
 	assert(sampler);
-	assert(textureColorPipeline);
+	assert(texturePipeline);
 	assert(vertexShader->base.type == VERTEX_SHADER_TYPE);
 	assert(fragmentShader->base.type == FRAGMENT_SHADER_TYPE);
 	assert(vertexShader->base.window == framebuffer->base.window);
@@ -637,8 +640,6 @@ MpgxResult createTextureColorPipeline(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
-	Window window = framebuffer->base.window;
-	handle->base.window = window;
 	handle->base.texture = texture;
 	handle->base.sampler = sampler;
 	handle->base.vpc.mvp = identMat4F;
@@ -647,7 +648,7 @@ MpgxResult createTextureColorPipeline(
 	handle->base.fpc.color = whiteLinearColor;
 
 #ifndef NDEBUG
-	const char* name = TEXTURE_COLOR_PIPELINE_NAME;
+	const char* name = TEXTURE_PIPELINE_NAME;
 #else
 	const char* name = NULL;
 #endif
@@ -692,6 +693,7 @@ MpgxResult createTextureColorPipeline(
 		fragmentShader,
 	};
 
+	Window window = framebuffer->base.window;
 	GraphicsAPI api = getGraphicsAPI();
 
 	if (api == VULKAN_GRAPHICS_API)
@@ -699,6 +701,7 @@ MpgxResult createTextureColorPipeline(
 #if MPGX_SUPPORT_VULKAN
 		return createVkPipeline(
 			framebuffer,
+			window,
 			name,
 			sampler->vk.handle,
 			texture->vk.imageView,
@@ -706,7 +709,7 @@ MpgxResult createTextureColorPipeline(
 			handle,
 			shaders,
 			2,
-			textureColorPipeline);
+			texturePipeline);
 #else
 		abort();
 #endif
@@ -717,12 +720,13 @@ MpgxResult createTextureColorPipeline(
 #if MPGX_SUPPORT_OPENGL
 		return createGlPipeline(
 			framebuffer,
+			window,
 			name,
 			state ? state : &defaultState,
 			handle,
 			shaders,
 			2,
-			textureColorPipeline);
+			texturePipeline);
 #else
 		abort();
 #endif
@@ -733,101 +737,101 @@ MpgxResult createTextureColorPipeline(
 	}
 }
 
-Image getTextureColorPipelineTexture(
-	GraphicsPipeline textureColorPipeline)
+Image getTexturePipelineTexture(
+	GraphicsPipeline texturePipeline)
 {
-	assert(textureColorPipeline);
-	assert(strcmp(textureColorPipeline->base.name,
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
-	Handle handle = textureColorPipeline->base.handle;
+	assert(texturePipeline);
+	assert(strcmp(texturePipeline->base.name,
+		TEXTURE_PIPELINE_NAME) == 0);
+	Handle handle = texturePipeline->base.handle;
 	return handle->base.texture;
 }
-Sampler getTextureColorPipelineSampler(
-	GraphicsPipeline textureColorPipeline)
+Sampler getTexturePipelineSampler(
+	GraphicsPipeline texturePipeline)
 {
-	assert(textureColorPipeline);
-	assert(strcmp(textureColorPipeline->base.name,
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
-	Handle handle = textureColorPipeline->base.handle;
+	assert(texturePipeline);
+	assert(strcmp(texturePipeline->base.name,
+		TEXTURE_PIPELINE_NAME) == 0);
+	Handle handle = texturePipeline->base.handle;
 	return handle->base.sampler;
 }
 
-Mat4F getTextureColorPipelineMvp(
-	GraphicsPipeline textureColorPipeline)
+Mat4F getTexturePipelineMvp(
+	GraphicsPipeline texturePipeline)
 {
-	assert(textureColorPipeline);
-	assert(strcmp(textureColorPipeline->base.name,
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
-	Handle handle = textureColorPipeline->base.handle;
+	assert(texturePipeline);
+	assert(strcmp(texturePipeline->base.name,
+		TEXTURE_PIPELINE_NAME) == 0);
+	Handle handle = texturePipeline->base.handle;
 	return handle->base.vpc.mvp;
 }
-void setTextureColorPipelineMvp(
-	GraphicsPipeline textureColorPipeline,
+void setTexturePipelineMvp(
+	GraphicsPipeline texturePipeline,
 	Mat4F mvp)
 {
-	assert(textureColorPipeline);
-	assert(strcmp(textureColorPipeline->base.name,
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
-	Handle handle = textureColorPipeline->base.handle;
+	assert(texturePipeline);
+	assert(strcmp(texturePipeline->base.name,
+		TEXTURE_PIPELINE_NAME) == 0);
+	Handle handle = texturePipeline->base.handle;
 	handle->base.vpc.mvp = mvp;
 }
 
-Vec2F getTextureColorPipelineSize(
-	GraphicsPipeline textureColorPipeline)
+Vec2F getTexturePipelineSize(
+	GraphicsPipeline texturePipeline)
 {
-	assert(textureColorPipeline);
-	assert(strcmp(textureColorPipeline->base.name,
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
-	Handle handle = textureColorPipeline->base.handle;
+	assert(texturePipeline);
+	assert(strcmp(texturePipeline->base.name,
+		TEXTURE_PIPELINE_NAME) == 0);
+	Handle handle = texturePipeline->base.handle;
 	return handle->base.vpc.size;
 }
-void setTextureColorPipelineSize(
-	GraphicsPipeline textureColorPipeline,
+void setTexturePipelineSize(
+	GraphicsPipeline texturePipeline,
 	Vec2F size)
 {
-	assert(textureColorPipeline);
-	assert(strcmp(textureColorPipeline->base.name,
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
-	Handle handle = textureColorPipeline->base.handle;
+	assert(texturePipeline);
+	assert(strcmp(texturePipeline->base.name,
+		TEXTURE_PIPELINE_NAME) == 0);
+	Handle handle = texturePipeline->base.handle;
 	handle->base.vpc.size = size;
 }
 
-Vec2F getTextureColorPipelineOffset(
-	GraphicsPipeline textureColorPipeline)
+Vec2F getTexturePipelineOffset(
+	GraphicsPipeline texturePipeline)
 {
-	assert(textureColorPipeline);
-	assert(strcmp(textureColorPipeline->base.name,
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
-	Handle handle = textureColorPipeline->base.handle;
+	assert(texturePipeline);
+	assert(strcmp(texturePipeline->base.name,
+		TEXTURE_PIPELINE_NAME) == 0);
+	Handle handle = texturePipeline->base.handle;
 	return handle->base.vpc.offset;
 }
-void setTextureColorPipelineOffset(
-	GraphicsPipeline textureColorPipeline,
+void setTexturePipelineOffset(
+	GraphicsPipeline texturePipeline,
 	Vec2F offset)
 {
-	assert(textureColorPipeline);
-	assert(strcmp( textureColorPipeline->base.name,
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
-	Handle handle = textureColorPipeline->base.handle;
+	assert(texturePipeline);
+	assert(strcmp( texturePipeline->base.name,
+		TEXTURE_PIPELINE_NAME) == 0);
+	Handle handle = texturePipeline->base.handle;
 	handle->base.vpc.offset = offset;
 }
 
-LinearColor getTextureColorPipelineColor(
-	GraphicsPipeline textureColorPipeline)
+LinearColor getTexturePipelineColor(
+	GraphicsPipeline texturePipeline)
 {
-	assert(textureColorPipeline);
-	assert(strcmp(textureColorPipeline->base.name,
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
-	Handle handle = textureColorPipeline->base.handle;
+	assert(texturePipeline);
+	assert(strcmp(texturePipeline->base.name,
+		TEXTURE_PIPELINE_NAME) == 0);
+	Handle handle = texturePipeline->base.handle;
 	return handle->base.fpc.color;
 }
-void setTextureColorPipelineColor(
-	GraphicsPipeline textureColorPipeline,
+void setTexturePipelineColor(
+	GraphicsPipeline texturePipeline,
 	LinearColor color)
 {
-	assert(textureColorPipeline);
-	assert(strcmp(textureColorPipeline->base.name,
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
-	Handle handle = textureColorPipeline->base.handle;
+	assert(texturePipeline);
+	assert(strcmp(texturePipeline->base.name,
+		TEXTURE_PIPELINE_NAME) == 0);
+	Handle handle = texturePipeline->base.handle;
 	handle->base.fpc.color = color;
 }

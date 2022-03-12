@@ -370,9 +370,9 @@ inline static bool isShouldDraw(
 	*element = renderElement;
 	return true;
 }
-static void onRenderUpdate(void* argument)
+static void onRendererDraw(void* argument)
 {
-	GraphicsRenderer renderer = argument;
+	GraphicsRenderer renderer = (GraphicsRenderer)argument;
 	GraphicsRender* renders = renderer->renders;
 	GraphicsRenderElement* renderElements =  renderer->renderElements;
 	bool useCulling = renderer->useCulling;
@@ -444,20 +444,19 @@ GraphicsRendererResult drawGraphicsRenderer(
 
 	size_t elementCount = 0;
 
-	if (threadPool && renderCount > getThreadPoolThreadCount(threadPool))
+	if (threadPool && renderCount >= getThreadPoolThreadCount(threadPool))
 	{
-		waitThreadPool(threadPool);
+		size_t threadCount = getThreadPoolThreadCount(threadPool);
+
 		renderer->data = data;
 		renderer->threadIndex = 0;
 		renderer->elementIndex = 0;
-
-		size_t threadCount = getThreadPoolThreadCount(threadPool);
 
 		for (size_t i = 0; i < threadCount; i++)
 		{
 			addThreadPoolTask(
 				threadPool,
-				onRenderUpdate,
+				onRendererDraw,
 				renderer);
 		}
 

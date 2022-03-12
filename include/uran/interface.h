@@ -18,6 +18,7 @@
 
 #include "cmmt/camera.h"
 #include "cmmt/bounding.h"
+#include "mpmt/thread_pool.h"
 
 /*
  * Interface structure.
@@ -83,11 +84,13 @@ static const InterfaceElementEvents emptyInterfaceElementEvents = {
  * window - window instance.
  * scale - interface scale multiplier.
  * capacity - initial interface element capacity or 0.
+ * threadPool - thread pool instance or NULL.
  */
 Interface createInterface(
 	Window window,
 	cmmt_float_t scale,
-	size_t capacity);
+	size_t capacity,
+	ThreadPool threadPool);
 /*
  * Destroys interface instance.
  * interface - interface instance or NULL.
@@ -99,6 +102,11 @@ void destroyInterface(Interface interface);
  * interface - interface instance.
  */
 Window getInterfaceWindow(Interface interface);
+/*
+ * Returns interface thread pool instance.
+ * interface - interface instance.
+ */
+ThreadPool getInterfaceThreadPool(Interface interface);
 /*
  * Returns interface element count.
  * interface - interface instance.

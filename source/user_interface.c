@@ -13,8 +13,6 @@
 // limitations under the License.
 
 #include "uran/user_interface.h"
-#include "uran/primitives/square_primitive.h"
-
 #include <string.h>
 
 #if _WIN32
@@ -32,8 +30,7 @@ struct UserInterface_T
 	Transformer transformer;
 	FontAtlas fontAtlas;
 	Interface interface;
-	GraphicsMesh squareMesh;
-	GraphicsRenderer spriteRenderer;
+	GraphicsRenderer panelRenderer;
 	GraphicsRenderer textRenderer;
 };
 
@@ -82,78 +79,9 @@ typedef UiLabelHandle_T* UiLabelHandle;
 typedef UiWindowHandle_T* UiWindowHandle;
 typedef UiButtonHandle_T* UiButtonHandle;
 
-inline static MpgxResult createSquareMesh(
-	Window window,
-	GraphicsMesh* squareMesh)
-{
-	assert(window);
-	assert(squareMesh);
-
-	Buffer vertexBuffer;
-
-	MpgxResult mpgxResult = createBuffer(
-		window,
-		VERTEX_BUFFER_TYPE,
-		GPU_ONLY_BUFFER_USAGE,
-		oneSquareVertices2D,
-		sizeof(oneSquareVertices2D),
-		&vertexBuffer);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-		return mpgxResult;
-
-	Buffer indexBuffer;
-
-	mpgxResult = createBuffer(
-		window,
-		INDEX_BUFFER_TYPE,
-		GPU_ONLY_BUFFER_USAGE,
-		triangleSquareIndices,
-		sizeof(triangleSquareIndices),
-		&indexBuffer);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-	{
-		destroyBuffer(vertexBuffer);
-		return mpgxResult;
-	}
-
-	GraphicsMesh mesh;
-
-	mpgxResult = createGraphicsMesh(
-		window,
-		UINT16_INDEX_TYPE,
-		sizeof(triangleSquareIndices) / sizeof(uint16_t),
-		0,
-		vertexBuffer,
-		indexBuffer,
-		&mesh);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-	{
-		destroyBuffer(vertexBuffer);
-		destroyBuffer(indexBuffer);
-		return mpgxResult;
-	}
-
-	*squareMesh = mesh;
-	return SUCCESS_MPGX_RESULT;
-}
-inline static void destroySquareMesh(GraphicsMesh squareMesh)
-{
-	if (!squareMesh)
-		return;
-
-	Buffer vertexBuffer = getGraphicsMeshVertexBuffer(squareMesh);
-	Buffer indexBuffer = getGraphicsMeshIndexBuffer(squareMesh);
-	destroyGraphicsMesh(squareMesh);
-	destroyBuffer(indexBuffer);
-	destroyBuffer(vertexBuffer);
-}
-
 MpgxResult createUserInterface(
 	Transformer transformer,
-	GraphicsPipeline spritePipeline,
+	GraphicsPipeline panelPipeline,
 	GraphicsPipeline textPipeline,
 	FontAtlas fontAtlas,
 	cmmt_float_t scale,
@@ -162,13 +90,13 @@ MpgxResult createUserInterface(
 	UserInterface* ui)
 {
 	assert(transformer);
-	assert(spritePipeline);
+	assert(panelPipeline);
 	assert(textPipeline);
 	assert(fontAtlas);
 	assert(scale > 0.0f);
 	assert(ui);
 
-	Window window = getGraphicsPipelineWindow(spritePipeline);
+	Window window = getGraphicsPipelineWindow(panelPipeline);
 
 	UserInterface userInterface = calloc(1,
 		sizeof(UserInterface_T));
@@ -183,7 +111,8 @@ MpgxResult createUserInterface(
 	Interface interface = createInterface(
 		window,
 		scale,
-		capacity);
+		capacity,
+		threadPool);
 
 	if (!interface)
 	{
@@ -193,20 +122,20 @@ MpgxResult createUserInterface(
 
 	userInterface->interface = interface;
 
-	GraphicsRenderer spriteRenderer = createSpriteRenderer(
-		spritePipeline,
+	GraphicsRenderer panelRenderer = createPanelRenderer(
+		panelPipeline,
 		DESCENDING_GRAPHICS_RENDER_SORTING,
 		false,
 		0,
 		threadPool);
 
-	if (!spriteRenderer)
+	if (!panelRenderer)
 	{
 		destroyUserInterface(userInterface);
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	userInterface->spriteRenderer = spriteRenderer;
+	userInterface->panelRenderer = panelRenderer;
 
 	GraphicsRenderer textRenderer = createTextRenderer(
 		textPipeline,
@@ -223,20 +152,6 @@ MpgxResult createUserInterface(
 
 	userInterface->textRenderer = textRenderer;
 
-	GraphicsMesh squareMesh;
-
-	MpgxResult mpgxResult = createSquareMesh(
-		window,
-		&squareMesh);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-	{
-		destroyUserInterface(userInterface);
-		return mpgxResult;
-	}
-
-	userInterface->squareMesh = squareMesh;
-
 	*ui = userInterface;
 	return SUCCESS_MPGX_RESULT;
 }
@@ -245,9 +160,8 @@ void destroyUserInterface(UserInterface ui)
 	if (!ui)
 		return;
 
-	destroySquareMesh(ui->squareMesh);
 	destroyGraphicsRenderer(ui->textRenderer);
-	destroyGraphicsRenderer(ui->spriteRenderer);
+	destroyGraphicsRenderer(ui->panelRenderer);
 	destroyInterface(ui->interface);
 	free(ui);
 }
@@ -257,10 +171,10 @@ Transformer getUserInterfaceTransformer(UserInterface ui)
 	assert(ui);
 	return ui->transformer;
 }
-GraphicsPipeline getUserInterfaceSpritePipeline(UserInterface ui)
+GraphicsPipeline getUserInterfacePanelPipeline(UserInterface ui)
 {
 	assert(ui);
-	return getGraphicsRendererPipeline(ui->spriteRenderer);
+	return getGraphicsRendererPipeline(ui->panelRenderer);
 }
 GraphicsPipeline getUserInterfaceTextPipeline(UserInterface ui)
 {
@@ -299,11 +213,9 @@ GraphicsRendererResult drawUserInterface(UserInterface ui)
 		view, camera, false);
 
 	tmpResult = drawGraphicsRenderer(
-		ui->spriteRenderer,
+		ui->panelRenderer,
 		&data);
 	result = addGraphicsRendererResult(result, tmpResult);
-
-	// TODO: only bind vertex/index buffer once, and then just send draw commands
 
 	tmpResult = drawGraphicsRenderer(
 		ui->textRenderer,
@@ -334,7 +246,6 @@ MpgxResult createUiPanel(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	LinearColor color,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* _handle,
@@ -373,12 +284,11 @@ MpgxResult createUiPanel(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	GraphicsRender render = createSpriteRender(
-		ui->spriteRenderer,
+	GraphicsRender render = createPanelRender(
+		ui->panelRenderer,
 		transform,
 		oneSizeBox3F,
-		color,
-		ui->squareMesh);
+		srgbToLinearColor(DEFAULT_UI_PANEL_COLOR));
 
 	if (!render)
 	{
@@ -416,6 +326,7 @@ MpgxResult createUiPanel(
 	*uiPanel = element;
 	return SUCCESS_MPGX_RESULT;
 }
+
 void* getUiPanelHandle(InterfaceElement panel)
 {
 	assert(panel);
@@ -631,6 +542,7 @@ MpgxResult createUiLabel(
 	free(string32);
 	return mpgxResult;
 }
+
 void* getUiLabelHandle(InterfaceElement label)
 {
 	assert(label);
@@ -744,10 +656,6 @@ MpgxResult createUiWindow32(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	cmmt_float_t barHeight,
-	cmmt_float_t titleHeight,
-	LinearColor barColor,
-	LinearColor panelColor,
 	SrgbColor titleColor,
 	Transform parent,
 	const InterfaceElementEvents* events,
@@ -761,8 +669,6 @@ MpgxResult createUiWindow32(
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(scale.x > 0.0f);
 	assert(scale.y > 0.0f);
-	assert(barHeight > 0.0f);
-	assert(titleHeight > 0.0f);
 	assert(uiWindow);
 
 	assert(!parent || (parent && ui->transformer ==
@@ -780,13 +686,15 @@ MpgxResult createUiWindow32(
 	handle->isDragging = false;
 
 	Transformer transformer = ui->transformer;
-	GraphicsRenderer spriteRenderer = ui->spriteRenderer;
-	GraphicsMesh squareMesh = ui->squareMesh;
+	GraphicsRenderer panelRenderer = ui->panelRenderer;
 
 	Transform barTransform = createTransform(
 		transformer,
 		zeroVec3F,
-		vec3F(scale.x, barHeight, (cmmt_float_t)1.0),
+		vec3F(
+			scale.x,
+			DEFAULT_UI_BAR_HEIGHT,
+			(cmmt_float_t)1.0),
 		oneQuat,
 		NO_ROTATION_TYPE,
 		parent,
@@ -798,12 +706,11 @@ MpgxResult createUiWindow32(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	GraphicsRender barRender = createSpriteRender(
-		spriteRenderer,
+	GraphicsRender barRender = createPanelRender(
+		panelRenderer,
 		barTransform,
 		oneSizeBox3F,
-		barColor,
-		squareMesh);
+		srgbToLinearColor(DEFAULT_UI_BAR_COLOR));
 
 	if (!barRender)
 	{
@@ -819,7 +726,7 @@ MpgxResult createUiWindow32(
 		vec3F(
 			(cmmt_float_t)0.0,
 			-(scale.y * (cmmt_float_t)0.5 +
-				barHeight * (cmmt_float_t)0.5),
+				DEFAULT_UI_BAR_HEIGHT * (cmmt_float_t)0.5),
 			(cmmt_float_t)0.0),
 		vec3F(
 			scale.x,
@@ -836,12 +743,11 @@ MpgxResult createUiWindow32(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	GraphicsRender panelRender = createSpriteRender(
-		spriteRenderer,
+	GraphicsRender panelRender = createPanelRender(
+		panelRenderer,
 		panelTransform,
 		oneSizeBox3F,
-		panelColor,
-		squareMesh);
+		srgbToLinearColor(DEFAULT_UI_PANEL_COLOR));
 
 	if (!panelRender)
 	{
@@ -859,8 +765,8 @@ MpgxResult createUiWindow32(
 			(cmmt_float_t)0.0,
 			(cmmt_float_t)-0.001),
 		vec3F(
-			titleHeight,
-			titleHeight,
+			DEFAULT_UI_TEXT_HEIGHT,
+			DEFAULT_UI_TEXT_HEIGHT,
 			(cmmt_float_t)1.0),
 		oneQuat,
 		NO_ROTATION_TYPE,
@@ -953,10 +859,6 @@ MpgxResult createUiWindow(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	cmmt_float_t barHeight,
-	cmmt_float_t titleHeight,
-	LinearColor barColor,
-	LinearColor panelColor,
 	SrgbColor titleColor,
 	Transform parent,
 	const InterfaceElementEvents* events,
@@ -970,8 +872,6 @@ MpgxResult createUiWindow(
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(scale.x > 0.0f);
 	assert(scale.y > 0.0f);
-	assert(barHeight > 0.0f);
-	assert(titleHeight > 0.0f);
 	assert(uiWindow);
 
 	assert(!parent || (parent && ui->transformer ==
@@ -996,10 +896,6 @@ MpgxResult createUiWindow(
 		alignment,
 		position,
 		scale,
-		barHeight,
-		titleHeight,
-		barColor,
-		panelColor,
 		titleColor,
 		parent,
 		events,
@@ -1010,6 +906,7 @@ MpgxResult createUiWindow(
 	free(title32);
 	return mpgxResult;
 }
+
 void* getUiWindowHandle(InterfaceElement window)
 {
 	assert(window);
@@ -1046,13 +943,31 @@ GraphicsRender getUiWindowTitleRender(InterfaceElement window)
 		getInterfaceElementHandle(window);
 	return handle->titleRender;
 }
+OnInterfaceElementEvent getUiWindowOnUpdateEvent(InterfaceElement window)
+{
+	assert(window);
+	assert(strcmp(getInterfaceElementName(
+		window), UI_WINDOW_NAME) == 0);
+	UiWindowHandle handle =
+		getInterfaceElementHandle(window);
+	return handle->onUpdate;
+}
+OnInterfaceElementEvent getUiWindowOnPressEvent(InterfaceElement window)
+{
+	assert(window);
+	assert(strcmp(getInterfaceElementName(
+		window), UI_WINDOW_NAME) == 0);
+	UiWindowHandle handle =
+		getInterfaceElementHandle(window);
+	return handle->onPress;
+}
 
 static void onUiButtonDisable(InterfaceElement element)
 {
 	assert(element);
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
-	setSpriteRenderColor(
+	setPanelRenderColor(
 		handle->panelRender,
 		handle->disabledColor);
 	if (handle->onDisable)
@@ -1063,7 +978,7 @@ static void onUiButtonEnable(InterfaceElement element)
 	assert(element);
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
-	setSpriteRenderColor(
+	setPanelRenderColor(
 		handle->panelRender,
 		handle->enabledColor);
 	if (handle->onEnable)
@@ -1074,7 +989,7 @@ static void onUiButtonEnter(InterfaceElement element)
 	assert(element);
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
-	setSpriteRenderColor(
+	setPanelRenderColor(
 		handle->panelRender,
 		handle->hoveredColor);
 	if (handle->onEnter)
@@ -1085,7 +1000,7 @@ static void onUiButtonExit(InterfaceElement element)
 	assert(element);
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
-	setSpriteRenderColor(
+	setPanelRenderColor(
 		handle->panelRender,
 		handle->enabledColor);
 	if (handle->onExit)
@@ -1097,7 +1012,7 @@ static void onUiButtonPress(InterfaceElement element)
 	assert(element);
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
-	setSpriteRenderColor(
+	setPanelRenderColor(
 		handle->panelRender,
 		handle->pressedColor);
 	if (handle->onPress)
@@ -1109,7 +1024,7 @@ static void onUiButtonRelease(InterfaceElement element)
 	assert(element);
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
-	setSpriteRenderColor(
+	setPanelRenderColor(
 		handle->panelRender,
 		handle->hoveredColor);
 	if (handle->isPressed && handle->onRelease)
@@ -1151,7 +1066,6 @@ MpgxResult createUiButton32(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	cmmt_float_t textHeight,
 	LinearColor disabledColor,
 	LinearColor enabledColor,
 	LinearColor hoveredColor,
@@ -1170,7 +1084,6 @@ MpgxResult createUiButton32(
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(scale.x > 0.0f);
 	assert(scale.y > 0.0f);
-	assert(textHeight > 0.0f);
 	assert(uiButton);
 
 	assert(!parent || (parent && ui->transformer ==
@@ -1206,12 +1119,11 @@ MpgxResult createUiButton32(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	GraphicsRender panelRender = createSpriteRender(
-		ui->spriteRenderer,
+	GraphicsRender panelRender = createPanelRender(
+		ui->panelRenderer,
 		panelTransform,
 		oneSizeBox3F,
-		enabledColor,
-		ui->squareMesh);
+		enabledColor);
 
 	if (!panelRender)
 	{
@@ -1229,8 +1141,8 @@ MpgxResult createUiButton32(
 			(cmmt_float_t)0.0,
 			(cmmt_float_t)-0.001),
 		vec3F(
-			textHeight,
-			textHeight,
+			DEFAULT_UI_TEXT_HEIGHT,
+			DEFAULT_UI_TEXT_HEIGHT,
 			(cmmt_float_t)1.0),
 		oneQuat,
 		NO_ROTATION_TYPE,
@@ -1331,7 +1243,6 @@ MpgxResult createUiButton(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	cmmt_float_t textHeight,
 	LinearColor disabledColor,
 	LinearColor enabledColor,
 	LinearColor hoveredColor,
@@ -1350,7 +1261,6 @@ MpgxResult createUiButton(
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(scale.x > 0.0f);
 	assert(scale.y > 0.0f);
-	assert(textHeight > 0.0f);
 	assert(uiButton);
 
 	assert(!parent || (parent && ui->transformer ==
@@ -1375,7 +1285,6 @@ MpgxResult createUiButton(
 		alignment,
 		position,
 		scale,
-		textHeight,
 		disabledColor,
 		enabledColor,
 		hoveredColor,
@@ -1417,4 +1326,58 @@ GraphicsRender getUiButtonTextRender(InterfaceElement button)
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
 	return handle->textRender;
+}
+OnInterfaceElementEvent getUiButtonOnEnableEvent(InterfaceElement button)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	return handle->onEnable;
+}
+OnInterfaceElementEvent getUiButtonOnDisableEvent(InterfaceElement button)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	return handle->onDisable;
+}
+OnInterfaceElementEvent getUiButtonOnEnterEvent(InterfaceElement button)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	return handle->onEnter;
+}
+OnInterfaceElementEvent getUiButtonOnExitEvent(InterfaceElement button)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	return handle->onExit;
+}
+OnInterfaceElementEvent getUiButtonOnPressEvent(InterfaceElement button)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	return handle->onPress;
+}
+OnInterfaceElementEvent getUiButtonOnReleaseEvent(InterfaceElement button)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	return handle->onRelease;
 }

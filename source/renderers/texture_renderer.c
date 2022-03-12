@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "uran/renderers/texture_color_renderer.h"
+#include "uran/renderers/texture_renderer.h"
 
 #include <string.h>
 #include <assert.h>
@@ -47,38 +47,38 @@ static size_t onDraw(
 	Mat4F mvp = dotMat4F(
 		*viewProj,
 		*model);
-	setTextureColorPipelineMvp(
+	setTexturePipelineMvp(
 		graphicsPipeline,
 		mvp);
-	setTextureColorPipelineColor(
+	setTexturePipelineColor(
 		graphicsPipeline,
 		handle->color);
-	setTextureColorPipelineSize(
+	setTexturePipelineSize(
 		graphicsPipeline,
 		handle->size);
-	setTextureColorPipelineOffset(
+	setTexturePipelineOffset(
 		graphicsPipeline,
 		handle->offset);
 	return drawGraphicsMesh(
 		graphicsPipeline,
 		handle->mesh);
 }
-GraphicsRenderer createTextureColorRenderer(
-	GraphicsPipeline textureColorPipeline,
+GraphicsRenderer createTextureRenderer(
+	GraphicsPipeline texturePipeline,
 	GraphicsRenderSorting sorting,
 	bool useCulling,
 	size_t capacity,
 	ThreadPool threadPool)
 {
-	assert(textureColorPipeline);
+	assert(texturePipeline);
 	assert(sorting < GRAPHICS_RENDER_SORTING_COUNT);
 
 	assert(strcmp(getGraphicsPipelineName(
-		textureColorPipeline),
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
+		texturePipeline),
+		TEXTURE_PIPELINE_NAME) == 0);
 
 	return createGraphicsRenderer(
-		textureColorPipeline,
+		texturePipeline,
 		sorting,
 		useCulling,
 		onDestroy,
@@ -86,8 +86,8 @@ GraphicsRenderer createTextureColorRenderer(
 		capacity,
 		threadPool);
 }
-GraphicsRender createTextureColorRender(
-	GraphicsRenderer textureColorRenderer,
+GraphicsRender createTextureRender(
+	GraphicsRenderer textureRenderer,
 	Transform transform,
 	Box3F bounds,
 	LinearColor color,
@@ -95,18 +95,18 @@ GraphicsRender createTextureColorRender(
 	Vec2F offset,
 	GraphicsMesh mesh)
 {
-	assert(textureColorRenderer);
+	assert(textureRenderer);
 	assert(transform);
 	assert(mesh);
 
 	assert(getGraphicsPipelineWindow(
 		getGraphicsRendererPipeline(
-		textureColorRenderer)) ==
+		textureRenderer)) ==
 		getGraphicsMeshWindow(mesh));
 	assert(strcmp(getGraphicsPipelineName(
 		getGraphicsRendererPipeline(
-		textureColorRenderer)),
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
+		textureRenderer)),
+		TEXTURE_PIPELINE_NAME) == 0);
 
 	Handle handle = calloc(1, sizeof(Handle_T));
 
@@ -119,7 +119,7 @@ GraphicsRender createTextureColorRender(
 	handle->mesh = mesh;
 
 	GraphicsRender render = createGraphicsRender(
-		textureColorRenderer,
+		textureRenderer,
 		transform,
 		bounds,
 		handle);
@@ -141,7 +141,7 @@ LinearColor getTexColRenderColor(
 		getGraphicsRendererPipeline(
 		getGraphicsRenderRenderer(
 		textureSpriteRender))),
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
+		TEXTURE_PIPELINE_NAME) == 0);
 	Handle handle = getGraphicsRenderHandle(
 		textureSpriteRender);
 	return handle->color;
@@ -155,7 +155,7 @@ void setTexColRenderColor(
 		getGraphicsRendererPipeline(
 		getGraphicsRenderRenderer(
 		textureSpriteRender))),
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
+		TEXTURE_PIPELINE_NAME) == 0);
 	Handle handle = getGraphicsRenderHandle(
 		textureSpriteRender);
 	handle->color = color;
@@ -169,7 +169,7 @@ Vec2F getTexColRenderSize(
 		getGraphicsRendererPipeline(
 		getGraphicsRenderRenderer(
 		textureSpriteRender))),
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
+		TEXTURE_PIPELINE_NAME) == 0);
 	Handle handle = getGraphicsRenderHandle(
 		textureSpriteRender);
 	return handle->size;
@@ -183,7 +183,7 @@ void setTexColRenderSize(
 		getGraphicsRendererPipeline(
 		getGraphicsRenderRenderer(
 		textureSpriteRender))),
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
+		TEXTURE_PIPELINE_NAME) == 0);
 	Handle handle = getGraphicsRenderHandle(
 		textureSpriteRender);
 	handle->size = size;
@@ -197,7 +197,7 @@ Vec2F getTexColRenderOffset(
 		getGraphicsRendererPipeline(
 		getGraphicsRenderRenderer(
 		textureSpriteRender))),
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
+		TEXTURE_PIPELINE_NAME) == 0);
 	Handle handle = getGraphicsRenderHandle(
 		textureSpriteRender);
 	return handle->offset;
@@ -211,7 +211,7 @@ void setTexColRenderOffset(
 		getGraphicsRendererPipeline(
 		getGraphicsRenderRenderer(
 		textureSpriteRender))),
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
+		TEXTURE_PIPELINE_NAME) == 0);
 	Handle handle = getGraphicsRenderHandle(
 		textureSpriteRender);
 	handle->offset = offset;
@@ -225,7 +225,7 @@ GraphicsMesh getTexColRenderMesh(
 		getGraphicsRendererPipeline(
 		getGraphicsRenderRenderer(
 		textureSpriteRender))),
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
+		TEXTURE_PIPELINE_NAME) == 0);
 	Handle handle = getGraphicsRenderHandle(
 		textureSpriteRender);
 	return handle->mesh;
@@ -240,7 +240,7 @@ void setTexColRenderMesh(
 		getGraphicsRendererPipeline(
 		getGraphicsRenderRenderer(
 		textureSpriteRender))),
-		TEXTURE_COLOR_PIPELINE_NAME) == 0);
+		TEXTURE_PIPELINE_NAME) == 0);
 	Handle handle = getGraphicsRenderHandle(
 		textureSpriteRender);
 	handle->mesh = mesh;
