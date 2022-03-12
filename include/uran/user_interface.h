@@ -234,9 +234,9 @@ GraphicsRender getUiLabelRender(InterfaceElement label);
  * scale - window scale.
  * titleColor - window title color.
  * parent - parent instance or NULL.
- * isActive - is window active.
  * events - interface events or NULL.
  * handle - window handle or NULL.
+ * isActive - is window active.
  * uiPanel - pointer to the UI window.
  */
 MpgxResult createUiWindow32(
@@ -314,6 +314,24 @@ OnInterfaceElementEvent getUiWindowOnUpdateEvent(InterfaceElement window);
  */
 OnInterfaceElementEvent getUiWindowOnPressEvent(InterfaceElement window);
 
+/*
+ * Create a new UTF-32 UI button instance.
+ * Returns operation MPGX result.
+ *
+ * ui - user interface instance.
+ * text - text string.
+ * textLength - text string length.
+ * alignment - alignment type.
+ * position - button position.
+ * scale - button scale.
+ * textColor - button text color.
+ * parent - parent instance or NULL.
+ * events - interface events or NULL.
+ * handle - button handle or NULL.
+ * isEnabled - is button enabled.
+ * isActive - is button active.
+ * uiButton - pointer to the UI button.
+ */
 MpgxResult createUiButton32(
 	UserInterface ui,
 	const uint32_t* text,
@@ -321,10 +339,6 @@ MpgxResult createUiButton32(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	LinearColor disabledColor, // TODO: set defautl, use getters/setters instead, also add events setters (for window too)
-	LinearColor enabledColor,
-	LinearColor hoveredColor,
-	LinearColor pressedColor,
 	SrgbColor textColor,
 	Transform parent,
 	const InterfaceElementEvents* events,
@@ -332,6 +346,24 @@ MpgxResult createUiButton32(
 	bool isEnabled,
 	bool isActive,
 	InterfaceElement* uiButton);
+/*
+ * Create a new UTF-8 UI button instance.
+ * Returns operation MPGX result.
+ *
+ * ui - user interface instance.
+ * text - text string.
+ * textLength - text string length.
+ * alignment - alignment type.
+ * position - button position.
+ * scale - button scale.
+ * textColor - button text color.
+ * parent - parent instance or NULL.
+ * events - interface events or NULL.
+ * handle - button handle or NULL.
+ * isEnabled - is button enabled.
+ * isActive - is button active.
+ * uiButton - pointer to the UI button.
+ */
 MpgxResult createUiButton(
 	UserInterface ui,
 	const char* text,
@@ -339,10 +371,6 @@ MpgxResult createUiButton(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	LinearColor disabledColor,
-	LinearColor enabledColor,
-	LinearColor hoveredColor,
-	LinearColor pressedColor,
 	SrgbColor textColor,
 	Transform parent,
 	const InterfaceElementEvents* events,
@@ -395,3 +423,67 @@ OnInterfaceElementEvent getUiButtonOnPressEvent(InterfaceElement button);
  * button - UI button instance.
  */
 OnInterfaceElementEvent getUiButtonOnReleaseEvent(InterfaceElement button);
+
+/*
+ * Returns UI button enabled color.
+ * button - UI button instance.
+ */
+LinearColor getUiButtonEnabledColor(
+	InterfaceElement button);
+/*
+ * Sets UI button enabled color.
+ *
+ * button - UI button instance.
+ * color - color value.
+ */
+void setUiButtonEnabledColor(
+	InterfaceElement button,
+	LinearColor color);
+
+/*
+ * Returns UI button disabled color.
+ * button - UI button instance.
+ */
+LinearColor getUiButtonDisabledColor(
+	InterfaceElement button);
+/*
+ * Sets UI button disabled color.
+ *
+ * button - UI button instance.
+ * color - color value.
+ */
+void setUiButtonDisabledColor(
+	InterfaceElement button,
+	LinearColor color);
+
+/*
+ * Returns UI button hovered color.
+ * button - UI button instance.
+ */
+LinearColor getUiButtonHoveredColor(
+	InterfaceElement button);
+/*
+ * Sets UI button hovered color.
+ *
+ * button - UI button instance.
+ * color - color value.
+ */
+void setUiButtonHoveredColor(
+	InterfaceElement button,
+	LinearColor color);
+
+/*
+ * Returns UI button pressed color.
+ * button - UI button instance.
+ */
+LinearColor getUiButtonPressedColor(
+	InterfaceElement button);
+/*
+ * Sets UI button pressed color.
+ *
+ * button - UI button instance.
+ * color - color value.
+ */
+void setUiButtonPressedColor(
+	InterfaceElement button,
+	LinearColor color);

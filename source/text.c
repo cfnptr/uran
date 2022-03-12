@@ -1787,11 +1787,16 @@ inline static void internalDestroyText(Text text)
 
 	if (api == VULKAN_GRAPHICS_API)
 	{
+#if MPGX_SUPPORT_VULKAN
 		destroyBuffer(text->vk.vertexBuffer);
+#else
+		abort();
+#endif
 	}
 	else if (api == OPENGL_GRAPHICS_API ||
 		api == OPENGL_ES_GRAPHICS_API)
 	{
+#if MPGX_SUPPORT_OPENGL
 		GraphicsMesh mesh = text->gl.mesh;
 
 		if (mesh)
@@ -1800,6 +1805,9 @@ inline static void internalDestroyText(Text text)
 			destroyGraphicsMesh(mesh);
 			destroyBuffer(vertexBuffer);
 		}
+#else
+		abort();
+#endif
 	}
 	else
 	{

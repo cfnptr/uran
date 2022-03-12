@@ -1066,10 +1066,6 @@ MpgxResult createUiButton32(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	LinearColor disabledColor,
-	LinearColor enabledColor,
-	LinearColor hoveredColor,
-	LinearColor pressedColor,
 	SrgbColor textColor,
 	Transform parent,
 	const InterfaceElementEvents* events,
@@ -1096,10 +1092,10 @@ MpgxResult createUiButton32(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
 	handle->handle = _handle;
-	handle->disabledColor = disabledColor;
-	handle->enabledColor = enabledColor;
-	handle->hoveredColor = hoveredColor;
-	handle->pressedColor = pressedColor;
+	handle->disabledColor = srgbToLinearColor(DEFAULT_UI_DISABLED_BUTTON_COLOR);
+	handle->enabledColor = srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR);
+	handle->hoveredColor = srgbToLinearColor(DEFAULT_UI_HOVERED_BUTTON_COLOR);
+	handle->pressedColor = srgbToLinearColor(DEFAULT_UI_PRESSED_BUTTON_COLOR);
 	handle->isPressed = false;
 
 	Transformer transformer = ui->transformer;
@@ -1123,7 +1119,7 @@ MpgxResult createUiButton32(
 		ui->panelRenderer,
 		panelTransform,
 		oneSizeBox3F,
-		enabledColor);
+		srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR));
 
 	if (!panelRender)
 	{
@@ -1243,10 +1239,6 @@ MpgxResult createUiButton(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	LinearColor disabledColor,
-	LinearColor enabledColor,
-	LinearColor hoveredColor,
-	LinearColor pressedColor,
 	SrgbColor textColor,
 	Transform parent,
 	const InterfaceElementEvents* events,
@@ -1285,10 +1277,6 @@ MpgxResult createUiButton(
 		alignment,
 		position,
 		scale,
-		disabledColor,
-		enabledColor,
-		hoveredColor,
-		pressedColor,
 		textColor,
 		parent,
 		events,
@@ -1380,4 +1368,92 @@ OnInterfaceElementEvent getUiButtonOnReleaseEvent(InterfaceElement button)
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
 	return handle->onRelease;
+}
+
+LinearColor getUiButtonEnabledColor(
+	InterfaceElement button)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	return handle->enabledColor;
+}
+void setUiButtonEnabledColor(
+	InterfaceElement button,
+	LinearColor color)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	handle->enabledColor = color;
+}
+
+LinearColor getUiButtonDisabledColor(
+	InterfaceElement button)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	return handle->disabledColor;
+}
+void setUiButtonDisabledColor(
+	InterfaceElement button,
+	LinearColor color)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	handle->disabledColor = color;
+}
+
+LinearColor getUiButtonHoveredColor(
+	InterfaceElement button)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	return handle->hoveredColor;
+}
+void setUiButtonHoveredColor(
+	InterfaceElement button,
+	LinearColor color)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	handle->hoveredColor = color;
+}
+
+LinearColor getUiButtonPressedColor(
+	InterfaceElement button)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	return handle->pressedColor;
+}
+void setUiButtonPressedColor(
+	InterfaceElement button,
+	LinearColor color)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	handle->pressedColor = color;
 }
