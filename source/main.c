@@ -66,10 +66,16 @@ MAIN_FUNCTION
 
 	if (logyResult != SUCCESS_LOGY_RESULT)
 	{
-		printf("Failed to create logger. (error: %s)\n",
+		fprintf(stderr,
+			"Failed to create logger. (error: %s)\n",
 			logyResultToString(logyResult));
 		return EXIT_FAILURE;
 	}
+
+#if CREATE_EDITOR
+	logMessage(logger, INFO_LOG_LEVEL,
+		"Uran - Editor (v" URAN_VERSION_STRING ")");
+#endif
 
 	logMessage(logger, INFO_LOG_LEVEL,
 #if __linux__
@@ -79,6 +85,7 @@ MAIN_FUNCTION
 #elif _WIN32
 		"OS: Windows.");
 #else
+		"OS: Unknown.");
 #error Unknown operating system
 #endif
 

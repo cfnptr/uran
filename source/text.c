@@ -64,7 +64,6 @@ struct FontAtlas_T
 	Image atlasImage;
 	uint32_t fontSize;
 	float newLineAdvance;
-	bool isConstant;
 #if MPGX_SUPPORT_VULKAN
 	uint8_t _alignment[3];
 	VkDescriptorPool descriptorPool;
@@ -957,7 +956,6 @@ MpgxResult createFontAtlas(
 	uint32_t fontSize,
 	const uint32_t* chars,
 	size_t charCount,
-	bool isConstant,
 	Logger logger,
 	FontAtlas* fontAtlas)
 {
@@ -982,7 +980,6 @@ MpgxResult createFontAtlas(
 
 	fontAtlasInstance->pipeline = textPipeline;
 	fontAtlasInstance->fontSize = fontSize;
-	fontAtlasInstance->isConstant = isConstant;
 
 	FT_Face defaultFace = regularFonts[0]->face;
 
@@ -1209,7 +1206,7 @@ MpgxResult createFontAtlas(
 			(cmmt_int_t)pixelLength,
 			1),
 		1,
-		isConstant,
+		true,
 		&atlasImage);
 
 	free(pixels);
@@ -1280,7 +1277,6 @@ MpgxResult createAsciiFontAtlas(
 	Font* boldItalicFonts,
 	size_t fontCount,
 	uint32_t fontSize,
-	bool isConstant,
 	Logger logger,
 	FontAtlas* fontAtlas)
 {
@@ -1295,7 +1291,6 @@ MpgxResult createAsciiFontAtlas(
 	assert(fontSize % 2 == 0);
 	assert(textInitialized);
 
-
 	return createFontAtlas(
 		textPipeline,
 		regularFonts,
@@ -1306,7 +1301,6 @@ MpgxResult createAsciiFontAtlas(
 		fontSize,
 		printableAscii32,
 		sizeof(printableAscii32) / sizeof(uint32_t),
-		isConstant,
 		logger,
 		fontAtlas);
 }
@@ -1385,12 +1379,6 @@ uint32_t getFontAtlasFontSize(FontAtlas fontAtlas)
 	assert(fontAtlas);
 	assert(textInitialized);
 	return fontAtlas->fontSize;
-}
-bool isFontAtlasConstant(FontAtlas fontAtlas)
-{
-	assert(fontAtlas);
-	assert(textInitialized);
-	return fontAtlas->isConstant;
 }
 
 inline static bool fillVertices(
@@ -1752,7 +1740,7 @@ inline static bool fillVertices(
 	}
 
 	*vertexCount = vertexIndex;
-	*textSize = vec2F(sizeX, sizeY);
+	*textSize = vec2F(sizeX, sizeY + newLineAdvance * 0.25f);
 	return true;
 }
 inline static uint32_t* createIndices(uint32_t indexCount)
@@ -1888,10 +1876,9 @@ MpgxResult createAtlasText32(
 
 	Buffer vertexBuffer;
 
-	MpgxResult mpgxResult = createBuffer(
-		window,
+	MpgxResult mpgxResult = createBuffer(window,
 		VERTEX_BUFFER_TYPE,
-		isConstant ? CPU_TO_GPU_BUFFER_USAGE : GPU_ONLY_BUFFER_USAGE,
+		isConstant ? GPU_ONLY_BUFFER_USAGE : CPU_TO_GPU_BUFFER_USAGE,
 		vertices,
 		vertexCount * sizeof(TextVertex),
 		&vertexBuffer);
@@ -2069,385 +2056,6 @@ MpgxResult createAtlasText(
 	return mpgxResult;
 }
 
-/*MpgxResult createText32(
-	GraphicsPipeline textPipeline,
-	Font font,
-	uint32_t fontSize,
-	AlignmentType alignment,
-	const uint32_t* _data,
-	size_t dataLength,
-	bool isConstant,
-	Text* text)
-{
-	assert(textPipeline);
-	assert(font);
-	assert(fontSize > 0);
-	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(_data);
-	assert(dataLength > 0);
-	assert(text);
-
-	assert(strcmp(textPipeline->base.name,
-		TEXT_PIPELINE_NAME) == 0);
-
-	Text textInstance = malloc(sizeof(Text_T));
-
-	if (!textInstance)
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
-
-	uint32_t* data = malloc(
-		dataLength * sizeof(uint32_t));
-
-	if (!data)
-	{
-		free(text);
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
-	}
-
-	memcpy(data, _data,
-		dataLength * sizeof(uint32_t));
-
-	Glyph* glyphs;
-	size_t glyphCount;
-
-	MpgxResult mpgxResult = createGlyphs(
-		_data,
-		dataLength,
-		&glyphs,
-		&glyphCount);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-	{
-		free(data);
-		free(text);
-		return mpgxResult;
-	}
-
-	FT_Face face = font->face;
-
-	FT_Error ftResult = FT_Set_Pixel_Sizes(
-		face,
-		0,
-		(FT_UInt)fontSize);
-
-	if (ftResult != 0)
-	{
-		free(glyphs);
-		free(data);
-		free(text);
-		return UNKNOWN_ERROR_MPGX_RESULT;
-	}
-
-	float newLineAdvance =
-		((float)face->size->metrics.height / 64.0f) /
-		(float)fontSize;
-
-	uint8_t* pixels;
-	size_t pixelCount;
-	uint32_t pixelLength;
-
-	bool result = true;
-
-	if (!result)
-	{
-		free(glyphs);
-		free(data);
-		free(text);
-		return UNKNOWN_ERROR_MPGX_RESULT;
-	}
-
-	Window window = textPipeline->base.framebuffer->base.window;
-
-	Image texture;
-
-	mpgxResult = createImage(
-		window,
-		SAMPLED_IMAGE_TYPE,
-		IMAGE_2D,
-		R8_UNORM_IMAGE_FORMAT,
-		(const void**)&pixels,
-		vec3I(pixelLength, pixelLength, 1),
-		1,
-		isConstant,
-		&texture);
-
-	free(pixels);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-	{
-		free(glyphs);
-		free(data);
-		free(text);
-		return mpgxResult;
-	}
-
-	float* vertices;
-	size_t vertexCount;
-	Vec2F textSize;
-
-	result = createTextVertices(
-		data,
-		dataLength,
-		glyphs,
-		glyphCount,
-		newLineAdvance,
-		alignment,
-		&vertices,
-		&vertexCount,
-		&textSize);
-
-	free(glyphs);
-
-	if (!result)
-	{
-		destroyImage(texture);
-		free(data);
-		free(text);
-		return UNKNOWN_ERROR_MPGX_RESULT;
-	}
-
-	Buffer vertexBuffer;
-
-	mpgxResult = createBuffer(
-		window,
-		VERTEX_BUFFER_TYPE,
-		isConstant ?
-			GPU_ONLY_BUFFER_USAGE :
-			CPU_TO_GPU_BUFFER_USAGE,
-		vertices,
-		vertexCount * sizeof(float),
-		&vertexBuffer);
-
-	free(vertices);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-	{
-		destroyImage(texture);
-		free(data);
-		free(text);
-		return mpgxResult;
-	}
-
-	uint32_t* indices;
-	size_t indexCount;
-
-	result = createTextIndices(
-		vertexCount,
-		&indices,
-		&indexCount);
-
-	if (!result)
-	{
-		destroyBuffer(vertexBuffer);
-		destroyImage(texture);
-		free(data);
-		free(text);
-		return UNKNOWN_ERROR_MPGX_RESULT;
-	}
-
-	Buffer indexBuffer;
-
-	mpgxResult = createBuffer(
-		window,
-		INDEX_BUFFER_TYPE,
-		isConstant ?
-			GPU_ONLY_BUFFER_USAGE :
-			CPU_TO_GPU_BUFFER_USAGE,
-		indices,
-		indexCount * sizeof(uint32_t),
-		&indexBuffer);
-
-	free(indices);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-	{
-		destroyBuffer(vertexBuffer);
-		destroyImage(texture);
-		free(data);
-		free(text);
-		return mpgxResult;
-	}
-
-	GraphicsMesh mesh;
-
-	mpgxResult = createGraphicsMesh(
-		window,
-		UINT32_INDEX_TYPE,
-		indexCount,
-		0,
-		vertexBuffer,
-		indexBuffer,
-		&mesh);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-	{
-		destroyBuffer(indexBuffer);
-		destroyBuffer(vertexBuffer);
-		destroyImage(texture);
-		free(data);
-		free(text);
-		return mpgxResult;
-	}
-
-	GraphicsAPI api = getGraphicsAPI();
-
-#if MPGX_SUPPORT_VULKAN
-	if (api == VULKAN_GRAPHICS_API)
-	{
-		VkWindow vkWindow = getVkWindow(window);
-		VkDevice device = vkWindow->device;
-
-		Handle handle = textPipeline->vk.handle;
-		uint8_t bufferCount = handle->vk.bufferCount;
-
-		VkDescriptorPool descriptorPool;
-
-		mpgxResult = createVkDescriptorPool(
-			device,
-			&descriptorPool);
-
-		if (mpgxResult != SUCCESS_MPGX_RESULT)
-		{
-			// TODO: destroy transform, add it to the text handle
-			destroyGraphicsMesh(mesh);
-			destroyImage(texture);
-			free(data);
-			free(text);
-			return mpgxResult;
-		}
-
-		VkDescriptorSet* descriptorSets;
-
-		mpgxResult = createVkDescriptorSet(
-			device,
-			handle->vk.descriptorSetLayout,
-			descriptorPool,
-			handle->vk.sampler->vk.handle,
-			texture->vk.imageView,
-			descriptorSets);
-
-		if (mpgxResult != SUCCESS_MPGX_RESULT)
-		{
-			vkDestroyDescriptorPool(
-				device,
-				descriptorPool,
-				NULL);
-			// TODO: destroy transform, add it to the text handle
-			destroyGraphicsMesh(mesh);
-			destroyImage(texture);
-			free(data);
-			free(text);
-			return mpgxResult;
-		}
-
-		textInstance->descriptorPool = descriptorPool;
-		textInstance->descriptorSets = descriptorSets;
-	}
-	else
-	{
-		textInstance->descriptorPool = NULL;
-		textInstance->descriptorSets = NULL;
-	}
-#endif
-
-	textInstance->font = font;
-	textInstance->pipeline = textPipeline;
-	textInstance->data = data;
-	textInstance->dataCapacity = dataLength;
-	textInstance->dataLength = dataLength;
-	textInstance->texture = texture;
-	textInstance->mesh = mesh;
-	textInstance->textSize = textSize;
-	textInstance->fontSize = fontSize;
-	textInstance->alignment = alignment;
-	textInstance->isConstant = isConstant;
-
-	Handle handle = textPipeline->base.handle;
-	size_t count = handle->base.textCount;
-
-	if (count == handle->base.textCapacity)
-	{
-		size_t capacity = handle->base.textCapacity * 2;
-
-		Text* texts = realloc(
-			handle->base.texts,
-			capacity * sizeof(Text));
-
-		if (!texts)
-		{
-#if MPGX_SUPPORT_VULKAN
-			if (api == VULKAN_GRAPHICS_API)
-			{
-				free(textInstance->descriptorSets);
-
-				VkWindow vkWindow = getVkWindow(window);
-
-				vkDestroyDescriptorPool(
-					vkWindow->device,
-					textInstance->descriptorPool,
-					NULL);
-			}
-#endif
-			// TODO: destroy transform, add it to the text handle
-			destroyGraphicsMesh(textInstance->mesh);
-			destroyImage(textInstance->texture);
-			free(textInstance->data);
-			free(textInstance);
-			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
-		}
-
-		handle->base.texts = texts;
-		handle->base.textCapacity = capacity;
-	}
-
-	handle->base.texts[count] = textInstance;
-	handle->base.textCount = count + 1;
-
-	*text = textInstance;
-	return SUCCESS_MPGX_RESULT;
-}
-MpgxResult createText8(
-	GraphicsPipeline textPipeline,
-	Font font,
-	uint32_t fontSize,
-	AlignmentType alignment,
-	const char* data,
-	size_t dataLength,
-	bool isConstant,
-	Text* text)
-{
-	assert(textPipeline);
-	assert(font);
-	assert(fontSize > 0);
-	assert(data);
-	assert(dataLength > 0);
-	assert(text);
-
-	uint32_t* array;
-	size_t arrayLength;
-
-	bool result = allocateStringUTF32(
-		data,
-		dataLength,
-		&array,
-		&arrayLength);
-
-	if (!result)
-		return UNKNOWN_ERROR_MPGX_RESULT; // TODO:
-
-	MpgxResult mpgxResult = createText32(
-		textPipeline,
-		font,
-		fontSize,
-		alignment,
-		array,
-		arrayLength,
-		isConstant,
-		text);
-
-	free(array);
-	return mpgxResult;
-}*/
 void destroyText(Text text)
 {
 	assert(textInitialized);
@@ -2494,59 +2102,15 @@ bool isTextConstant(Text text)
 	assert(textInitialized);
 	return text->base.isConstant;
 }
-
-// TODO: inspect cmmt float vectors \/
-
-Vec2F getTextOffset(Text text)
+AlignmentType getTextAlignment(
+	Text text)
 {
 	assert(text);
 	assert(textInitialized);
-
-	AlignmentType alignment = text->base.alignment;
-	Vec2F textSize = text->base.textSize;
-
-	switch (alignment)
-	{
-	default:
-		abort();
-	case CENTER_ALIGNMENT_TYPE:
-		return vec2F(
-			-textSize.x * 0.5f,
-			textSize.y * 0.5f);
-	case LEFT_ALIGNMENT_TYPE:
-		return vec2F(
-			0.0f,
-			textSize.y * 0.5f);
-	case RIGHT_ALIGNMENT_TYPE:
-		return vec2F(
-			-textSize.x,
-			textSize.y * 0.5f);
-	case BOTTOM_ALIGNMENT_TYPE:
-		return vec2F(
-			-textSize.x * 0.5f,
-			0.0f);
-	case TOP_ALIGNMENT_TYPE:
-		return vec2F(
-			-textSize.x * 0.5f,
-			textSize.y);
-	case LEFT_BOTTOM_ALIGNMENT_TYPE:
-		return vec2F(
-			0.0f,
-			0.0f);
-	case LEFT_TOP_ALIGNMENT_TYPE:
-		return vec2F(
-			0.0f,
-			textSize.y);
-	case RIGHT_BOTTOM_ALIGNMENT_TYPE:
-		return vec2F(
-			-textSize.x,
-			0.0f);
-	case RIGHT_TOP_ALIGNMENT_TYPE:
-		return vec2F(
-			-textSize.x,
-			textSize.y);
-	}
+	return text->base.alignment;
 }
+
+// TODO: inspect cmmt float vectors \/
 
 // TODO: take into account text alignment
 /*bool getTextCaretAdvance(
@@ -2648,605 +2212,246 @@ bool getTextCaretPosition(
 	abort();
 }*/
 
-AlignmentType getTextAlignment(
-	Text text)
-{
-	assert(text);
-	assert(textInitialized);
-	return text->base.alignment;
-}
-void setTextAlignment(
+MpgxResult bakeText32(
 	Text text,
-	AlignmentType alignment)
+	const uint32_t* string,
+	size_t stringLength,
+	AlignmentType alignment,
+	SrgbColor color,
+	bool useTags,
+	bool isBold,
+	bool isItalic)
 {
 	assert(text);
-	assert(!text->base.isConstant);
+	assert(string);
+	assert(stringLength > 0);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(textInitialized);
-	text->base.alignment = alignment;
-}
-
-/*size_t getTextStringLength(Text text)
-{
-	assert(text);
-	assert(textInitialized);
-	return text->stringLength;
-}
-const uint32_t* getTextString(
-	Text text)
-{
-	assert(text);
-	assert(textInitialized);
-	return text->string;
-}
-
-bool setTextData32(
-	Text text,
-	const uint32_t* _data,
-	size_t dataLength,
-	bool reuseBuffers)
-{
-	assert(text);
-	assert(_data);
-	assert(dataLength > 0);
-	assert(!text->isConstant);
+	assert(!text->base.isConstant);
 	assert(textInitialized);
 
-	if (reuseBuffers)
-	{
-		if (dataLength > text->dataCapacity)
-		{
-			uint32_t* data = realloc(
-				text->data,
-				dataLength * sizeof(uint32_t));
+	TextVertex* vertices = malloc(
+		stringLength * 4 * sizeof(TextVertex));
 
-			if (!data)
-				return false;
+	if (!vertices)
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
-			memcpy(data, _data,
-				dataLength * sizeof(uint32_t));
+	FontAtlas fontAtlas = text->base.fontAtlas;
 
-			text->data = data;
-			text->dataCapacity = dataLength;
-			text->dataLength = dataLength;
-			return true;
-		}
-		else
-		{
-			memcpy(text->data, _data,
-				dataLength * sizeof(uint32_t));
-			text->dataLength = dataLength;
-			return true;
-		}
-	}
-	else
-	{
-		uint32_t* data = malloc(
-			dataLength * sizeof(uint32_t));
+	uint32_t vertexCount;
+	Vec2F textSize;
 
-		if (!data)
-			return false;
-
-		free(text->data);
-
-		text->data = data;
-		text->dataCapacity = dataLength;
-		text->dataLength = dataLength;
-		return true;
-	}
-}
-bool setTextData8(
-	Text text,
-	const char* data,
-	size_t dataLength,
-	bool reuseBuffers)
-{
-	assert(data);
-	assert(dataLength > 0);
-	assert(!text->isConstant);
-
-	uint32_t* array;
-	size_t arrayLength;
-
-	bool result = allocateStringUTF32(
-		data,
-		dataLength,
-		&array,
-		&arrayLength);
+	bool result = fillVertices(
+		string,
+		stringLength,
+		fontAtlas->regularGlyphs,
+		fontAtlas->boldGlyphs,
+		fontAtlas->italicGlyphs,
+		fontAtlas->boldItalicGlyphs,
+		fontAtlas->glyphCount,
+		fontAtlas->newLineAdvance,
+		alignment,
+		color,
+		useTags,
+		isBold,
+		isItalic,
+		vertices,
+		&vertexCount,
+		&textSize);
 
 	if (!result)
-		return false;
-
-	result = setTextData32(
-		text,
-		array,
-		arrayLength,
-		reuseBuffers);
-
-	free(array);
-	return result;
-}
-
-MpgxResult bakeText(
-	Text text,
-	bool reuseBuffers)
-{
-	assert(text);
-	assert(!text->isConstant);
-	assert(textInitialized);
-
-	GraphicsPipeline pipeline = text->pipeline;
-	Window window = pipeline->base.framebuffer->base.window;
-	GraphicsAPI api = getGraphicsAPI();
-
-	uint32_t* data = text->data;
-	size_t dataLength = text->dataLength;
-
-	if (reuseBuffers)
 	{
-		Glyph* glyphs;
-		size_t glyphCount;
-
-		MpgxResult mpgxResult = createGlyphs(
-			data,
-			dataLength,
-			&glyphs,
-			&glyphCount);
-
-		if (mpgxResult != SUCCESS_MPGX_RESULT)
-			return mpgxResult;
-
-		FT_Face face = text->font->face;
-		uint32_t fontSize = text->fontSize;
-
-		FT_Error ftResult = FT_Set_Pixel_Sizes(
-			face,
-			0,
-			(FT_UInt)fontSize);
-
-		if (ftResult != 0)
-		{
-			free(glyphs);
-			return UNKNOWN_ERROR_MPGX_RESULT;
-		}
-
-		float newLineAdvance =
-			((float)face->size->metrics.height / 64.0f) /
-			(float)fontSize;
-
-		uint32_t textPixelLength =
-			getImageSize(text->texture).x;
-
-		uint8_t* pixels;
-		size_t pixelCount;
-		uint32_t pixelLength;
-
-		bool result = true;
-
-		if (!result)
-		{
-			free(glyphs);
-			return UNKNOWN_ERROR_MPGX_RESULT;
-		}
-
-		Image texture;
-
-#if MPGX_SUPPORT_VULKAN
-		VkDescriptorSet* descriptorSets;
-#endif
-
-		if (pixelLength > textPixelLength)
-		{
-			MpgxResult mpgxResult = createImage(
-				window,
-				SAMPLED_IMAGE_TYPE,
-				IMAGE_2D,
-				R8_UNORM_IMAGE_FORMAT,
-				(const void**)&pixels,
-				vec3I(pixelLength, pixelLength, 1),
-				1,
-				false,
-				&texture);
-
-			free(pixels);
-			pixels = NULL;
-
-			if (mpgxResult != SUCCESS_MPGX_RESULT)
-			{
-				free(glyphs);
-				return mpgxResult;
-			}
-
-#if MPGX_SUPPORT_VULKAN
-			if (api == VULKAN_GRAPHICS_API)
-			{
-				VkWindow vkWindow = getVkWindow(window);
-				VkDevice device = vkWindow->device;
-				Handle handle = pipeline->vk.handle;
-
-				mpgxResult = createVkDescriptorSet(
-					device,
-					handle->vk.descriptorSetLayout,
-					text->descriptorPool,
-					handle->vk.sampler->vk.handle,
-					texture->vk.imageView,
-					descriptorSets);
-
-				if (mpgxResult != SUCCESS_MPGX_RESULT)
-				{
-					destroyImage(texture);
-					free(glyphs);
-					return mpgxResult;
-				}
-			}
-#endif
-		}
-		else
-		{
-			texture = NULL;
-		}
-
-		float* vertices;
-		size_t vertexCount;
-		Vec2F textSize;
-
-		result = createTextVertices(
-			data,
-			dataLength,
-			glyphs,
-			glyphCount,
-			newLineAdvance,
-			text->alignment,
-			&vertices,
-			&vertexCount,
-			&textSize);
-
-		free(glyphs);
-
-		if (!result)
-		{
-			destroyImage(texture);
-			free(pixels);
-			return UNKNOWN_ERROR_MPGX_RESULT;
-		}
-
-		Buffer vertexBuffer = NULL;
-		Buffer indexBuffer = NULL;
-
-		size_t textVertexBufferSize = getBufferSize(
-			getGraphicsMeshVertexBuffer(text->mesh));
-
-		if (vertexCount * sizeof(float) > textVertexBufferSize)
-		{
-			MpgxResult mpgxResult = createBuffer(
-				window,
-				VERTEX_BUFFER_TYPE,
-				CPU_TO_GPU_BUFFER_USAGE,
-				vertices,
-				vertexCount * sizeof(float),
-				&vertexBuffer);
-
-			free(vertices);
-
-			if (mpgxResult != SUCCESS_MPGX_RESULT)
-			{
-				destroyImage(texture);
-				free(pixels);
-				return mpgxResult;
-			}
-
-			uint32_t* indices;
-			size_t indexCount;
-
-			result = createTextIndices(
-				vertexCount,
-				&indices,
-				&indexCount);
-
-			if (!result)
-			{
-				destroyBuffer(vertexBuffer);
-				destroyImage(texture);
-				free(pixels);
-				return UNKNOWN_ERROR_MPGX_RESULT;
-			}
-
-			mpgxResult = createBuffer(
-				window,
-				INDEX_BUFFER_TYPE,
-				CPU_TO_GPU_BUFFER_USAGE,
-				indices,
-				indexCount * sizeof(uint32_t),
-				&indexBuffer);
-
-			free(indices);
-
-			if (mpgxResult != SUCCESS_MPGX_RESULT)
-			{
-				destroyBuffer(vertexBuffer);
-				destroyImage(texture);
-				free(pixels);
-				return mpgxResult;
-			}
-		}
-
-		if (!texture)
-		{
-			MpgxResult mpgxResult = setImageData(
-				text->texture,
-				pixels,
-				vec3I(pixelLength, pixelLength, 1),
-				zeroVec3I);
-
-			free(pixels); // TODO: replace pixels with image data map
-
-			if (mpgxResult != SUCCESS_MPGX_RESULT)
-			{
-				destroyBuffer(indexBuffer);
-				destroyBuffer(vertexBuffer);
-				destroyImage(texture);
-				return mpgxResult;
-			}
-		}
-		else
-		{
-#if MPGX_SUPPORT_VULKAN
-			if (api == VULKAN_GRAPHICS_API)
-			{
-				free(text->descriptorSets);
-				text->descriptorSets = descriptorSets;
-			}
-#endif
-
-			destroyImage(text->texture);
-			text->texture = texture;
-		}
-
-		if (!vertexBuffer)
-		{
-			GraphicsMesh mesh = text->mesh;
-			Buffer _vertexBuffer = getGraphicsMeshVertexBuffer(mesh);
-
-			MpgxResult mpgxResult = setBufferData(
-				_vertexBuffer,
-				vertices,
-				vertexCount * sizeof(float),
-				0);
-
-			// TODO: if mpgxResult != SUCCESS
-
-			setGraphicsMeshIndexCount(
-				mesh,
-				(vertexCount / 16) * 6);
-
-			free(vertices);
-		}
-		else
-		{
-			GraphicsMesh mesh = text->mesh;
-			Buffer _vertexBuffer = getGraphicsMeshVertexBuffer(mesh);
-			Buffer _indexBuffer = getGraphicsMeshIndexBuffer(mesh);
-
-			destroyBuffer(_vertexBuffer);
-			destroyBuffer(_indexBuffer);
-
-			setGraphicsMeshVertexBuffer(
-				mesh,
-				vertexBuffer);
-			setGraphicsMeshIndexBuffer(
-				mesh,
-				UINT32_INDEX_TYPE,
-				(vertexCount / 16) * 6,
-				0,
-				indexBuffer);
-		}
-
-		text->textSize = textSize;
-	}
-	else
-	{
-		Glyph* glyphs;
-		size_t glyphCount;
-
-		MpgxResult mpgxResult = createGlyphs(
-			data,
-			dataLength,
-			&glyphs,
-			&glyphCount);
-
-		if (mpgxResult != SUCCESS_MPGX_RESULT)
-			return mpgxResult;
-
-		FT_Face face = text->font->face;
-		uint32_t fontSize = text->fontSize;
-
-		FT_Error ftResult = FT_Set_Pixel_Sizes(
-			face,
-			0,
-			(FT_UInt)fontSize);
-
-		if (ftResult != 0)
-		{
-			free(glyphs);
-			return UNKNOWN_ERROR_MPGX_RESULT;
-		}
-
-		float newLineAdvance =
-			((float)face->size->metrics.height / 64.0f) /
-			(float)fontSize;
-
-		uint8_t* pixels;
-		size_t pixelCount;
-		uint32_t pixelLength;
-
-		bool result = true;
-
-		if (!result)
-		{
-			free(glyphs);
-			return UNKNOWN_ERROR_MPGX_RESULT;
-		}
-
-		Image texture;
-
-		mpgxResult = createImage(
-			window,
-			SAMPLED_IMAGE_TYPE,
-			IMAGE_2D,
-			R8_UNORM_IMAGE_FORMAT,
-			(const void**)&pixels,
-			vec3I(pixelLength, pixelLength, 1),
-			1,
-			false,
-			&texture);
-
-		free(pixels);
-
-		if (mpgxResult != SUCCESS_MPGX_RESULT)
-		{
-			free(glyphs);
-			return mpgxResult;
-		}
-
-		float* vertices;
-		size_t vertexCount;
-		Vec2F textSize;
-
-		result = createTextVertices(
-			data,
-			dataLength,
-			glyphs,
-			glyphCount,
-			newLineAdvance,
-			text->alignment,
-			&vertices,
-			&vertexCount,
-			&textSize);
-
-		free(glyphs);
-
-		if (!result)
-		{
-			destroyImage(texture);
-			return UNKNOWN_ERROR_MPGX_RESULT;
-		}
-
-		Buffer vertexBuffer;
-
-		mpgxResult = createBuffer(
-			window,
-			VERTEX_BUFFER_TYPE,
-			CPU_TO_GPU_BUFFER_USAGE,
-			vertices,
-			vertexCount * sizeof(float),
-			&vertexBuffer);
-
 		free(vertices);
+		return BAD_VALUE_MPGX_RESULT;
+	}
 
-		if (mpgxResult != SUCCESS_MPGX_RESULT)
+	GraphicsAPI api = getGraphicsAPI();
+	GraphicsPipeline pipeline = fontAtlas->pipeline;
+	Handle handle = pipeline->base.handle;
+	Window window = pipeline->base.window;
+	Buffer indexBuffer = handle->base.indexBuffer;
+	Text* texts = handle->base.texts;
+	size_t textCount = handle->base.textCount;
+	uint32_t indexCount = (vertexCount / 4) * 6;
+
+	if (indexBuffer == NULL || indexBuffer->base.size <
+		indexCount * sizeof(uint32_t))
+	{
+		uint32_t* indices = createIndices(indexCount);
+
+		if (!indices)
 		{
-			destroyImage(texture);
-			return mpgxResult;
+			free(vertices);
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 		}
 
-		uint32_t* indices;
-		size_t indexCount;
+		Buffer newIndexBuffer;
 
-		result = createTextIndices(
-			vertexCount,
-			&indices,
-			&indexCount);
-
-		if (!result)
-		{
-			destroyBuffer(vertexBuffer);
-			destroyImage(texture);
-			return UNKNOWN_ERROR_MPGX_RESULT;
-		}
-
-		Buffer indexBuffer;
-
-		mpgxResult = createBuffer(
-			window,
+		MpgxResult mpgxResult = createBuffer(window,
 			INDEX_BUFFER_TYPE,
-			CPU_TO_GPU_BUFFER_USAGE,
+			GPU_ONLY_BUFFER_USAGE,
 			indices,
 			indexCount * sizeof(uint32_t),
-			&indexBuffer);
+			&newIndexBuffer);
 
 		free(indices);
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
 		{
-			destroyBuffer(vertexBuffer);
-			destroyImage(texture);
+			free(vertices);
 			return mpgxResult;
 		}
 
-		GraphicsMesh mesh;
+		if (api == OPENGL_GRAPHICS_API ||
+			api == OPENGL_ES_GRAPHICS_API)
+		{
+#if MPGX_SUPPORT_OPENGL
+			for (size_t i = 0; i < textCount; i++)
+			{
+				GraphicsMesh textMesh = texts[i]->gl.mesh;
+				textMesh->gl.indexBuffer = newIndexBuffer;
+			}
+#else
+			abort();
+#endif
+		}
 
-		mpgxResult = createGraphicsMesh(
-			window,
-			UINT32_INDEX_TYPE,
-			indexCount,
-			0,
-			vertexBuffer,
-			indexBuffer,
-			&mesh);
+		handle->base.indexBuffer = newIndexBuffer;
+		destroyBuffer(indexBuffer);
+	}
+
+	Buffer vertexBuffer;
+
+	if (api == VULKAN_GRAPHICS_API)
+	{
+#if MPGX_SUPPORT_VULKAN
+		vertexBuffer = text->vk.vertexBuffer;
+#else
+		abort();
+#endif
+	}
+	else if (api == OPENGL_GRAPHICS_API ||
+		api == OPENGL_ES_GRAPHICS_API)
+	{
+#if MPGX_SUPPORT_OPENGL
+		vertexBuffer = text->gl.mesh->gl.vertexBuffer;
+#else
+		abort();
+#endif
+	}
+	else
+	{
+		abort();
+	}
+
+	size_t dataSize = vertexCount * sizeof(TextVertex);
+
+	if (vertexBuffer->base.size < dataSize)
+	{
+		Buffer newVertexBuffer;
+
+		MpgxResult mpgxResult = createBuffer(window,
+			VERTEX_BUFFER_TYPE,
+			CPU_TO_GPU_BUFFER_USAGE,
+			vertices,
+			dataSize,
+			&newVertexBuffer);
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
 		{
-			destroyBuffer(indexBuffer);
-			destroyBuffer(vertexBuffer);
-			destroyImage(texture);
+			free(vertices);
 			return mpgxResult;
 		}
 
-#if MPGX_SUPPORT_VULKAN
 		if (api == VULKAN_GRAPHICS_API)
 		{
-			VkWindow vkWindow = getVkWindow(window);
-			VkDevice device = vkWindow->device;
-			Handle handle = pipeline->vk.handle;
-			uint8_t bufferCount = handle->vk.bufferCount;
-			VkDescriptorPool descriptorPool = text->descriptorPool;
-
-			VkDescriptorSet* descriptorSets;
-
-			mpgxResult = createVkDescriptorSet(
-				device,
-				handle->vk.descriptorSetLayout,
-				descriptorPool,
-				handle->vk.sampler->vk.handle,
-				texture->vk.imageView,
-				descriptorSets);
-
-			if (mpgxResult != SUCCESS_MPGX_RESULT)
-			{
-				// TODO: destroy transform, add it to the text handle
-				destroyGraphicsMesh(mesh);
-				destroyImage(texture);
-				return mpgxResult;
-			}
-
-			free(text->descriptorSets);
-
-			text->descriptorPool = descriptorPool;
-			text->descriptorSets = descriptorSets;
-		}
+#if MPGX_SUPPORT_VULKAN
+			text->vk.vertexBuffer = newVertexBuffer;
+#else
+			abort();
 #endif
+		}
+		else
+		{
+#if MPGX_SUPPORT_OPENGL
+			text->gl.mesh->gl.vertexBuffer = newVertexBuffer;
+#else
+			abort();
+#endif
+		}
 
-		// TODO: destroy transform, add it to the text handle
-		destroyGraphicsMesh(text->mesh);
-		destroyImage(text->texture);
+		destroyBuffer(vertexBuffer);
+	}
+	else
+	{
+		setBufferData(
+			vertexBuffer,
+			vertices,
+			dataSize,
+			0);
 
-		text->texture = texture;
-		text->mesh = mesh;
-		text->textSize = textSize;
+		if (api == VULKAN_GRAPHICS_API)
+		{
+#if MPGX_SUPPORT_VULKAN
+			text->vk.indexCount = indexCount;
+#else
+			abort();
+#endif
+		}
+		else
+		{
+#if MPGX_SUPPORT_OPENGL
+			text->gl.mesh->gl.indexCount = indexCount;
+#else
+			abort();
+#endif
+		}
 	}
 
+	free(vertices);
 	return SUCCESS_MPGX_RESULT;
-}*/
+}
+MpgxResult bakeText(
+	Text text,
+	const char* string,
+	size_t stringLength,
+	AlignmentType alignment,
+	SrgbColor color,
+	bool useTags,
+	bool isBold,
+	bool isItalic)
+{
+	assert(text);
+	assert(string);
+	assert(stringLength > 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(!text->base.isConstant);
+	assert(textInitialized);
+
+	uint32_t* string32;
+	size_t stringLength32;
+
+	MpgxResult mpgxResult = allocateStringUTF32(
+		string,
+		stringLength,
+		&string32,
+		&stringLength32);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+		return mpgxResult;
+
+	mpgxResult = bakeText32(
+		text,
+		string32,
+		stringLength32,
+		alignment,
+		color,
+		useTags,
+		isBold,
+		isItalic);
+
+	free(string32);
+	return mpgxResult;
+}
 
 size_t drawText(
 	Text text,
@@ -3372,8 +2577,7 @@ MpgxResult createTextSampler(
 	assert(window);
 	assert(textSampler);
 
-	return createSampler(
-		window,
+	return createSampler(window,
 		NEAREST_IMAGE_FILTER,
 		NEAREST_IMAGE_FILTER,
 		NEAREST_IMAGE_FILTER,
@@ -3919,4 +3123,24 @@ void setTextPipelineMVP(
 		TEXT_PIPELINE_NAME) == 0);
 	Handle handle = textPipeline->base.handle;
 	handle->base.vpc.mvp = mvp;
+}
+
+LinearColor getTextPipelineColor(
+	GraphicsPipeline textPipeline)
+{
+	assert(textPipeline);
+	assert(strcmp(textPipeline->base.name,
+		TEXT_PIPELINE_NAME) == 0);
+	Handle handle = textPipeline->base.handle;
+	return handle->base.fpc.color;
+}
+void setTextPipelineColor(
+	GraphicsPipeline textPipeline,
+	LinearColor color)
+{
+	assert(textPipeline);
+	assert(strcmp(textPipeline->base.name,
+		TEXT_PIPELINE_NAME) == 0);
+	Handle handle = textPipeline->base.handle;
+	handle->base.fpc.color = color;
 }

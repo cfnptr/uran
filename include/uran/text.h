@@ -17,6 +17,7 @@
 #include "pack/reader.h"
 #include "logy/logger.h"
 #include "cmmt/color.h"
+#include "cmmt/bounding.h"
 
 #include <stdbool.h>
 
@@ -219,7 +220,6 @@ void destroyFont(Font font);
  * fontSize - font pixel size.
  * chars - atlas char array.
  * charCount - char array size.
- * isConstant - is font atlas constant.
  * logger - logger instance or NULL.
  * fontAtlas - pointer to the font atlas instance.
  */
@@ -233,7 +233,6 @@ MpgxResult createFontAtlas(
 	uint32_t fontSize,
 	const uint32_t* chars,
 	size_t charCount,
-	bool isConstant,
 	Logger logger,
 	FontAtlas* fontAtlas);
 /*
@@ -259,7 +258,6 @@ MpgxResult createAsciiFontAtlas(
 	Font* boldItalicFonts,
 	size_t fontCount,
 	uint32_t fontSize,
-	bool isConstant,
 	Logger logger,
 	FontAtlas* fontAtlas);
 /*
@@ -303,11 +301,6 @@ size_t getFontAtlasFontCount(FontAtlas fontAtlas);
  * fontAtlas - font atlas instance.
  */
 uint32_t getFontAtlasFontSize(FontAtlas fontAtlas);
-/*
- * Returns true if font atlas is constant.
- * fontAtlas - font atlas instance.
- */
-bool isFontAtlasConstant(FontAtlas fontAtlas);
 
 /*
  * Create a new UTF-32 atlas text instance.
@@ -362,6 +355,7 @@ MpgxResult createAtlasText(
 
 // TODO: shrinkAtlasIndexBuffer
 
+/* TODO:
 MpgxResult createText32(
 	GraphicsPipeline textPipeline,
 	Font font,
@@ -380,6 +374,8 @@ MpgxResult createText(
 	size_t dataLength,
 	bool isConstant,
 	Text* text);
+ */
+
 /*
  * Destroys text instance.
  * text - text instance or NULL.
@@ -401,9 +397,13 @@ Vec2F getTextSize(Text text);
  * text - text instance.
  */
 bool isTextConstant(Text text);
+/*
+ * Returns text alignment type.
+ * text - text instance.
+ */
+AlignmentType getTextAlignment(Text text);
 
-Vec2F getTextOffset(Text text);
-
+/* TODO:
 bool getTextCaretAdvance(
 	Text text,
 	size_t index,
@@ -412,35 +412,54 @@ bool getTextCaretPosition(
 	Text text,
 	Vec2F* advance,
 	size_t* index);
+ */
 
 /*
- * Returns text alignment type.
+ * Recreate UTF-32 text mesh data.
+ * Returns operation MPGX result.
+ *
  * text - text instance.
+ * string - text string.
+ * stringLength - text string length.
+ * alignment - text alignment.
+ * color - default text color.
+ * useTags - use HTML tags.
+ * isBold - is text initially bold.
+ * isItalic - is text initially italic.
  */
-AlignmentType getTextAlignment(
-	Text text);
+MpgxResult bakeText32(
+	Text text,
+	const uint32_t* string,
+	size_t stringLength,
+	AlignmentType alignment,
+	SrgbColor color,
+	bool useTags,
+	bool isBold,
+	bool isItalic);
 /*
- * Sets text alignment type.
+ * Recreate UTF-8 text mesh data.
+ * Returns operation MPGX result.
+ *
  * text - text instance.
+ * string - text string.
+ * stringLength - text string length.
+ * alignment - text alignment.
+ * color - default text color.
+ * useTags - use HTML tags.
+ * isBold - is text initially bold.
+ * isItalic - is text initially italic.
  */
-void setTextAlignment(
-	Text text,
-	AlignmentType alignment);
-
-bool setTextData32(
-	Text text,
-	const uint32_t* data,
-	size_t dataLength,
-	bool reuseBuffers);
-bool setTextData(
-	Text text,
-	const char* data,
-	size_t dataLength,
-	bool reuseBuffers);
-
 MpgxResult bakeText(
 	Text text,
-	bool reuseBuffers);
+	const char* string,
+	size_t stringLength,
+	AlignmentType alignment,
+	SrgbColor color,
+	bool useTags,
+	bool isBold,
+	bool isItalic);
+
+// TODO: shrink text vertex buffer
 
 /*
  * Draw text mesh. (rendering command)
@@ -500,17 +519,35 @@ Mat4F getTextPipelineMVP(
 	GraphicsPipeline textPipeline);
 /*
  * Sets text pipeline image sampler.
+ *
  * textPipeline - text pipeline instance.
+ * mvp - model view prokection matrix value.
  */
 void setTextPipelineMVP(
 	GraphicsPipeline textPipeline,
 	Mat4F mvp);
 
 /*
+ * Returns text pipeline MVP matrix.
+ * textPipeline - text pipeline instance.
+ */
+LinearColor getTextPipelineColor(
+	GraphicsPipeline textPipeline);
+/*
+ * Sets text pipeline image sampler.
+ *
+ * textPipeline - text pipeline instance.
+ * color - color value.
+ */
+void setTextPipelineColor(
+	GraphicsPipeline textPipeline,
+	LinearColor color);
+
+/*
  * Returns running platform scale.
  * framebuffer - framebuffer instance.
  */
-inline static float calculatePlatformScale(Framebuffer framebuffer)
+inline static cmmt_float_t getPlatformScale(Framebuffer framebuffer)
 {
 	assert(framebuffer);
 
@@ -518,8 +555,91 @@ inline static float calculatePlatformScale(Framebuffer framebuffer)
 	Vec2I windowSize = getWindowSize(getFramebufferWindow(framebuffer));
 
 	return max(
-		(float)framebufferSize.x / (float)windowSize.x,
-		(float)framebufferSize.y / (float)windowSize.y);
+		(cmmt_float_t)framebufferSize.x / (cmmt_float_t)windowSize.x,
+		(cmmt_float_t)framebufferSize.y / (cmmt_float_t)windowSize.y);
+}
+
+/*
+ * Creates 2D text bounding box.
+ *
+ * alignment - alignment type.
+ * textSize - text size value.
+ */
+inline static Box2F createTextBox2F(
+	AlignmentType alignment,
+	Vec2F textSize)
+{
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+
+	Vec2F position;
+
+	switch (alignment)
+	{
+	default:
+		abort();
+	case CENTER_ALIGNMENT_TYPE:
+		position = zeroVec2F;
+		break;
+	case LEFT_ALIGNMENT_TYPE:
+		position = vec2F(
+			(cmmt_float_t)textSize.x * (cmmt_float_t)0.5,
+			(cmmt_float_t)0.0);
+		break;
+	case RIGHT_ALIGNMENT_TYPE:
+		position = vec2F(
+			(cmmt_float_t)textSize.x * (cmmt_float_t)-0.5,
+			(cmmt_float_t)0.0);
+		break;
+	case BOTTOM_ALIGNMENT_TYPE:
+		position = vec2F(
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)textSize.y * (cmmt_float_t)0.5);
+		break;
+	case TOP_ALIGNMENT_TYPE:
+		position = vec2F(
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)textSize.y * (cmmt_float_t)-0.5);
+		break;
+	case LEFT_BOTTOM_ALIGNMENT_TYPE:
+		position = vec2F(
+			(cmmt_float_t)textSize.x * (cmmt_float_t)0.5,
+			(cmmt_float_t)textSize.y * (cmmt_float_t)0.5);
+		break;
+	case LEFT_TOP_ALIGNMENT_TYPE:
+		position = vec2F(
+			(cmmt_float_t)textSize.x * (cmmt_float_t)0.5,
+			(cmmt_float_t)textSize.y * (cmmt_float_t)-0.5);
+		break;
+	case RIGHT_BOTTOM_ALIGNMENT_TYPE:
+		position = vec2F(
+			(cmmt_float_t)textSize.x * (cmmt_float_t)-0.5,
+			(cmmt_float_t)textSize.y * (cmmt_float_t)0.5);
+		break;
+	case RIGHT_TOP_ALIGNMENT_TYPE:
+		position = vec2F(
+			(cmmt_float_t)textSize.x * (cmmt_float_t)-0.5,
+			(cmmt_float_t)textSize.y * (cmmt_float_t)-0.5);
+		break;
+	}
+
+	return posSizeBox2F(position, textSize);
+}
+/*
+ * Creates 3D text bounding box.
+ *
+ * alignment - alignment type.
+ * textSize - text size value.
+ */
+inline static Box3F createTextBox3F(
+	AlignmentType alignment,
+	Vec2F textSize)
+{
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	Box2F box = createTextBox2F(alignment, textSize);
+
+	return box3F(
+		vec3F(box.minimum.x, box.minimum.y, (cmmt_float_t)-0.5),
+		vec3F(box.maximum.x, box.maximum.y, (cmmt_float_t)0.5));
 }
 
 // TODO: add enumerator and count getter

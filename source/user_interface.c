@@ -312,7 +312,7 @@ MpgxResult createUiPanel(
 		alignment,
 		position,
 		oneSizeBox2F,
-		false,
+		events ? true : false,
 		onUiPanelDestroy,
 		events,
 		handle);
@@ -436,10 +436,12 @@ MpgxResult createUiLabel32(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
+	Vec2F textSize = getTextSize(text);
+
 	GraphicsRender render = createTextRender(
 		ui->textRenderer,
 		transform,
-		oneSizeBox3F, // TODO:
+		createTextBox3F(alignment, textSize),
 		whiteLinearColor,
 		text,
 		zeroVec4I);
@@ -466,8 +468,8 @@ MpgxResult createUiLabel32(
 		transform,
 		alignment,
 		position,
-		oneSizeBox2F,
-		false,
+		createTextBox2F(alignment, textSize),
+		events ? true : false,
 		onUiLabelDestroy,
 		events,
 		handle);
@@ -803,7 +805,9 @@ MpgxResult createUiWindow32(
 	GraphicsRender titleRender = createTextRender(
 		ui->textRenderer,
 		titleTransform,
-		oneSizeBox3F, // TODO: adjust
+		createTextBox3F(
+			alignment,
+			getTextSize(text)),
 		whiteLinearColor,
 		text,
 		zeroVec4I);
@@ -1175,7 +1179,9 @@ MpgxResult createUiButton32(
 	GraphicsRender textRender = createTextRender(
 		ui->textRenderer,
 		textTransform,
-		oneSizeBox3F, // TODO: adjust
+		createTextBox3F(
+			alignment,
+			getTextSize(textInstance)),
 		whiteLinearColor,
 		textInstance,
 		zeroVec4I);

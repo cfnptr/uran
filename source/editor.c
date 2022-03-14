@@ -20,6 +20,7 @@
 #include "conf/writer.h"
 #include "cmmt/angle.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #define EDITOR_SETTINGS_FILE_PATH "editor-settings.txt"
@@ -43,13 +44,26 @@ typedef struct BaseWindow_T
 
 typedef BaseWindow_T* BaseWindow;
 
-typedef struct MenuWindow_T
+typedef struct StatsWindow_T
 {
+	Logger logger;
+	Window window;
 	BaseWindow base;
-	InterfaceElement versionLabel;
-} MenuWindow_T;
+	InterfaceElement label;
+	double lastUpdateTime;
+} StatsWindow_T;
 
-typedef MenuWindow_T* MenuWindow;
+typedef StatsWindow_T* StatsWindow;
+
+typedef struct MenuBar_T
+{
+	Window window;
+	StatsWindow statsWindow;
+	InterfaceElement panel;
+	InterfaceElement statsButton;
+} MenuBar_T;
+
+typedef MenuBar_T* MenuBar;
 
 typedef struct Settings
 {
@@ -64,7 +78,8 @@ struct Editor_T
 	GraphicsPipeline textPipeline;
 	FontAtlas fontAtlas;
 	UserInterface ui;
-	MenuWindow menuWindow;
+	StatsWindow statsWindow;
+	MenuBar menuBar;
 	Settings settings;
 };
 
@@ -616,7 +631,6 @@ inline static FontAtlas createFontAtlasInstance(
 		boldItalicFonts,
 		2,
 		fontSize,
-		true,
 		logger,
 		&fontAtlas);
 
@@ -742,8 +756,7 @@ inline static BaseWindow createBaseWindow(
 
 	InterfaceElement window;
 
-	MpgxResult mpgxResult = createUiWindow32(
-		ui,
+	MpgxResult mpgxResult = createUiWindow32(ui,
 		title,
 		titleLength,
 		CENTER_ALIGNMENT_TYPE,
@@ -753,7 +766,7 @@ inline static BaseWindow createBaseWindow(
 		NULL,
 		&events,
 		baseWindow,
-		true,
+		false,
 		&window);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
@@ -778,8 +791,7 @@ inline static BaseWindow createBaseWindow(
 
 	InterfaceElement closeButton;
 
-	mpgxResult = createUiButton32(
-		ui,
+	mpgxResult = createUiButton32(ui,
 		text,
 		sizeof(text) / sizeof(uint32_t),
 		LEFT_ALIGNMENT_TYPE,
@@ -830,93 +842,277 @@ inline static BaseWindow createBaseWindow(
 	return baseWindow;
 }
 
-inline static void destroyMenuWindow(MenuWindow menuWindow)
+static void onStatsLabelUpdate(InterfaceElement element)
 {
-	if (!menuWindow)
+	assert(element);
+	StatsWindow statsWindow = getUiLabelHandle(element);
+	double updateTime = getWindowUpdateTime(statsWindow->window);
+
+	if (updateTime < statsWindow->lastUpdateTime)
 		return;
 
-	destroyInterfaceElement(menuWindow->versionLabel);
-	destroyBaseWindow(menuWindow->base);
-	free(menuWindow);
+	double deltaTime = getWindowDeltaTime(statsWindow->window);
+	Text text = getTextRenderText(getUiLabelRender(element));
+
+	char buffer[256];
+
+	int count = snprintf(
+		buffer,
+		256,
+		"<b>FPS</b>: %d (<i>%dms</i>)",
+		(int)(1.0 / deltaTime),
+		(int)(deltaTime * 1000.0));
+
+	MpgxResult mpgxResult = bakeText(
+		text,
+		buffer,
+		count,
+		LEFT_TOP_ALIGNMENT_TYPE,
+		DEFAULT_UI_TEXT_COLOR,
+		true,
+		false,
+		false);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		logMessage(statsWindow->logger, FATAL_LOG_LEVEL,
+			"Failed to bake stats text. (error: %s)",
+			mpgxResultToString(mpgxResult));
+		abort();
+	}
+
+	statsWindow->lastUpdateTime = updateTime + 0.1;
 }
-inline static MenuWindow createMenuWindow(
+inline static void destroyStatsWindow(StatsWindow statsWindow)
+{
+	if (!statsWindow)
+		return;
+
+	destroyInterfaceElement(statsWindow->label);
+	destroyBaseWindow(statsWindow->base);
+	free(statsWindow);
+}
+inline static StatsWindow createStatsWindow(
 	UserInterface ui,
-	Logger logger)
+	Logger logger,
+	Window window)
 {
 	assert(ui);
 	assert(logger);
+	assert(window);
 
-	MenuWindow menuWindow = calloc(
-		1, sizeof(MenuWindow_T));
+	StatsWindow statsWindow = calloc(
+		1, sizeof(StatsWindow_T));
 
-	if (!menuWindow)
+	if (!statsWindow)
 		return NULL;
 
-	const uint32_t title[] = {
-		'M', 'e', 'n', 'u',
+	const uint32_t windowTitle[] = {
+		'S', 't', 'a', 't', 's',
 	};
 
-	BaseWindow base = createBaseWindow(
-		ui,
-		title,
-		sizeof(title) / sizeof(uint32_t),
+	BaseWindow base = createBaseWindow(ui,
+		windowTitle,
+		sizeof(windowTitle) / sizeof(uint32_t),
 		vec3F(
 			(cmmt_float_t)0.0,
 			(cmmt_float_t)32.0,
 			(cmmt_float_t)0.0),
 		vec2F(
 			(cmmt_float_t)256.0,
-			(cmmt_float_t)64.0),
+			(cmmt_float_t)128.0),
 		logger);
 
 	if (!base)
 	{
 		logMessage(logger, ERROR_LOG_LEVEL,
-			"Failed to create UI base window.");
-		destroyMenuWindow(menuWindow);
+			"Failed to create base window.");
+		destroyStatsWindow(statsWindow);
 		return NULL;
 	}
 
-	menuWindow->base = base;
+	statsWindow->logger = logger;
+	statsWindow->window = window;
+	statsWindow->base = base;
 
 	Transform windowTransform =
 		getInterfaceElementTransform(base->window);
 
-	const char* version = "v" URAN_VERSION_STRING;
-	InterfaceElement versionLabel;
+	const uint32_t labelText[] = {
+		'L', 'o', 'a', 'd', 'i', 'n', 'g',
+	};
 
-	MpgxResult mpgxResult = createUiLabel(
-		ui,
-		version,
-		strlen(version),
-		CENTER_ALIGNMENT_TYPE,
+	InterfaceElementEvents events = emptyInterfaceElementEvents;
+	events.onUpdate = onStatsLabelUpdate;
+
+	InterfaceElement label;
+
+	MpgxResult mpgxResult = createUiLabel32(ui,
+		labelText,
+		sizeof(labelText) / sizeof(uint32_t),
+		LEFT_TOP_ALIGNMENT_TYPE,
 		vec3F(
-			(cmmt_float_t)0.0,
-			(cmmt_float_t)-65.0,
+			(cmmt_float_t)8.0,
+			(cmmt_float_t)-32.0,
 			(cmmt_float_t)-0.001),
 		(cmmt_float_t)12.0,
 		DEFAULT_UI_TEXT_COLOR,
 		true,
 		false,
 		true,
-		true,
+		false,
 		windowTransform,
-		NULL,
-		NULL,
+		&events,
+		statsWindow,
 		true,
-		&versionLabel);
+		&label);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
 		logMessage(logger, ERROR_LOG_LEVEL,
 			"Failed to create UI label. (error: %s)",
 			mpgxResultToString(mpgxResult));
-		destroyMenuWindow(menuWindow);
+		destroyStatsWindow(statsWindow);
 		return NULL;
 	}
 
-	menuWindow->versionLabel = versionLabel;
-	return menuWindow;
+	statsWindow->label = label;
+	return statsWindow;
+}
+
+inline static void onMenuBarUpdate(InterfaceElement element)
+{
+	assert(element);
+	MenuBar menuBar = getUiPanelHandle(element);
+	Transform transform = getInterfaceElementTransform(menuBar->panel);
+	Vec2I windowSize = getWindowSize(menuBar->window);
+	Vec3F scale = vec3F(
+		(cmmt_float_t)windowSize.x,
+		(cmmt_float_t)24.0,
+		(cmmt_float_t)1.0);
+	setTransformScale(transform, scale);
+}
+inline static void onMenuBarStatsRelease(InterfaceElement element)
+{
+	assert(element);
+	MenuBar menuBar = getUiButtonHandle(element);
+	InterfaceElement statsWindow = menuBar->statsWindow->base->window;
+	Transform transform = getInterfaceElementTransform(statsWindow);
+	setInterfaceElementPosition(
+		statsWindow,
+		vec3F(
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)64.0,
+			(cmmt_float_t)0.0));
+	setTransformActive(transform, true);
+}
+inline static void destroyMenuBar(MenuBar menuBar)
+{
+	if (!menuBar)
+		return;
+
+	destroyInterfaceElement(menuBar->statsButton);
+	destroyInterfaceElement(menuBar->panel);
+	free(menuBar);
+}
+inline static MenuBar createMenuBar(
+	UserInterface ui,
+	Logger logger,
+	Window window,
+	cmmt_float_t platformScale,
+	StatsWindow statsWindow)
+{
+	assert(ui);
+	assert(logger);
+	assert(window);
+	assert(platformScale > 0.0);
+	assert(statsWindow);
+
+	MenuBar menuBar = calloc(1,
+		sizeof(MenuBar_T));
+
+	if (!menuBar)
+		return NULL;
+
+	menuBar->window = window;
+	menuBar->statsWindow = statsWindow;
+
+	InterfaceElementEvents events = emptyInterfaceElementEvents;
+	events.onUpdate = onMenuBarUpdate;
+
+	InterfaceElement panel;
+
+	MpgxResult mpgxResult = createUiPanel(ui,
+		TOP_ALIGNMENT_TYPE,
+		vec3F(
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)-12.0,
+			(cmmt_float_t)-0.1),
+		vec2F(
+			(cmmt_float_t)defaultWindowSize.x,
+			(cmmt_float_t)24.0),
+		NULL,
+		&events,
+		menuBar,
+		true,
+		&panel);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		logMessage(logger, ERROR_LOG_LEVEL,
+			"Failed to create UI panel. (error: %s)",
+			mpgxResultToString(mpgxResult));
+		destroyMenuBar(menuBar);
+		return NULL;
+	}
+
+	setPanelRenderColor(getUiPanelRender(panel),
+		srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR));
+
+	menuBar->panel = panel;
+
+	Transform panelTransform =
+		getInterfaceElementTransform(panel);
+
+	const uint32_t statsText[] = {
+		'S', 't', 'a', 't', 's',
+	};
+
+	events = emptyInterfaceElementEvents;
+	events.onRelease = onMenuBarStatsRelease;
+
+	InterfaceElement statsButton;
+
+	mpgxResult = createUiButton32(ui,
+		statsText,
+		sizeof(statsText) / sizeof(uint32_t),
+		LEFT_ALIGNMENT_TYPE,
+		vec3F(
+			(cmmt_float_t)24.0,
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)-0.01),
+		vec2F(
+			(cmmt_float_t)48.0,
+			(cmmt_float_t)24.0),
+		DEFAULT_UI_TEXT_COLOR,
+		panelTransform,
+		&events,
+		menuBar,
+		true,
+		true,
+		&statsButton);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		logMessage(logger, ERROR_LOG_LEVEL,
+			"Failed to create UI button. (error: %s)",
+			mpgxResultToString(mpgxResult));
+		destroyMenuBar(menuBar);
+		return NULL;
+	}
+
+	menuBar->statsButton = statsButton;
+	return menuBar;
 }
 
 Editor createEditor(
@@ -1054,7 +1250,7 @@ Editor createEditor(
 
 	editorInstance->textPipeline = textPipeline;
 
-	float platformScale = calculatePlatformScale(framebuffer);
+	cmmt_float_t platformScale = getPlatformScale(framebuffer);
 	int fontSize = (int)(24 * platformScale);
 
 	FontAtlas fontAtlas = createFontAtlasInstance(
@@ -1096,20 +1292,39 @@ Editor createEditor(
 
 	editorInstance->ui = ui;
 
-	MenuWindow menuWindow = createMenuWindow(
+	StatsWindow statsWindow = createStatsWindow(
 		ui,
-		logger);
+		logger,
+		window);
 
-	if (!menuWindow)
+	if (!statsWindow)
 	{
 		logMessage(logger, ERROR_LOG_LEVEL,
-			"Failed to create menu window.");
+			"Failed to create stats window.");
 		destroyEditor(editorInstance);
 		destroyPackReader(packReader);
 		return NULL;
 	}
 
-	editorInstance->menuWindow = menuWindow;
+	editorInstance->statsWindow = statsWindow;
+
+	MenuBar menuBar = createMenuBar(
+		ui,
+		logger,
+		window,
+		platformScale,
+		statsWindow);
+
+	if (!menuBar)
+	{
+		logMessage(logger, ERROR_LOG_LEVEL,
+			"Failed to create menu bar.");
+		destroyEditor(editorInstance);
+		destroyPackReader(packReader);
+		return NULL;
+	}
+
+	editorInstance->menuBar = menuBar;
 
 	destroyPackReader(packReader);
 	return editorInstance;
@@ -1119,7 +1334,8 @@ void destroyEditor(Editor editor)
 	if (!editor)
 		return;
 
-	destroyMenuWindow(editor->menuWindow);
+	destroyMenuBar(editor->menuBar);
+	destroyStatsWindow(editor->statsWindow);
 	destroyUserInterface(editor->ui);
 	destroyFontAtlasInstance(editor->fontAtlas);
 	destroyTextPipelineInstance(editor->textPipeline);
@@ -1143,31 +1359,9 @@ Window getEditorWindow(Editor editor)
 	return editor->window;
 }
 
-inline static void updateMenuWindow(Editor editor)
-{
-	assert(editor);
-
-	if (getWindowKeyboardKey(editor->window, U_KEYBOARD_KEY))
-	{
-		InterfaceElement menuElement = editor->menuWindow->base->window;
-		Transform menuTransform = getInterfaceElementTransform(menuElement);
-		Vec3F scale = getTransformScale(menuTransform);
-
-		setInterfaceElementPosition(
-			menuElement,
-			vec3F(
-				(cmmt_float_t)0.0,
-				scale.y * (cmmt_float_t)0.5,
-				(cmmt_float_t)0.0));
-		setTransformActive(
-			menuTransform,
-			true);
-	}
-}
 void updateEditor(Editor editor)
 {
 	assert(editor);
-	updateMenuWindow(editor);
 	updateUserInterface(editor->ui);
 	updateTransformer(editor->transformer);
 

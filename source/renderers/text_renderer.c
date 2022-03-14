@@ -49,6 +49,9 @@ static size_t onDraw(
 	setTextPipelineMVP(
 		graphicsPipeline,
 		mvp);
+	setTextPipelineColor(
+		graphicsPipeline,
+		handle->color);
 	return drawText(
 		handle->text,
 		handle->scissor);
