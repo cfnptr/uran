@@ -1132,6 +1132,8 @@ Editor createEditor(
 	if (!editorInstance)
 		return NULL;
 
+	editorInstance->logger = logger;
+
 	PackReader packReader;
 
 	PackResult packResult = createFilePackReader(
@@ -1147,8 +1149,6 @@ Editor createEditor(
 		destroyEditor(editorInstance);
 		return NULL;
 	}
-
-	editorInstance->logger = logger;
 
 	Settings* settings = &editorInstance->settings;
 	loadSettings(logger, settings);

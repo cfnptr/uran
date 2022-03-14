@@ -1105,8 +1105,8 @@ MpgxResult createFontAtlas(
 	uint32_t glyphLength = (uint32_t)ceil(sqrt((double)glyphCount));
 	uint32_t pixelLength = glyphLength * fontSize;
 
-	uint8_t* pixels = malloc(
-		pixelLength * pixelLength *
+	uint8_t* pixels = calloc(
+		pixelLength * pixelLength,
 		4 * sizeof(uint8_t));
 
 	if (!pixels)
