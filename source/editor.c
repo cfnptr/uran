@@ -189,7 +189,7 @@ inline static void storeSettings(
 
 	result &= writeConfString(confWriter,
 		"graphicsAPI", stringValue);
-	result &= writeConfNewLine(confWriter);
+	//result &= writeConfNewLine(confWriter);
 
 	destroyConfWriter(confWriter);
 
@@ -1250,14 +1250,11 @@ Editor createEditor(
 
 	editorInstance->textPipeline = textPipeline;
 
-	cmmt_float_t platformScale = getPlatformScale(framebuffer);
-	int fontSize = (int)(24 * platformScale);
-
 	FontAtlas fontAtlas = createFontAtlasInstance(
 		logger,
 		packReader,
 		textPipeline,
-		fontSize);
+		48);
 
 	if (!fontAtlas)
 	{
@@ -1307,6 +1304,8 @@ Editor createEditor(
 	}
 
 	editorInstance->statsWindow = statsWindow;
+
+	float platformScale = getPlatformScale(framebuffer);
 
 	MenuBar menuBar = createMenuBar(
 		ui,
