@@ -35,6 +35,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 option(URAN_BUILD_EDITOR "Build Uran editor executable" ON)
 
+if (NOT DEFINED URAN_PROGRAM_DIRECTORY)
+	set(URAN_PROGRAM_DIRECTORY ${PROJECT_SOURCE_DIR}/program)
+endif ()
+
 set(CONF_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 set(CONF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory(libraries/conf)
@@ -129,7 +133,7 @@ if (URAN_BUILD_EDITOR)
 	target_include_directories(uran-editor PRIVATE
 		${PROJECT_BINARY_DIR}
 		${PROJECT_SOURCE_DIR}/include
-		${PROJECT_SOURCE_DIR}/program)
+		${URAN_PROGRAM_DIRECTORY})
 
 	if (${CMAKE_BUILD_TYPE} MATCHES "Release" AND
 		(${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR

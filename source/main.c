@@ -31,19 +31,6 @@
 
 #define LOG_FILE_PATH "log.txt"
 
-static void onUpdate(void* argument)
-{
-	assert(argument);
-
-	Program program = *(Program*)argument;
-	updateProgram(program);
-
-	Window window = getProgramWindow(program);
-	beginWindowRecord(window);
-	renderProgram(program);
-	endWindowRecord(window);
-}
-
 MAIN_FUNCTION
 {
 	remove(LOG_FILE_PATH);
@@ -71,11 +58,6 @@ MAIN_FUNCTION
 			logyResultToString(logyResult));
 		return EXIT_FAILURE;
 	}
-
-#if CREATE_EDITOR
-	logMessage(logger, INFO_LOG_LEVEL,
-		"Uran - Editor (v" URAN_VERSION_STRING ")");
-#endif
 
 	logMessage(logger, INFO_LOG_LEVEL,
 #if __linux__
@@ -107,38 +89,14 @@ MAIN_FUNCTION
 		return EXIT_FAILURE;
 	}
 
-	Program program;
-	Editor editor;
-
-#if CREATE_EDITOR
-	editor = createEditor(
+	Program program = createProgram(
 		logger,
-		threadPool,
-		onUpdate,
-		&program);
-
-	if (!editor)
-	{
-		logMessage(logger, FATAL_LOG_LEVEL,
-			"Failed to create editor.");
-		destroyThreadPool(threadPool);
-		destroyLogger(logger);
-		return EXIT_FAILURE;
-	}
-#else
-	editor = NULL;
-#endif
-
-	program = createProgram(
-		logger,
-		threadPool,
-		editor);
+		threadPool);
 
 	if (!program)
 	{
 		logMessage(logger, FATAL_LOG_LEVEL,
 			"Failed to create program.");
-		destroyEditor(editor);
 		destroyThreadPool(threadPool);
 		destroyLogger(logger);
 		return EXIT_FAILURE;
@@ -160,9 +118,6 @@ MAIN_FUNCTION
 	joinWindow(window);
 
 	destroyProgram(program);
-#if CREATE_EDITOR
-	destroyEditor(editor);
-#endif
 	destroyThreadPool(threadPool);
 	destroyLogger(logger);
 	return EXIT_SUCCESS;

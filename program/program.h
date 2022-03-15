@@ -12,17 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// ==============================================================
-// Modify this file to add your custom game or application logic.
-// ==============================================================
+// =================================================================
+// Modify this file to create your custom game or application logic.
+// =================================================================
 
 #pragma once
 #include "uran/editor.h"
-
-/*
- * Create editor instance and pass to the createProgram function.
- */
-#define CREATE_EDITOR 1
 
 /*
  * Program structure.
@@ -39,32 +34,21 @@ typedef struct Program_T
 typedef Program_T* Program;
 
 /*
- * Create a new program instance.
- * Return program instance on success, otherwise NULL.
- *
- * logger - logger instance.
- * threadPool - thread pool instance.
- * editor - editor instance.
+ * Updates program.
+ * argument - function argument.
  */
-inline static Program createProgram(
-	Logger logger,
-	ThreadPool threadPool,
-	Editor editor)
+static void onProgramUpdate(void* argument)
 {
-	assert(logger);
-	assert(threadPool);
-	assert(editor);
-
-	Program program = calloc(1, sizeof(Program_T));
-
-	if (!program)
-		return NULL;
-
-	program->logger = logger;
-	program->threadPool = threadPool;
-	program->editor = editor;
-	return program;
+	assert(argument);
+	Program program = (Program)argument;
+	Editor editor = program->editor;
+	Window window = getEditorWindow(editor);
+	updateEditor(editor);
+	beginWindowRecord(window);
+	renderEditor(editor);
+	endWindowRecord(window);
 }
+
 /*
  * Destroys program instance.
  * program - program instance or NULL.
@@ -74,26 +58,52 @@ inline static void destroyProgram(Program program)
 	if (!program)
 		return;
 
+	destroyEditor(program->editor);
 	free(program);
 }
+/*
+ * Create a new program instance.
+ * Return program instance on success, otherwise NULL.
+ *
+ * logger - logger instance.
+ * threadPool - thread pool instance.
+ * editor - editor instance.
+ */
+inline static Program createProgram(
+	Logger logger,
+	ThreadPool threadPool)
+{
+	assert(logger);
+	assert(threadPool);
 
-/*
- * Updates program.
- * program - program instance.
- */
-inline static void updateProgram(Program program)
-{
-	assert(program);
-	updateEditor(program->editor);
-}
-/*
- * Renders program.
- * program - program instance.
- */
-inline static void renderProgram(Program program)
-{
-	assert(program);
-	renderEditor(program->editor);
+	logMessage(logger, INFO_LOG_LEVEL,
+		"Uran - Editor (v" URAN_VERSION_STRING ")");
+
+	Program program = calloc(
+		1, sizeof(Program_T));
+
+	if (!program)
+		return NULL;
+
+	program->logger = logger;
+	program->threadPool = threadPool;
+
+	Editor editor = createEditor(
+		logger,
+		threadPool,
+		onProgramUpdate,
+		program);
+
+	if (!editor)
+	{
+		logMessage(logger, ERROR_LOG_LEVEL,
+			"Failed to create editor.");
+		destroyProgram(program);
+		return NULL;
+	}
+
+	program->editor = editor;
+	return program;
 }
 
 /*

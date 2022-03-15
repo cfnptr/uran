@@ -1363,7 +1363,6 @@ void updateEditor(Editor editor)
 	assert(editor);
 	updateUserInterface(editor->ui);
 	updateTransformer(editor->transformer);
-
 }
 void renderEditor(Editor editor)
 {
