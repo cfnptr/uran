@@ -33,10 +33,11 @@ set(CMAKE_C_STANDARD_REQUIRED TRUE)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
-option(URAN_BUILD_EDITOR "Build Uran editor executable" ON)
-
 if (NOT DEFINED URAN_PROGRAM_DIRECTORY)
 	set(URAN_PROGRAM_DIRECTORY ${PROJECT_SOURCE_DIR}/program)
+endif ()
+if (NOT DEFINED URAN_PROGRAM_NAME)
+	set(URAN_PROGRAM_NAME uran-editor)
 endif ()
 
 set(CONF_BUILD_SHARED OFF CACHE BOOL "" FORCE)
@@ -96,7 +97,9 @@ set(URAN_SOURCES
 	source/shader_data.c
 	source/text.c
 	source/transformer.c
-	source/user_interface.c)
+	source/user_interface.c
+
+	${URAN_PROGRAM_SOURCES})
 
 set(URAN_LINK_LIBRARIES
 	conf-static
@@ -118,31 +121,29 @@ target_include_directories(uran-static PUBLIC
 	${PROJECT_BINARY_DIR}
 	${PROJECT_SOURCE_DIR}/include)
 
-if (URAN_BUILD_EDITOR)
-	if (${CMAKE_SYSTEM_NAME} MATCHES "Windows" AND
-		${CMAKE_BUILD_TYPE} MATCHES "Release")
-		add_executable(uran-editor WIN32 source/main.c)
-	else ()
-		add_executable(uran-editor source/main.c)
-	endif ()
-
-	set_target_properties(uran-editor PROPERTIES
-		OUTPUT_NAME "uran-editor")
-	target_link_libraries(uran-editor PRIVATE
-		uran-static)
-	target_include_directories(uran-editor PRIVATE
-		${PROJECT_BINARY_DIR}
-		${PROJECT_SOURCE_DIR}/include
-		${URAN_PROGRAM_DIRECTORY})
-
-	if (${CMAKE_BUILD_TYPE} MATCHES "Release" AND
-		(${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR
-		${CMAKE_SYSTEM_NAME} MATCHES "Darwin"))
-		add_custom_command(TARGET uran-editor POST_BUILD
-			COMMAND strip "$<TARGET_FILE:uran-editor>"
-			VERBATIM)
-	endif ()
-
-	configure_file(resources/editor-resources.pack
-		editor-resources.pack COPYONLY)
+if (${CMAKE_SYSTEM_NAME} MATCHES "Windows" AND
+	${CMAKE_BUILD_TYPE} MATCHES "Release")
+	add_executable(uran-editor WIN32 source/main.c)
+else ()
+	add_executable(uran-editor source/main.c)
 endif ()
+
+set_target_properties(uran-editor PROPERTIES
+	OUTPUT_NAME "${URAN_PROGRAM_NAME}")
+target_link_libraries(uran-editor PRIVATE
+	uran-static)
+target_include_directories(uran-editor PRIVATE
+	${PROJECT_BINARY_DIR}
+	${PROJECT_SOURCE_DIR}/include
+	${URAN_PROGRAM_DIRECTORY})
+
+if (${CMAKE_BUILD_TYPE} MATCHES "Release" AND
+	(${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR
+	${CMAKE_SYSTEM_NAME} MATCHES "Darwin"))
+	add_custom_command(TARGET uran-editor POST_BUILD
+		COMMAND strip "$<TARGET_FILE:uran-editor>"
+		VERBATIM)
+endif ()
+
+configure_file(resources/editor-resources.pack
+	editor-resources.pack COPYONLY)

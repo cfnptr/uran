@@ -32,9 +32,11 @@ Work in Progress!
 
 ### CMake options
 
-| Name                | Description                  | Default value |
-|---------------------|------------------------------|---------------|
-| URAN_BUILD_EDITOR   | Build Uran editor executable | `ON`          |
+| Name                   | Description                     | Default value                   |
+|------------------------|---------------------------------|---------------------------------|
+| URAN_PROGRAM_DIRECTORY | Custom program header directory | `${PROJECT_SOURCE_DIR}/program` |
+| URAN_PROGRAM_NAME      | Custom program executable name  | `uran-editor`                   |
+| URAN_PROGRAM_SOURCES   | Custom program source files     | ''                              |
 
 ## Cloning
 
