@@ -40,17 +40,22 @@ typedef InterfaceElement_T* InterfaceElement;
 
 /*
  * Interface element destroy function.
+ * handle - handle instance or NULL.
  */
 typedef void(*OnInterfaceElementDestroy)(
 	void* handle);
 /*
  * Interface element event function.
+ * element - interface element instance.
  */
 typedef void(*OnInterfaceElementEvent)(
 	InterfaceElement element);
 
 /*
  * Interface element enumeration function.
+ *
+ * element - interface element instance.
+ * handle - handle instance or NULL.
  */
 typedef void(*OnInterfaceElement)(
 	InterfaceElement element, void* handle);

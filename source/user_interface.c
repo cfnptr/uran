@@ -23,6 +23,7 @@
 #define UI_LABEL_NAME "Label"
 #define UI_WINDOW_NAME "Window"
 #define UI_BUTTON_NAME "Button"
+#define UI_INPUT_FIELD_NAME "InputField"
 
 struct UserInterface_T
 {
@@ -73,11 +74,30 @@ typedef struct UiButtonHandle_T
 	GraphicsRender textRender;
 	bool isPressed;
 } UiButtonHandle_T;
+typedef struct UiInputFieldHandle_T
+{
+	Window window;
+	void* handle;
+	OnInterfaceElementEvent onEnable;
+	OnInterfaceElementEvent onDisable;
+	OnInterfaceElementEvent onEnter;
+	OnInterfaceElementEvent onExit;
+	OnInterfaceElementEvent onPress;
+	LinearColor disabledColor;
+	LinearColor enabledColor;
+	LinearColor focusedColor;
+	GraphicsRender panelRender;
+	GraphicsRender focusRender;
+	GraphicsRender textRender;
+	GraphicsRender placeholderRender;
+	bool isFocused;
+} UiInputFieldHandle_T;
 
 typedef UiPanelHandle_T* UiPanelHandle;
 typedef UiLabelHandle_T* UiLabelHandle;
 typedef UiWindowHandle_T* UiWindowHandle;
 typedef UiButtonHandle_T* UiButtonHandle;
+typedef UiInputFieldHandle_T* UiInputFieldHandle;
 
 MpgxResult createUserInterface(
 	Transformer transformer,
@@ -212,16 +232,11 @@ GraphicsRendererResult drawUserInterface(UserInterface ui)
 	GraphicsRendererData data = createGraphicsRenderData(
 		view, camera, false);
 
-	tmpResult = drawGraphicsRenderer(
-		ui->panelRenderer,
-		&data);
+	tmpResult = drawGraphicsRenderer(ui->panelRenderer, &data);
 	result = addGraphicsRendererResult(result, tmpResult);
 
-	tmpResult = drawGraphicsRenderer(
-		ui->textRenderer,
-		&data);
+	tmpResult = drawGraphicsRenderer(ui->textRenderer, &data);
 	result = addGraphicsRendererResult(result, tmpResult);
-
 	return result;
 }
 
@@ -966,17 +981,6 @@ OnInterfaceElementEvent getUiWindowOnPressEvent(InterfaceElement window)
 	return handle->onPress;
 }
 
-static void onUiButtonDisable(InterfaceElement element)
-{
-	assert(element);
-	UiButtonHandle handle = (UiButtonHandle)
-		getInterfaceElementHandle(element);
-	setPanelRenderColor(
-		handle->panelRender,
-		handle->disabledColor);
-	if (handle->onDisable)
-		handle->onDisable(element);
-}
 static void onUiButtonEnable(InterfaceElement element)
 {
 	assert(element);
@@ -987,6 +991,17 @@ static void onUiButtonEnable(InterfaceElement element)
 		handle->enabledColor);
 	if (handle->onEnable)
 		handle->onEnable(element);
+}
+static void onUiButtonDisable(InterfaceElement element)
+{
+	assert(element);
+	UiButtonHandle handle = (UiButtonHandle)
+		getInterfaceElementHandle(element);
+	setPanelRenderColor(
+		handle->panelRender,
+		handle->disabledColor);
+	if (handle->onDisable)
+		handle->onDisable(element);
 }
 static void onUiButtonEnter(InterfaceElement element)
 {
@@ -1462,4 +1477,385 @@ void setUiButtonPressedColor(
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
 	handle->pressedColor = color;
+}
+
+static void onUiInputFieldEnable(InterfaceElement element)
+{
+	assert(element);
+	UiInputFieldHandle handle = (UiInputFieldHandle)
+		getInterfaceElementHandle(element);
+	setPanelRenderColor(
+		handle->panelRender,
+		handle->enabledColor);
+	if (handle->onEnable)
+		handle->onEnable(element);
+}
+static void onUiInputFieldDisable(InterfaceElement element)
+{
+	assert(element);
+	UiInputFieldHandle handle = (UiInputFieldHandle)
+		getInterfaceElementHandle(element);
+	setPanelRenderColor(
+		handle->panelRender,
+		handle->disabledColor);
+	if (handle->onDisable)
+		handle->onDisable(element);
+}
+static void onUiInputFieldEnter(InterfaceElement element)
+{
+	assert(element);
+	UiInputFieldHandle handle = (UiInputFieldHandle)
+		getInterfaceElementHandle(element);
+	setWindowCursorType(
+		handle->window,
+		IBEAM_CURSOR_TYPE);
+	if (handle->onEnter)
+		handle->onEnter(element);
+}
+static void onUiInputFieldExit(InterfaceElement element)
+{
+	assert(element);
+	UiInputFieldHandle handle = (UiInputFieldHandle)
+		getInterfaceElementHandle(element);
+	setWindowCursorType(
+		handle->window,
+		DEFAULT_CURSOR_TYPE);
+	if (handle->onExit)
+		handle->onExit(element);
+}
+static void onUiInputFieldPress(InterfaceElement element)
+{
+	assert(element);
+	UiInputFieldHandle handle = (UiInputFieldHandle)
+		getInterfaceElementHandle(element);
+	setPanelRenderColor(
+		handle->focusRender,
+		handle->focusedColor);
+	if (handle->onPress)
+		handle->onPress(element);
+	handle->isFocused = true;
+}
+static void onUiInputFieldDestroy(void* _handle)
+{
+	assert(_handle);
+	UiInputFieldHandle handle = (UiInputFieldHandle)_handle;
+
+	Transform transform;
+	GraphicsRender render = handle->placeholderRender;
+
+	if (render)
+	{
+		Text text = getTextRenderText(render);
+		transform = getGraphicsRenderTransform(render);
+		destroyGraphicsRender(render);
+		destroyText(text);
+		destroyTransform(transform);
+	}
+
+	render = handle->textRender;
+
+	if (render)
+	{
+		Text text = getTextRenderText(render);
+		transform = getGraphicsRenderTransform(render);
+		destroyGraphicsRender(render);
+		destroyText(text);
+		destroyTransform(transform);
+	}
+
+	render = handle->focusRender;
+
+	if (render)
+	{
+		transform = getGraphicsRenderTransform(render);
+		destroyGraphicsRender(render);
+		destroyTransform(transform);
+	}
+
+	render = handle->panelRender;
+
+	if (render)
+	{
+		transform = getGraphicsRenderTransform(render);
+		destroyGraphicsRender(render);
+		destroyTransform(transform);
+	}
+
+	free(handle);
+}
+MpgxResult createUiInputField32(
+	UserInterface ui,
+	const uint32_t* placeholder,
+	size_t placeholderLength,
+	AlignmentType alignment,
+	Vec3F position,
+	Vec2F scale,
+	SrgbColor placeholderColor,
+	SrgbColor textColor,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* _handle,
+	bool isEnabled,
+	bool isActive,
+	InterfaceElement* uiButton)
+{
+	assert(ui);
+	assert(placeholder);
+	assert(placeholderLength > 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale.x > 0.0f);
+	assert(scale.y > 0.0f);
+	assert(uiButton);
+
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
+
+	UiInputFieldHandle handle = calloc(1,
+		sizeof(UiInputFieldHandle_T));
+
+	if (!handle)
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+	handle->window = ui->window;
+	handle->handle = _handle;
+	handle->disabledColor = srgbToLinearColor(DEFAULT_UI_DISABLED_INPUT_COLOR);
+	handle->enabledColor = srgbToLinearColor(DEFAULT_UI_ENABLED_INPUT_COLOR);
+	handle->focusedColor = srgbToLinearColor(DEFAULT_UI_FOCUSED_INPUT_COLOR);
+	handle->isFocused = false;
+
+	Transformer transformer = ui->transformer;
+	GraphicsRenderer panelRenderer = ui->panelRenderer;
+	FontAtlas fontAtlas = ui->fontAtlas;
+
+	Transform panelTransform = createTransform(
+		transformer,
+		zeroVec3F,
+		vec3F(scale.x, scale.y, (cmmt_float_t)1.0),
+		oneQuat,
+		NO_ROTATION_TYPE,
+		parent,
+		isActive);
+
+	if (!panelTransform)
+	{
+		onUiInputFieldDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	GraphicsRender panelRender = createPanelRender(
+		panelRenderer,
+		panelTransform,
+		oneSizeBox3F,
+		srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR));
+
+	if (!panelRender)
+	{
+		destroyTransform(panelTransform);
+		onUiInputFieldDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	handle->panelRender = panelRender;
+
+	Transform focusTransform = createTransform(
+		transformer,
+		vec3F(
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)0.001),
+		vec3F(
+			scale.x + (cmmt_float_t)4.0,
+			scale.y + (cmmt_float_t)4.0,
+			(cmmt_float_t)1.0),
+		oneQuat,
+		NO_ROTATION_TYPE,
+		panelTransform,
+		isActive);
+
+	if (!panelTransform)
+	{
+		onUiInputFieldDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	GraphicsRender focusRender = createPanelRender(
+		panelRenderer,
+		focusTransform,
+		oneSizeBox3F,
+		srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR));
+
+	if (!focusRender)
+	{
+		destroyTransform(focusTransform);
+		onUiInputFieldDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	handle->focusRender = focusRender;
+
+	Transform textTransform = createTransform(
+		transformer,
+		vec3F(
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)-0.001),
+		vec3F(
+			DEFAULT_UI_TEXT_HEIGHT,
+			DEFAULT_UI_TEXT_HEIGHT,
+			(cmmt_float_t)1.0),
+		oneQuat,
+		NO_ROTATION_TYPE,
+		panelTransform,
+		false);
+
+	if (!textTransform)
+	{
+		onUiInputFieldDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	Text textInstance;
+
+	const uint32_t text[] = { 'X', };
+
+	MpgxResult mpgxResult = createAtlasText32(
+		fontAtlas,
+		text,
+		sizeof(text) / sizeof(uint32_t),
+		LEFT_ALIGNMENT_TYPE,
+		textColor,
+		false,
+		false,
+		false,
+		true,
+		&textInstance);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		destroyTransform(textTransform);
+		onUiInputFieldDestroy(handle);
+		return mpgxResult;
+	}
+
+	GraphicsRender textRender = createTextRender(
+		ui->textRenderer,
+		textTransform,
+		createTextBox3F(
+			alignment,
+			getTextSize(textInstance)),
+		whiteLinearColor,
+		textInstance,
+		zeroVec4I);
+
+	if (!textRender)
+	{
+		destroyText(textInstance);
+		destroyTransform(textTransform);
+		onUiInputFieldDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	handle->textRender = textRender;
+
+	Transform placeholderTransform = createTransform(
+		transformer,
+		vec3F(
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)-0.001),
+		vec3F(
+			DEFAULT_UI_TEXT_HEIGHT,
+			DEFAULT_UI_TEXT_HEIGHT,
+			(cmmt_float_t)1.0),
+		oneQuat,
+		NO_ROTATION_TYPE,
+		panelTransform,
+		true);
+
+	if (!placeholderTransform)
+	{
+		onUiInputFieldDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	Text placeholderInstance;
+
+	mpgxResult = createAtlasText32(
+		fontAtlas,
+		placeholder,
+		placeholderLength,
+		LEFT_ALIGNMENT_TYPE,
+		placeholderColor,
+		true,
+		false,
+		false,
+		true,
+		&placeholderInstance);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		destroyTransform(placeholderTransform);
+		onUiInputFieldDestroy(handle);
+		return mpgxResult;
+	}
+
+	GraphicsRender placeholderRender = createTextRender(
+		ui->textRenderer,
+		placeholderTransform,
+		createTextBox3F(
+			alignment,
+			getTextSize(textInstance)),
+		whiteLinearColor,
+		placeholderInstance,
+		zeroVec4I);
+
+	if (!placeholderRender)
+	{
+		destroyText(placeholderInstance);
+		destroyTransform(placeholderTransform);
+		onUiInputFieldDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	handle->placeholderRender = placeholderRender;
+
+#ifndef NDEBUG
+	const char* name = UI_INPUT_FIELD_NAME;
+#else
+	const char* name = NULL;
+#endif
+
+	InterfaceElementEvents elementEvents = events ?
+		*events : emptyInterfaceElementEvents;
+	handle->onEnable = elementEvents.onEnable;
+	handle->onDisable = elementEvents.onDisable;
+	handle->onEnter = elementEvents.onEnter;
+	handle->onExit = elementEvents.onExit;
+	handle->onPress = elementEvents.onPress;
+	elementEvents.onEnable = onUiInputFieldEnable;
+	elementEvents.onDisable = onUiInputFieldDisable;
+	elementEvents.onEnter = onUiInputFieldEnter;
+	elementEvents.onExit = onUiInputFieldExit;
+	elementEvents.onPress = onUiInputFieldPress;
+
+	InterfaceElement element = createInterfaceElement(
+		ui->interface,
+		name,
+		panelTransform,
+		alignment,
+		position,
+		oneSizeBox2F,
+		isEnabled,
+		onUiInputFieldDestroy,
+		&elementEvents,
+		handle);
+
+	if (!element)
+	{
+		onUiInputFieldDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	*uiButton = element;
+	return SUCCESS_MPGX_RESULT;
 }

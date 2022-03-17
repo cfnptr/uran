@@ -427,7 +427,7 @@ GraphicsRendererResult drawGraphicsRenderer(
 	assert(!renderer->isEnumerating);
 
 	GraphicsRendererResult result;
-	result.renderCount = 0;
+	result.drawCount = 0;
 	result.indexCount = 0;
 	result.passCount = 0;
 
@@ -549,7 +549,7 @@ GraphicsRendererResult drawGraphicsRenderer(
 
 		if (indexCount > 0)
 		{
-			result.renderCount++;
+			result.drawCount++;
 			result.indexCount += indexCount;
 		}
 	}

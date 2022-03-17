@@ -74,18 +74,25 @@ typedef struct GraphicsRendererData
  */
 typedef struct GraphicsRendererResult
 {
-	size_t renderCount;
+	size_t drawCount;
 	size_t indexCount;
 	size_t passCount;
 } GraphicsRendererResult;
 
 /*
  * Graphics render destroy function.
+ * handle - handle instance or NULL.
  */
 typedef void(*OnGraphicsRenderDestroy)(
 	void* handle);
 /*
  * Graphics render draw function.
+ * Returns rendered index count.
+ *
+ * graphicsRender - graphics render instance.
+ * graphicsPipeline - graphics pipeline instance.
+ * model - pointer to the model matrix.
+ * viewProj - pointer to the view projection matrix.
  */
 typedef size_t(*OnGraphicsRenderDraw)(
 	GraphicsRender graphicsRender,
@@ -94,6 +101,9 @@ typedef size_t(*OnGraphicsRenderDraw)(
 	const Mat4F* viewProj);
 /*
  * Graphics renderer enumeration function.
+ *
+ * graphicsRender - graphics render instance.
+ * handle - handle instance or NULL.
  */
 typedef void(*OnGraphicsRendererItem)(
 	GraphicsRender graphicsRender, void* handle);
@@ -454,7 +464,7 @@ inline static GraphicsRendererData createGraphicsRenderData(
 inline static GraphicsRendererResult createGraphicsRendererResult()
 {
 	GraphicsRendererResult result;
-	result.renderCount = 0;
+	result.drawCount = 0;
 	result.indexCount = 0;
 	result.passCount = 0;
 	return result;
@@ -469,7 +479,7 @@ inline static GraphicsRendererResult addGraphicsRendererResult(
 	GraphicsRendererResult a, GraphicsRendererResult b)
 {
 	GraphicsRendererResult result;
-	result.renderCount = a.renderCount + b.renderCount;
+	result.drawCount = a.drawCount + b.drawCount;
 	result.indexCount = a.indexCount + b.indexCount;
 	result.passCount = a.passCount + b.passCount;
 	return result;

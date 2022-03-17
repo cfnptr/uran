@@ -299,9 +299,7 @@ inline static void updateInterfacePositions(
 		break;
 	}
 
-	setTransformPosition(
-		transform,
-		position);
+	setTransformPosition(transform, position);
 }
 static void onInterfacePositionsUpdate(void* argument)
 {
@@ -346,7 +344,7 @@ void updateInterface(Interface interface)
 	size_t elementCount = interface->elementCount;
 	Window window = interface->window;
 
-	if (!elementCount || !isWindowFocused(window))
+	if (!elementCount)
 		return;
 
 	cmmt_float_t interfaceScale = interface->scale;
@@ -378,7 +376,7 @@ void updateInterface(Interface interface)
 		while (parent)
 		{
 			if (!isTransformActive(parent))
-				goto CONTINUE_1;
+				goto CONTINUE;
 			parent = getTransformParent(parent);
 		}
 
@@ -420,9 +418,12 @@ void updateInterface(Interface interface)
 			newElement = element;
 		}
 
-	CONTINUE_1:
+	CONTINUE:
 		continue;
 	}
+
+	if (!isWindowFocused(window))
+		return;
 
 	bool isLeftButtonPressed = getWindowMouseButton(
 		window, LEFT_MOUSE_BUTTON);

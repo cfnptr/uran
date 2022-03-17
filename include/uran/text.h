@@ -114,6 +114,19 @@ void terminateText(Logger logger);
 bool isTextInitialized();
 
 /*
+ * Convert UTF-8 string to UTF-32.
+ * Returns string length on success, otherwise 0.
+ *
+ * source - source UTF-8 string.
+ * destination - destination UTF-32 string.
+ * length - source string length.
+ */
+size_t stringUTF8toUTF32(
+	const char* source,
+	size_t sourceLength,
+	uint32_t* destination);
+
+/*
  * Allocate a new UTF-8 string from the UTF-32 string.
  * Returns operation MPGX result.
  *
@@ -125,8 +138,8 @@ bool isTextInitialized();
 MpgxResult allocateStringUTF8(
 	const uint32_t* source,
 	size_t sourceLength,
-	char** string,
-	size_t* stringLength);
+	char** destination,
+	size_t* destinationLength);
 /*
  * Returns true if UTF-8 string is valid.
  *

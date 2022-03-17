@@ -29,13 +29,6 @@
 #define APPLICATION_NAME "Editor"
 #define WINDOW_TITLE "Uran Editor"
 
-/*#define INPUT_PANEL_COLOR srgbToLinearColor(srgbColor(32, 32, 32, 255))
-#define FOCUSED_INPUT_COLOR srgbToLinearColor(srgbColor(128, 128, 128, 255))
-#define INCORRECT_INPUT_COLOR srgbToLinearColor(srgbColor(192, 32, 32, 255))
-#define DEFAULT_TEXT_COLOR srgbToLinearColor(srgbColor(240, 240, 240, 255))
-#define PLACEHOLDER_TEXT_COLOR srgbToLinearColor(srgbColor(144, 144, 144, 255))
-#define CHECKBOX_CHECK_COLOR srgbToLinearColor(srgbColor(128, 128, 128, 255))*/
-
 typedef struct BaseWindow_T
 {
 	InterfaceElement window;
@@ -51,6 +44,7 @@ typedef struct StatsWindow_T
 	BaseWindow base;
 	InterfaceElement label;
 	double lastUpdateTime;
+	GraphicsRendererResult rendererResult;
 } StatsWindow_T;
 
 typedef StatsWindow_T* StatsWindow;
@@ -853,19 +847,31 @@ static void onStatsLabelUpdate(InterfaceElement element)
 
 	double deltaTime = getWindowDeltaTime(statsWindow->window);
 	Text text = getTextRenderText(getUiLabelRender(element));
+	GraphicsRendererResult rendererResult = statsWindow->rendererResult;
 
-	char buffer[256];
+	char bufferUTF8[256];
+	uint32_t bufferUTF32[256];
 
-	int count = snprintf(
-		buffer,
+	size_t count = snprintf(
+		bufferUTF8,
 		256,
-		"<b>FPS</b>: %d (<i>%dms</i>)",
+		"<b>FPS</b>: %d (<i>%dms</i>)\n"
+		"<b>Draw count</b>: %zu\n"
+		"<b>Polygon count</b>: %zu\n"
+		"<b>Pass count</b>: %zu",
 		(int)(1.0 / deltaTime),
-		(int)(deltaTime * 1000.0));
+		(int)(deltaTime * 1000.0),
+		rendererResult.drawCount,
+		rendererResult.indexCount / 3,
+		rendererResult.passCount);
+	count = stringUTF8toUTF32(
+		bufferUTF8,
+		count,
+		bufferUTF32);
 
-	MpgxResult mpgxResult = bakeText(
+	MpgxResult mpgxResult = bakeText32(
 		text,
-		buffer,
+		bufferUTF32,
 		count,
 		LEFT_TOP_ALIGNMENT_TYPE,
 		DEFAULT_UI_TEXT_COLOR,
@@ -914,10 +920,7 @@ inline static StatsWindow createStatsWindow(
 	BaseWindow base = createBaseWindow(ui,
 		windowTitle,
 		sizeof(windowTitle) / sizeof(uint32_t),
-		vec3F(
-			(cmmt_float_t)0.0,
-			(cmmt_float_t)32.0,
-			(cmmt_float_t)0.0),
+		zeroVec3F,
 		vec2F(
 			(cmmt_float_t)256.0,
 			(cmmt_float_t)128.0),
@@ -955,7 +958,7 @@ inline static StatsWindow createStatsWindow(
 			(cmmt_float_t)8.0,
 			(cmmt_float_t)-32.0,
 			(cmmt_float_t)-0.001),
-		(cmmt_float_t)12.0,
+		(cmmt_float_t)DEFAULT_UI_TEXT_HEIGHT,
 		DEFAULT_UI_TEXT_COLOR,
 		true,
 		false,
@@ -996,14 +999,13 @@ inline static void onMenuBarStatsRelease(InterfaceElement element)
 {
 	assert(element);
 	MenuBar menuBar = getUiButtonHandle(element);
-	InterfaceElement statsWindow = menuBar->statsWindow->base->window;
-	Transform transform = getInterfaceElementTransform(statsWindow);
-	setInterfaceElementPosition(
-		statsWindow,
+	InterfaceElement window = menuBar->statsWindow->base->window;
+	Transform transform = getInterfaceElementTransform(window);
+	setInterfaceElementPosition(window,
 		vec3F(
-			(cmmt_float_t)0.0,
-			(cmmt_float_t)64.0,
-			(cmmt_float_t)0.0));
+			(cmmt_float_t)384.0,
+			(cmmt_float_t)-128.0,
+			(cmmt_float_t)0.1));
 	setTransformActive(transform, true);
 }
 inline static void destroyMenuBar(MenuBar menuBar)
@@ -1019,13 +1021,11 @@ inline static MenuBar createMenuBar(
 	UserInterface ui,
 	Logger logger,
 	Window window,
-	cmmt_float_t platformScale,
 	StatsWindow statsWindow)
 {
 	assert(ui);
 	assert(logger);
 	assert(window);
-	assert(platformScale > 0.0);
 	assert(statsWindow);
 
 	MenuBar menuBar = calloc(1,
@@ -1040,7 +1040,7 @@ inline static MenuBar createMenuBar(
 	InterfaceElementEvents events = emptyInterfaceElementEvents;
 	events.onUpdate = onMenuBarUpdate;
 
-	InterfaceElement panel;
+	InterfaceElement element;
 
 	MpgxResult mpgxResult = createUiPanel(ui,
 		TOP_ALIGNMENT_TYPE,
@@ -1055,7 +1055,7 @@ inline static MenuBar createMenuBar(
 		&events,
 		menuBar,
 		true,
-		&panel);
+		&element);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
@@ -1066,33 +1066,30 @@ inline static MenuBar createMenuBar(
 		return NULL;
 	}
 
-	setPanelRenderColor(getUiPanelRender(panel),
+	setPanelRenderColor(getUiPanelRender(element),
 		srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR));
 
-	menuBar->panel = panel;
+	menuBar->panel = element;
 
 	Transform panelTransform =
-		getInterfaceElementTransform(panel);
+		getInterfaceElementTransform(element);
 
 	const uint32_t statsText[] = {
 		'S', 't', 'a', 't', 's',
 	};
-
-	events = emptyInterfaceElementEvents;
+	events.onUpdate = NULL;
 	events.onRelease = onMenuBarStatsRelease;
-
-	InterfaceElement statsButton;
 
 	mpgxResult = createUiButton32(ui,
 		statsText,
 		sizeof(statsText) / sizeof(uint32_t),
 		LEFT_ALIGNMENT_TYPE,
 		vec3F(
-			(cmmt_float_t)24.0,
+			(cmmt_float_t)32.0,
 			(cmmt_float_t)0.0,
 			(cmmt_float_t)-0.01),
 		vec2F(
-			(cmmt_float_t)48.0,
+			(cmmt_float_t)64.0,
 			(cmmt_float_t)24.0),
 		DEFAULT_UI_TEXT_COLOR,
 		panelTransform,
@@ -1100,7 +1097,7 @@ inline static MenuBar createMenuBar(
 		menuBar,
 		true,
 		true,
-		&statsButton);
+		&element);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
@@ -1111,7 +1108,7 @@ inline static MenuBar createMenuBar(
 		return NULL;
 	}
 
-	menuBar->statsButton = statsButton;
+	menuBar->statsButton = element;
 	return menuBar;
 }
 
@@ -1305,13 +1302,10 @@ Editor createEditor(
 
 	editorInstance->statsWindow = statsWindow;
 
-	float platformScale = getPlatformScale(framebuffer);
-
 	MenuBar menuBar = createMenuBar(
 		ui,
 		logger,
 		window,
-		platformScale,
 		statsWindow);
 
 	if (!menuBar)
@@ -1356,6 +1350,13 @@ Window getEditorWindow(Editor editor)
 {
 	assert(editor);
 	return editor->window;
+}
+void setEditorRendererResult(
+	Editor editor,
+	GraphicsRendererResult result)
+{
+	assert(editor);
+	editor->statsWindow->rendererResult = result;
 }
 
 void updateEditor(Editor editor)

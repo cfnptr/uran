@@ -27,6 +27,15 @@
 #define DEFAULT_UI_DISABLED_BUTTON_COLOR srgbColor(64, 64, 64, 255)
 #define DEFAULT_UI_HOVERED_BUTTON_COLOR srgbColor(96, 96, 96, 255)
 #define DEFAULT_UI_PRESSED_BUTTON_COLOR srgbColor(64, 64, 64, 255)
+#define DEFAULT_UI_PRESSED_BUTTON_COLOR srgbColor(64, 64, 64, 255)
+#define DEFAULT_UI_INPUT_PANEL_COLOR srgbColor(32, 32, 32, 255)
+#define DEFAULT_UI_ENABLED_INPUT_COLOR srgbColor(80, 80, 80, 255)
+#define DEFAULT_UI_DISABLED_INPUT_COLOR srgbColor(64, 64, 64, 255)
+#define DEFAULT_UI_FOCUSED_INPUT_COLOR srgbColor(128, 128, 128, 255)
+#define DEFAULT_UI_INCORRECT_INPUT_COLOR srgbColor(192, 32, 32, 255)
+#define DEFAULT_UI_PLACEHOLDER_COLOR srgbColor(144, 144, 144, 255)
+
+// #define CHECKBOX_CHECK_COLOR srgbToLinearColor(srgbColor(128, 128, 128, 255))
 
 /*
  * User interface structure.
@@ -487,3 +496,38 @@ LinearColor getUiButtonPressedColor(
 void setUiButtonPressedColor(
 	InterfaceElement button,
 	LinearColor color);
+
+// TODO: comments
+
+MpgxResult createUiInputField32(
+	UserInterface ui,
+	const uint32_t* placeholder,
+	size_t placeholderLength,
+	AlignmentType alignment,
+	Vec3F position,
+	Vec2F scale,
+	SrgbColor placeholderColor,
+	SrgbColor textColor,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* handle,
+	bool isEnabled,
+	bool isActive,
+	InterfaceElement* uiButton);
+MpgxResult createUiInputField(
+	UserInterface ui,
+	const char* placeholder,
+	size_t placeholderLength,
+	AlignmentType alignment,
+	Vec3F position,
+	Vec2F scale,
+	SrgbColor placeholderColor,
+	SrgbColor textColor,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* handle,
+	bool isEnabled,
+	bool isActive,
+	InterfaceElement* uiButton);
+
+// TODO: InputBox, ScrollBox, Checkbox

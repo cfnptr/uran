@@ -61,6 +61,16 @@ Transformer getEditorTransformer(Editor editor);
 Window getEditorWindow(Editor editor);
 
 /*
+ * Sets editor stats renderer data.
+ *
+ * editor - editor instance.
+ * result - graphics renderer result.
+ */
+void setEditorRendererResult(
+	Editor editor,
+	GraphicsRendererResult result);
+
+/*
  * Updates editor.
  * editor - editor instance.
  */
@@ -70,5 +80,3 @@ void updateEditor(Editor editor);
  * editor - editor instance.
  */
 void renderEditor(Editor editor);
-
-

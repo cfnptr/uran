@@ -231,6 +231,70 @@ bool isTextInitialized()
 	return textInitialized;
 }
 
+size_t stringUTF8toUTF32(
+	const char* source,
+	size_t sourceLength,
+	uint32_t* destination)
+{
+	assert(source);
+	assert(sourceLength > 0);
+	assert(destination);
+
+	size_t i = 0, length = 0;
+
+	while(i < sourceLength)
+	{
+		char value = source[i];
+
+		if ((value & 0b10000000) == 0)
+		{
+			destination[length] = (uint32_t)source[i];
+			i += 1;
+		}
+		else if (i + 1 < sourceLength &&
+			!((value & 0b11100000) ^ 0b11000000 |
+			(source[i + 1] & 0b11000000) ^ 0b10000000))
+		{
+			destination[length] =
+				(uint32_t)(source[i] & 0b00011111) << 6 |
+				(uint32_t)(source[i + 1] & 0b00111111);
+			i += 2;
+		}
+		else if (i + 2 < sourceLength &&
+			!((value & 0b11110000) ^ 0b11100000 |
+			(source[i + 1] & 0b11000000) ^ 0b10000000 |
+			(source[i + 2] & 0b11000000) ^ 0b10000000))
+		{
+			destination[length] =
+				(uint32_t)(source[i] & 0b00001111) << 12 |
+				(uint32_t)(source[i + 1] & 0b00111111) << 6 |
+				(uint32_t)(source[i + 2] & 0b00111111);
+			i += 3;
+		}
+		else if (i + 3 < sourceLength &&
+			!((value & 0b11111000) ^ 0b11110000 |
+			(source[i + 1] & 0b11000000) ^ 0b10000000 |
+			(source[i + 2] & 0b11000000) ^ 0b10000000 |
+			(source[i + 3] & 0b11000000) ^ 0b10000000))
+		{
+			destination[length] =
+				(uint32_t)(source[i] & 0b00000111) << 18 |
+				(uint32_t)(source[i + 1] & 0b00111111) << 12 |
+				(uint32_t)(source[i + 2] & 0b00111111) << 6 |
+				(uint32_t)(source[i + 3] & 0b00111111);
+			i += 4;
+		}
+		else
+		{
+			return 0;
+		}
+
+		length++;
+	}
+
+	return length;
+}
+
 MpgxResult allocateStringUTF8(
 	const uint32_t* source,
 	size_t sourceLength,
@@ -2229,6 +2293,7 @@ MpgxResult bakeText32(
 	assert(!text->base.isConstant);
 	assert(textInitialized);
 
+	// TODO: allocate and reuse vertices buffer in the text
 	TextVertex* vertices = malloc(
 		stringLength * 4 * sizeof(TextVertex));
 

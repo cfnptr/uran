@@ -36,7 +36,7 @@ Work in Progress!
 |------------------------|---------------------------------|---------------------------------|
 | URAN_PROGRAM_DIRECTORY | Custom program header directory | `${PROJECT_SOURCE_DIR}/program` |
 | URAN_PROGRAM_NAME      | Custom program executable name  | `uran-editor`                   |
-| URAN_PROGRAM_SOURCES   | Custom program source files     | ''                              |
+| URAN_PROGRAM_SOURCES   | Custom program source files     |                                 |
 
 ## Cloning
 
