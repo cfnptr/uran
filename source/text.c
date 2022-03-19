@@ -85,6 +85,8 @@ typedef struct BaseText
 {
 	FontAtlas fontAtlas;
 	Vec2F textSize;
+	TextVertex* vertices;
+	uint32_t vertexCapacity;
 	AlignmentType alignment;
 	bool isConstant;
 } BaseText;
@@ -93,6 +95,8 @@ typedef struct VkText
 {
 	FontAtlas fontAtlas;
 	Vec2F textSize;
+	TextVertex* vertices;
+	uint32_t vertexCapacity;
 	AlignmentType alignment;
 	bool isConstant;
 	uint8_t _alignment[2];
@@ -105,9 +109,11 @@ typedef struct GlText
 {
 	FontAtlas fontAtlas;
 	Vec2F textSize;
+	TextVertex* vertices;
+	uint32_t vertexCapacity;
 	AlignmentType alignment;
 	bool isConstant;
-	uint8_t _alignment[6];
+	uint8_t _alignment[2];
 	GraphicsMesh mesh;
 } GlText;
 #endif
@@ -1866,6 +1872,7 @@ inline static void internalDestroyText(Text text)
 		abort();
 	}
 
+	free(text->base.vertices);
 	free(text);
 }
 
@@ -1898,14 +1905,17 @@ MpgxResult createAtlasText32(
 	textInstance->base.alignment = alignment;
 	textInstance->base.isConstant = isConstant;
 
-	TextVertex* vertices = malloc(
-		stringLength * 4 * sizeof(TextVertex));
+	uint32_t vertexCapacity = stringLength * 4;
+	TextVertex* vertices = malloc(vertexCapacity * sizeof(TextVertex));
 
 	if (!vertices)
 	{
 		internalDestroyText(textInstance);
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
+
+	textInstance->base.vertices = vertices;
+	textInstance->base.vertexCapacity = vertexCapacity;
 
 	uint32_t vertexCount;
 
@@ -1929,7 +1939,6 @@ MpgxResult createAtlasText32(
 
 	if (!result)
 	{
-		free(vertices);
 		internalDestroyText(textInstance);
 		return BAD_VALUE_MPGX_RESULT;
 	}
@@ -1947,8 +1956,6 @@ MpgxResult createAtlasText32(
 		vertexCount * sizeof(TextVertex),
 		&vertexBuffer);
 
-	free(vertices);
-
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
 		internalDestroyText(textInstance);
@@ -1960,9 +1967,9 @@ MpgxResult createAtlasText32(
 	Text* texts = handle->base.texts;
 	size_t textCount = handle->base.textCount;
 	uint32_t indexCount = (vertexCount / 4) * 6;
+	size_t indexSize = indexCount * sizeof(uint32_t);
 
-	if (indexBuffer == NULL || indexBuffer->base.size <
-		indexCount * sizeof(uint32_t))
+	if (!indexBuffer || indexBuffer->base.size < indexSize)
 	{
 		uint32_t* indices = createIndices(indexCount);
 
@@ -1979,7 +1986,7 @@ MpgxResult createAtlasText32(
 			INDEX_BUFFER_TYPE,
 			GPU_ONLY_BUFFER_USAGE,
 			indices,
-			indexCount * sizeof(uint32_t),
+			indexSize,
 			&newIndexBuffer);
 
 		free(indices);
@@ -2069,6 +2076,13 @@ MpgxResult createAtlasText32(
 
 	handle->base.texts[textCount] = textInstance;
 	handle->base.textCount = textCount + 1;
+
+	if (isConstant)
+	{
+		free(textInstance->base.vertices);
+		textInstance->base.vertices = NULL;
+		textInstance->base.vertexCapacity = 0;
+	}
 
 	*text = textInstance;
 	return SUCCESS_MPGX_RESULT;
@@ -2293,12 +2307,30 @@ MpgxResult bakeText32(
 	assert(!text->base.isConstant);
 	assert(textInitialized);
 
-	// TODO: allocate and reuse vertices buffer in the text
-	TextVertex* vertices = malloc(
-		stringLength * 4 * sizeof(TextVertex));
+	uint32_t vertexCapacity = stringLength * 4;
+	TextVertex* vertices = text->base.vertices;
 
-	if (!vertices)
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	if (text->base.vertexCapacity < vertexCapacity)
+	{
+		TextVertex* newVertices;
+
+		if (vertices)
+		{
+			newVertices = realloc(vertices,
+				vertexCapacity * sizeof(TextVertex));
+		}
+		else
+		{
+			newVertices = malloc(
+				vertexCapacity * sizeof(TextVertex));
+		}
+
+		if (!newVertices)
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+		text->base.vertices = vertices = newVertices;
+		text->base.vertexCapacity = vertexCapacity;
+	}
 
 	FontAtlas fontAtlas = text->base.fontAtlas;
 
@@ -2324,10 +2356,7 @@ MpgxResult bakeText32(
 		&textSize);
 
 	if (!result)
-	{
-		free(vertices);
 		return BAD_VALUE_MPGX_RESULT;
-	}
 
 	GraphicsAPI api = getGraphicsAPI();
 	GraphicsPipeline pipeline = fontAtlas->pipeline;
@@ -2337,17 +2366,14 @@ MpgxResult bakeText32(
 	Text* texts = handle->base.texts;
 	size_t textCount = handle->base.textCount;
 	uint32_t indexCount = (vertexCount / 4) * 6;
+	size_t indexSize = indexCount * sizeof(uint32_t);
 
-	if (indexBuffer == NULL || indexBuffer->base.size <
-		indexCount * sizeof(uint32_t))
+	if (!indexBuffer || indexBuffer->base.size < indexSize)
 	{
 		uint32_t* indices = createIndices(indexCount);
 
 		if (!indices)
-		{
-			free(vertices);
 			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
-		}
 
 		Buffer newIndexBuffer;
 
@@ -2355,16 +2381,13 @@ MpgxResult bakeText32(
 			INDEX_BUFFER_TYPE,
 			GPU_ONLY_BUFFER_USAGE,
 			indices,
-			indexCount * sizeof(uint32_t),
+			indexSize,
 			&newIndexBuffer);
 
 		free(indices);
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
-		{
-			free(vertices);
 			return mpgxResult;
-		}
 
 		if (api == OPENGL_GRAPHICS_API ||
 			api == OPENGL_ES_GRAPHICS_API)
@@ -2408,9 +2431,9 @@ MpgxResult bakeText32(
 		abort();
 	}
 
-	size_t dataSize = vertexCount * sizeof(TextVertex);
+	size_t vertexSize = vertexCount * sizeof(TextVertex);
 
-	if (vertexBuffer->base.size < dataSize)
+	if (vertexBuffer->base.size < vertexSize)
 	{
 		Buffer newVertexBuffer;
 
@@ -2418,19 +2441,17 @@ MpgxResult bakeText32(
 			VERTEX_BUFFER_TYPE,
 			CPU_TO_GPU_BUFFER_USAGE,
 			vertices,
-			dataSize,
+			vertexSize,
 			&newVertexBuffer);
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
-		{
-			free(vertices);
 			return mpgxResult;
-		}
 
 		if (api == VULKAN_GRAPHICS_API)
 		{
 #if MPGX_SUPPORT_VULKAN
 			text->vk.vertexBuffer = newVertexBuffer;
+			text->vk.indexCount = indexCount;
 #else
 			abort();
 #endif
@@ -2438,7 +2459,9 @@ MpgxResult bakeText32(
 		else
 		{
 #if MPGX_SUPPORT_OPENGL
-			text->gl.mesh->gl.vertexBuffer = newVertexBuffer;
+			GraphicsMesh mesh = text->gl.mesh;
+			mesh->gl.vertexBuffer = newVertexBuffer;
+			mesh->gl.indexCount = indexCount;
 #else
 			abort();
 #endif
@@ -2448,15 +2471,27 @@ MpgxResult bakeText32(
 	}
 	else
 	{
-		setBufferData(
-			vertexBuffer,
-			vertices,
-			dataSize,
-			0);
-
 		if (api == VULKAN_GRAPHICS_API)
 		{
 #if MPGX_SUPPORT_VULKAN
+			VkWindow vkWindow = getVkWindow(window);
+
+			VkResult vkResult = vkQueueWaitIdle(
+				vkWindow->graphicsQueue);
+
+			if (vkResult != VK_SUCCESS)
+				return vkToMpgxResult(vkResult);
+
+			MpgxResult mpgxResult = setVkBufferData(
+				vkWindow->allocator,
+				vertexBuffer->vk.allocation,
+				vertices,
+				vertexSize,
+				0);
+
+			if (mpgxResult != SUCCESS_MPGX_RESULT)
+				return mpgxResult;
+
 			text->vk.indexCount = indexCount;
 #else
 			abort();
@@ -2465,6 +2500,16 @@ MpgxResult bakeText32(
 		else
 		{
 #if MPGX_SUPPORT_OPENGL
+			MpgxResult mpgxResult = setGlBufferData(
+				vertexBuffer->gl.glType,
+				vertexBuffer->gl.handle,
+				vertices,
+				vertexSize,
+				0);
+
+			if (mpgxResult != SUCCESS_MPGX_RESULT)
+				return mpgxResult;
+
 			text->gl.mesh->gl.indexCount = indexCount;
 #else
 			abort();
@@ -2472,7 +2517,6 @@ MpgxResult bakeText32(
 		}
 	}
 
-	free(vertices);
 	return SUCCESS_MPGX_RESULT;
 }
 MpgxResult bakeText(

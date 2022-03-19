@@ -472,7 +472,7 @@ MpgxResult bakeText(
 	bool isBold,
 	bool isItalic);
 
-// TODO: shrink text vertex buffer
+// TODO: shrink text vertex buffer, shrink vertices buffer
 
 /*
  * Draw text mesh. (rendering command)
