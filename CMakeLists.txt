@@ -75,7 +75,7 @@ set(URAN_SOURCES
 	source/pipelines/gaussian_blur_pipeline.c
 	source/pipelines/gradient_sky_pipeline.c
 	source/pipelines/panel_pipeline.c
-	source/pipelines/ray_tracing_color_pipeline.c
+	source/pipelines/ray_color_pipeline.c
 	source/pipelines/simple_shadow_pipeline.c
 	source/pipelines/sprite_pipeline.c
 	source/pipelines/texture_pipeline.c

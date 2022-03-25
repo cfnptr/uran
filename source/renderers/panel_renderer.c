@@ -64,8 +64,8 @@ static size_t onDraw(
 		VkWindow vkWindow = getVkWindow(
 			graphicsPipeline->vk.window);
 
-		if (graphicsPipeline->gl.onUniformsSet)
-			graphicsPipeline->gl.onUniformsSet(graphicsPipeline);
+		if (graphicsPipeline->vk.onUniformsSet)
+			graphicsPipeline->vk.onUniformsSet(graphicsPipeline);
 
 		vkCmdDrawIndexed(
 			vkWindow->currenCommandBuffer,

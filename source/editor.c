@@ -1116,7 +1116,9 @@ Editor createEditor(
 	Logger logger,
 	ThreadPool threadPool,
 	OnWindowUpdate onUpdate,
-	void* updateArgument)
+	void* updateArgument,
+	bool useStencilBuffer,
+	bool useRayTracing)
 {
 	assert(logger);
 	assert(threadPool);
@@ -1198,9 +1200,9 @@ Editor createEditor(
 	mpgxResult = createWindow(
 		onUpdate,
 		updateArgument,
-		false,
+		useStencilBuffer,
 		true,
-		false,
+		useRayTracing,
 		NULL,
 		&window);
 

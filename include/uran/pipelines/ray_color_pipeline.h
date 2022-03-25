@@ -15,29 +15,29 @@
 #pragma once
 #include "mpgx/window.h"
 
-#define RAY_TRACING_COLOR_PIPELINE_NAME "RayTracingColor"
+#define RAY_COLOR_PIPELINE_NAME "RayColor"
 
 // TODO: fix and add comments
 
-MpgxResult createRayTracingColorPipeline(
+MpgxResult createRayColorPipeline(
 	Window window,
 	Shader generationShader,
 	Shader missShader,
 	Shader closestHitShader,
 	RayTracingScene scene,
-	RayTracingPipeline* rayTracingColorPipeline);
+	RayTracingPipeline* rayColorPipeline);
 
-RayTracingScene getRayTracingColorPipelineScene(
-	RayTracingPipeline rayTracingColorPipeline);
+RayTracingScene getRayColorPipelineScene(
+	RayTracingPipeline rayColorPipeline);
 
-Mat4F getRayTracingColorPipelineInvView(
-	RayTracingPipeline rayTracingColorPipeline);
-void setRayTracingColorPipelineInvView(
-	RayTracingPipeline rayTracingColorPipeline,
+Mat4F getRayColorPipelineInvView(
+	RayTracingPipeline rayColorPipeline);
+void setRayColorPipelineInvView(
+	RayTracingPipeline rayColorPipeline,
 	Mat4F invView);
 
-Mat4F getRayTracingColorPipelineInvProj(
-	RayTracingPipeline rayTracingColorPipeline);
-void setRayTracingColorPipelineInvProj(
-	RayTracingPipeline rayTracingColorPipeline,
+Mat4F getRayColorPipelineInvProj(
+	RayTracingPipeline rayColorPipeline);
+void setRayColorPipelineInvProj(
+	RayTracingPipeline rayColorPipeline,
 	Mat4F invProj);

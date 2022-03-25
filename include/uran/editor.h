@@ -37,12 +37,16 @@ typedef Editor_T* Editor;
  * threadPool - thread pool instance.
  * onUpdate - on window update function.
  * updateArgument - update function argument.
+ * useStencilBuffer - use stencil buffer in the framebuffer.
+ * useRayTracing - use ray tracing extension.
  */
 Editor createEditor(
 	Logger logger,
 	ThreadPool threadPool,
 	OnWindowUpdate onUpdate,
-	void* updateArgument);
+	void* updateArgument,
+	bool useStencilBuffer,
+	bool useRayTracing);
 /*
  * Destroys editor instance.
  * editor - pointer to the editor instance or NULL.

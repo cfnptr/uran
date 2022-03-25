@@ -92,7 +92,9 @@ inline static Program createProgram(
 		logger,
 		threadPool,
 		onProgramUpdate,
-		program);
+		program,
+		false,
+		false);
 
 	if (!editor)
 	{

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "uran/pipelines/ray_tracing_color_pipeline.h"
+#include "uran/pipelines/ray_color_pipeline.h"
 #include "mpgx/_source/image.h"
 #include "mpgx/_source/window.h"
 #include "mpgx/_source/ray_tracing_pipeline.h"
@@ -515,20 +515,20 @@ inline static MpgxResult createVkPipeline(
 }
 #endif
 
-MpgxResult createRayTracingColorPipeline(
+MpgxResult createRayColorPipeline(
 	Window window,
 	Shader generationShader,
 	Shader missShader,
 	Shader closestHitShader,
 	RayTracingScene scene,
-	RayTracingPipeline* rayTracingColorPipeline)
+	RayTracingPipeline* rayColorPipeline)
 {
 	assert(window);
 	assert(generationShader);
 	assert(missShader);
 	assert(closestHitShader);
 	assert(scene);
-	assert(rayTracingColorPipeline);
+	assert(rayColorPipeline);
 	assert(generationShader->base.type == RAY_GENERATION_SHADER_TYPE);
 	assert(missShader->base.type == RAY_MISS_SHADER_TYPE);
 	assert(closestHitShader->base.type == RAY_CLOSEST_HIT_SHADER_TYPE);
@@ -547,7 +547,7 @@ MpgxResult createRayTracingColorPipeline(
 	handle->base.rgpc.invProj = identMat4F;
 
 #ifndef NDEBUG
-	const char* name = RAY_TRACING_COLOR_PIPELINE_NAME;
+	const char* name = RAY_COLOR_PIPELINE_NAME;
 #else
 	const char* name = NULL;
 #endif
@@ -594,7 +594,7 @@ MpgxResult createRayTracingColorPipeline(
 			1,
 			&closestHitShader,
 			1,
-			rayTracingColorPipeline);
+			rayColorPipeline);
 #else
 		abort();
 #endif
@@ -605,52 +605,52 @@ MpgxResult createRayTracingColorPipeline(
 	}
 }
 
-RayTracingScene getRayTracingColorPipelineScene(
-	RayTracingPipeline rayTracingPipeline)
+RayTracingScene getRayColorPipelineScene(
+	RayTracingPipeline rayColorPipeline)
 {
-	assert(rayTracingPipeline);
-	assert(strcmp(rayTracingPipeline->base.name,
-		RAY_TRACING_COLOR_PIPELINE_NAME) == 0);
-	Handle handle = rayTracingPipeline->base.handle;
+	assert(rayColorPipeline);
+	assert(strcmp(rayColorPipeline->base.name,
+		RAY_COLOR_PIPELINE_NAME) == 0);
+	Handle handle = rayColorPipeline->base.handle;
 	return handle->base.scene;
 }
 
-Mat4F getRayTracingColorPipelineInvView(
-	RayTracingPipeline rayTracingPipeline)
+Mat4F getRayColorPipelineInvView(
+	RayTracingPipeline rayColorPipeline)
 {
-	assert(rayTracingPipeline);
-	assert(strcmp(rayTracingPipeline->base.name,
-		RAY_TRACING_COLOR_PIPELINE_NAME) == 0);
-	Handle handle = rayTracingPipeline->base.handle;
+	assert(rayColorPipeline);
+	assert(strcmp(rayColorPipeline->base.name,
+		RAY_COLOR_PIPELINE_NAME) == 0);
+	Handle handle = rayColorPipeline->base.handle;
 	return handle->base.rgpc.invView;
 }
-void setRayTracingColorPipelineInvView(
-	RayTracingPipeline rayTracingPipeline,
+void setRayColorPipelineInvView(
+	RayTracingPipeline rayColorPipeline,
 	Mat4F invView)
 {
-	assert(rayTracingPipeline);
-	assert(strcmp(rayTracingPipeline->base.name,
-		RAY_TRACING_COLOR_PIPELINE_NAME) == 0);
-	Handle handle = rayTracingPipeline->base.handle;
+	assert(rayColorPipeline);
+	assert(strcmp(rayColorPipeline->base.name,
+		RAY_COLOR_PIPELINE_NAME) == 0);
+	Handle handle = rayColorPipeline->base.handle;
 	handle->base.rgpc.invView = invView;
 }
 
-Mat4F getRayTracingColorPipelineInvProj(
-	RayTracingPipeline rayTracingPipeline)
+Mat4F getRayColorPipelineInvProj(
+	RayTracingPipeline rayColorPipeline)
 {
-	assert(rayTracingPipeline);
-	assert(strcmp(rayTracingPipeline->base.name,
-		RAY_TRACING_COLOR_PIPELINE_NAME) == 0);
-	Handle handle = rayTracingPipeline->base.handle;
+	assert(rayColorPipeline);
+	assert(strcmp(rayColorPipeline->base.name,
+		RAY_COLOR_PIPELINE_NAME) == 0);
+	Handle handle = rayColorPipeline->base.handle;
 	return handle->base.rgpc.invProj;
 }
-void setRayTracingColorPipelineInvProj(
-	RayTracingPipeline rayTracingPipeline,
+void setRayColorPipelineInvProj(
+	RayTracingPipeline rayColorPipeline,
 	Mat4F invProj)
 {
-	assert(rayTracingPipeline);
-	assert(strcmp(rayTracingPipeline->base.name,
-		RAY_TRACING_COLOR_PIPELINE_NAME) == 0);
-	Handle handle = rayTracingPipeline->base.handle;
+	assert(rayColorPipeline);
+	assert(strcmp(rayColorPipeline->base.name,
+		RAY_COLOR_PIPELINE_NAME) == 0);
+	Handle handle = rayColorPipeline->base.handle;
 	handle->base.rgpc.invProj = invProj;
 }
