@@ -452,14 +452,14 @@ GraphicsRendererResult drawGraphicsRenderer(
 		renderer->threadIndex = 0;
 		renderer->elementIndex = 0;
 
-		for (size_t i = 0; i < threadCount; i++)
-		{
-			addThreadPoolTask(
-				threadPool,
-				onRendererDraw,
-				renderer);
-		}
-
+		ThreadPoolTask task = {
+			onRendererDraw,
+			renderer
+		};
+		addThreadPoolTaskNumber(
+			threadPool,
+			task,
+			threadCount);
 		waitThreadPool(threadPool);
 		elementCount = renderer->elementIndex;
 	}

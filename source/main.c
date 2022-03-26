@@ -79,7 +79,9 @@ MAIN_FUNCTION
 		"CPU count: %d.", cpuCount);
 
 	ThreadPool threadPool = createThreadPool(
-		cpuCount, cpuCount);
+		cpuCount,
+		cpuCount,
+		STACK_TASK_ORDER_TYPE);
 
 	if (!threadPool)
 	{

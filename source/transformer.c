@@ -256,14 +256,14 @@ void updateTransformer(Transformer transformer)
 		size_t threadCount = getThreadPoolThreadCount(threadPool);
 		transformer->threadIndex = 0;
 
-		for (size_t i = 0; i < threadCount; i++)
-		{
-			addThreadPoolTask(
-				threadPool,
-				onTransformUpdate,
-				transformer);
-		}
-
+		ThreadPoolTask task = {
+			onTransformUpdate,
+			transformer
+		};
+		addThreadPoolTaskNumber(
+			threadPool,
+			task,
+			threadCount);
 		waitThreadPool(threadPool);
 	}
 	else

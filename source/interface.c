@@ -515,14 +515,14 @@ void updateInterface(Interface interface)
 		size_t threadCount = getThreadPoolThreadCount(threadPool);
 		interface->threadIndex = 0;
 
-		for (size_t i = 0; i < threadCount; i++)
-		{
-			addThreadPoolTask(
-				threadPool,
-				onInterfacePositionsUpdate,
-				interface);
-		}
-
+		ThreadPoolTask task = {
+			onInterfacePositionsUpdate,
+			interface
+		};
+		addThreadPoolTaskNumber(
+			threadPool,
+			task,
+			threadCount);
 		waitThreadPool(threadPool);
 	}
 	else
