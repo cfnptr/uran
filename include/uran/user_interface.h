@@ -99,6 +99,11 @@ FontAtlas getUserInterfaceFontAtlas(UserInterface ui);
  * ui - user interface instance.
  */
 Interface getUserInterface(UserInterface ui);
+/*
+ * Returns user interface cursor render.
+ * ui - user interface instance.
+ */
+GraphicsRender getUserInterfaceCursor(UserInterface ui);
 
 /*
  * Processes user interface events.
@@ -175,8 +180,6 @@ MpgxResult createUiLabel32(
 	cmmt_float_t scale,
 	SrgbColor color,
 	bool useTags,
-	bool isBold,
-	bool isItalic,
 	bool isConstant,
 	Transform parent,
 	const InterfaceElementEvents* events,
@@ -211,8 +214,6 @@ MpgxResult createUiLabel(
 	cmmt_float_t scale,
 	SrgbColor color,
 	bool useTags,
-	bool isBold,
-	bool isItalic,
 	bool isConstant,
 	Transform parent,
 	const InterfaceElementEvents* events,
@@ -508,12 +509,13 @@ MpgxResult createUiInputField32(
 	Vec2F scale,
 	SrgbColor placeholderColor,
 	SrgbColor textColor,
+	size_t maxLength,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
 	bool isEnabled,
 	bool isActive,
-	InterfaceElement* uiButton);
+	InterfaceElement* uiInputField);
 MpgxResult createUiInputField(
 	UserInterface ui,
 	const char* placeholder,
@@ -528,6 +530,6 @@ MpgxResult createUiInputField(
 	void* handle,
 	bool isEnabled,
 	bool isActive,
-	InterfaceElement* uiButton);
+	InterfaceElement* uiInputField);
 
 // TODO: InputBox, ScrollBox, Checkbox

@@ -321,23 +321,19 @@ uint32_t getFontAtlasFontSize(FontAtlas fontAtlas);
  *
  * fontAtlas - font atlas instance.
  * string - text string.
- * stringLength - text string length.
+ * length - string length.
  * alignment - text alignment.
  * color - default text color.
  * useTags - use HTML tags.
- * isBold - is text initially bold.
- * isItalic - is text initially italic.
  * text - pointer to the text instance.
  */
 MpgxResult createAtlasText32(
 	FontAtlas fontAtlas,
 	const uint32_t* string,
-	size_t stringLength,
+	size_t length,
 	AlignmentType alignment,
 	SrgbColor color,
 	bool useTags,
-	bool isBold,
-	bool isItalic,
 	bool isConstant,
 	Text* text);
 /*
@@ -346,23 +342,19 @@ MpgxResult createAtlasText32(
  *
  * fontAtlas - font atlas instance.
  * string - text string.
- * stringLength - text string length.
+ * length - string length.
  * alignment - text alignment.
  * color - default text color.
  * useTags - use HTML tags.
- * isBold - is text initially bold.
- * isItalic - is text initially italic.
  * text - pointer to the text instance.
  */
 MpgxResult createAtlasText(
 	FontAtlas fontAtlas,
 	const char* string,
-	size_t stringLength,
+	size_t length,
 	AlignmentType alignment,
 	SrgbColor color,
 	bool useTags,
-	bool isBold,
-	bool isItalic,
 	bool isConstant,
 	Text* text);
 
@@ -410,11 +402,94 @@ Vec2F getTextSize(Text text);
  * text - text instance.
  */
 bool isTextConstant(Text text);
+
+/*
+ * Returns text string.
+ * text - text instance.
+ */
+const uint32_t* getTextString(Text text);
+/*
+ * Returns text string length.
+ * text - text instance.
+ */
+uint32_t getTextLength(Text text);
+/*
+ * Set text UTF-32 string.
+ * Returns true on success.
+ *
+ * text - text instance.
+ * string - text string.
+ * length - string length
+ */
+bool setTextString32(
+	Text text,
+	const uint32_t* string,
+	uint32_t length);
+/*
+ * Set text UTF-8 string.
+ * Returns true on success.
+ *
+ * text - text instance.
+ * string - text string.
+ * length - string length
+ */
+bool setTextString(
+	Text text,
+	const char* string,
+	uint32_t length);
+
+
+// TODO: comment
+bool appendTextString32(
+	Text text,
+	const uint32_t* string,
+	uint32_t length,
+	uint32_t index);
+
 /*
  * Returns text alignment type.
  * text - text instance.
  */
 AlignmentType getTextAlignment(Text text);
+/*
+ * Sets text alignment type.
+ *
+ * text - text instance.
+ * alignment - alignment type.
+ */
+void setTextAlignment(
+	Text text,
+	AlignmentType alignment);
+
+/*
+ * Returns text color value.
+ * text - text instance.
+ */
+SrgbColor getTextColor(Text text);
+/*
+ * Sets text color value.
+ *
+ * text - text instance.
+ * color - color value.
+ */
+void setTextColor(
+	Text text,
+	SrgbColor color);
+
+/*
+ * Returns true if text uses HTML tags.
+ * text - text instance.
+ */
+bool isTextUseTags(Text text);
+/*
+ * Sets text use HTML tags.
+ *
+ * text - text instance.
+ * useTags - use HTML tags.
+ */
+void setTextUseTags(
+	Text text,
+	bool useTags);
 
 /* TODO:
 bool getTextCaretAdvance(
@@ -428,52 +503,11 @@ bool getTextCaretPosition(
  */
 
 /*
- * Recreate UTF-32 text mesh data.
+ * Recreate text mesh data.
  * Returns operation MPGX result.
- *
- * text - text instance.
- * string - text string.
- * stringLength - text string length.
- * alignment - text alignment.
- * color - default text color.
- * useTags - use HTML tags.
- * isBold - is text initially bold.
- * isItalic - is text initially italic.
  */
-MpgxResult bakeText32(
-	Text text,
-	const uint32_t* string,
-	size_t stringLength,
-	AlignmentType alignment,
-	SrgbColor color,
-	bool useTags,
-	bool isBold,
-	bool isItalic);
-/*
- * Recreate UTF-8 text mesh data.
- * Returns operation MPGX result.
- *
- * text - text instance.
- * string - text string.
- * stringLength - text string length.
- * alignment - text alignment.
- * color - default text color.
- * useTags - use HTML tags.
- * isBold - is text initially bold.
- * isItalic - is text initially italic.
- */
-MpgxResult bakeText(
-	Text text,
-	const char* string,
-	size_t stringLength,
-	AlignmentType alignment,
-	SrgbColor color,
-	bool useTags,
-	bool isBold,
-	bool isItalic);
-
+MpgxResult bakeText(Text text);
 // TODO: shrink text vertex buffer, shrink vertices buffer
-
 /*
  * Draw text mesh. (rendering command)
  * Returns drawn index count.

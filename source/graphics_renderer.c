@@ -64,6 +64,7 @@ GraphicsRenderer createGraphicsRenderer(
 	assert(sorting < GRAPHICS_RENDER_SORTING_COUNT);
 	assert(onDestroy);
 	assert(onDraw);
+	assert(capacity > 0);
 
 	GraphicsRenderer graphicsRenderer = calloc(1,
 		sizeof(GraphicsRenderer_T));
@@ -83,9 +84,6 @@ GraphicsRenderer createGraphicsRenderer(
 #ifndef NDEBUG
 	graphicsRenderer->isEnumerating = false;
 #endif
-
-	if (capacity == 0)
-		capacity = MPGX_DEFAULT_CAPACITY;
 
 	GraphicsRender* renders = malloc(
 		sizeof(GraphicsRender) * capacity);
@@ -122,6 +120,7 @@ GraphicsRenderer createDefaultGraphicsRenderer(
 	assert(pipeline);
 	assert(onDestroy);
 	assert(onDraw);
+	assert(capacity > 0);
 
 	return createGraphicsRenderer(
 		pipeline,

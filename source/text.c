@@ -84,22 +84,30 @@ typedef struct TextVertex
 typedef struct BaseText
 {
 	FontAtlas fontAtlas;
-	Vec2F textSize;
+	uint32_t* string;
+	uint32_t capacity;
+	uint32_t length;
 	TextVertex* vertices;
-	uint32_t vertexCapacity;
+	Vec2F size;
+	SrgbColor color;
 	AlignmentType alignment;
+	bool useTags;
 	bool isConstant;
 } BaseText;
 #if MPGX_SUPPORT_VULKAN
 typedef struct VkText
 {
 	FontAtlas fontAtlas;
-	Vec2F textSize;
+	uint32_t* string;
+	uint32_t capacity;
+	uint32_t length;
 	TextVertex* vertices;
-	uint32_t vertexCapacity;
+	Vec2F size;
+	SrgbColor color;
 	AlignmentType alignment;
+	bool useTags;
 	bool isConstant;
-	uint8_t _alignment[2];
+	uint8_t _alignment[1];
 	uint32_t indexCount;
 	Buffer vertexBuffer;
 } VkText;
@@ -108,12 +116,16 @@ typedef struct VkText
 typedef struct GlText
 {
 	FontAtlas fontAtlas;
-	Vec2F textSize;
+	uint32_t* string;
+	uint32_t capacity;
+	uint32_t length;
 	TextVertex* vertices;
-	uint32_t vertexCapacity;
+	Vec2F size;
+	SrgbColor color;
 	AlignmentType alignment;
+	bool useTags;
 	bool isConstant;
-	uint8_t _alignment[2];
+	uint8_t _alignment[1];
 	GraphicsMesh mesh;
 } GlText;
 #endif
@@ -1453,7 +1465,7 @@ uint32_t getFontAtlasFontSize(FontAtlas fontAtlas)
 
 inline static bool fillVertices(
 	const uint32_t* string,
-	size_t stringLength,
+	size_t length,
 	const Glyph* regularGlyphs,
 	const Glyph* boldGlyphs,
 	const Glyph* italicGlyphs,
@@ -1463,14 +1475,12 @@ inline static bool fillVertices(
 	AlignmentType alignment,
 	SrgbColor color,
 	bool useTags,
-	bool isBold,
-	bool isItalic,
 	TextVertex* vertices,
 	uint32_t* vertexCount,
 	Vec2F* textSize)
 {
 	assert(string);
-	assert(stringLength > 0);
+	assert(length > 0);
 	assert(regularGlyphs);
 	assert(boldGlyphs);
 	assert(italicGlyphs);
@@ -1482,40 +1492,16 @@ inline static bool fillVertices(
 	assert(textSize);
 
 	SrgbColor useColor = color;
-	bool useBold = isBold;
-	bool useItalic = isItalic;
-
-	const Glyph* glyphs;
-	float atlasIndex;
-
-	if (isBold & isItalic)
-	{
-		glyphs = boldItalicGlyphs;
-		atlasIndex = 3.0f;
-	}
-	else if (isBold)
-	{
-		glyphs = boldGlyphs;
-		atlasIndex = 1.0f;
-	}
-	else if (isItalic)
-	{
-		glyphs = italicGlyphs;
-		atlasIndex = 2.0f;
-	}
-	else
-	{
-		glyphs = regularGlyphs;
-		atlasIndex = 0.0f;
-	}
-
+	const Glyph* glyphs = regularGlyphs;
+	bool useBold = false, useItalic = false;
+	float atlasIndex = 0.0f;
 	float sizeX = 0.0f, sizeY = 0.0f;
 	float vertexOffsetX = 0.0f, vertexOffsetY = -newLineAdvance * 0.5f;
 	uint32_t vertexIndex = 0, lastNewLineIndex = 0;
 
 	float offset;
 
-	for (size_t i = 0; i < stringLength; i++)
+	for (size_t i = 0; i < length; i++)
 	{
 		uint32_t value = string[i];
 
@@ -1596,7 +1582,7 @@ inline static bool fillVertices(
 		}
 		else if ((value == '<') & useTags) // TODO: parse color
 		{
-			if (i + 2 < stringLength && string[i + 2] == '>')
+			if (i + 2 < length && string[i + 2] == '>')
 			{
 				if (string[i + 1] == 'b')
 				{
@@ -1633,7 +1619,7 @@ inline static bool fillVertices(
 					continue;
 				}
 			}
-			else if (i + 3 < stringLength && string[i + 1] == '/' && string[i + 3] == '>')
+			else if (i + 3 < length && string[i + 1] == '/' && string[i + 3] == '>')
 			{
 				if (string[i + 2] == 'b')
 				{
@@ -1873,28 +1859,19 @@ inline static void internalDestroyText(Text text)
 	}
 
 	free(text->base.vertices);
+	free(text->base.string);
 	free(text);
 }
-
-MpgxResult createAtlasText32(
+inline static MpgxResult internalCreateText(
 	FontAtlas fontAtlas,
-	const uint32_t* string,
-	size_t stringLength,
+	uint32_t* string,
+	size_t length,
 	AlignmentType alignment,
 	SrgbColor color,
 	bool useTags,
-	bool isBold,
-	bool isItalic,
 	bool isConstant,
 	Text* text)
 {
-	assert(fontAtlas);
-	assert(string);
-	assert(stringLength > 0);
-	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(text);
-	assert(textInitialized);
-
 	Text textInstance = calloc(
 		1, sizeof(Text_T));
 
@@ -1902,11 +1879,16 @@ MpgxResult createAtlasText32(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
 	textInstance->base.fontAtlas = fontAtlas;
+	textInstance->base.string = string;
+	textInstance->base.capacity = length;
+	textInstance->base.length = length;
+	textInstance->base.color = color;
 	textInstance->base.alignment = alignment;
+	textInstance->base.useTags = useTags;
 	textInstance->base.isConstant = isConstant;
 
-	uint32_t vertexCapacity = stringLength * 4;
-	TextVertex* vertices = malloc(vertexCapacity * sizeof(TextVertex));
+	TextVertex* vertices = malloc(
+		length * 4 * sizeof(TextVertex));
 
 	if (!vertices)
 	{
@@ -1915,13 +1897,12 @@ MpgxResult createAtlasText32(
 	}
 
 	textInstance->base.vertices = vertices;
-	textInstance->base.vertexCapacity = vertexCapacity;
 
 	uint32_t vertexCount;
 
 	bool result = fillVertices(
 		string,
-		stringLength,
+		length,
 		fontAtlas->regularGlyphs,
 		fontAtlas->boldGlyphs,
 		fontAtlas->italicGlyphs,
@@ -1931,11 +1912,9 @@ MpgxResult createAtlasText32(
 		alignment,
 		color,
 		useTags,
-		isBold,
-		isItalic,
 		vertices,
 		&vertexCount,
-		&textInstance->base.textSize);
+		&textInstance->base.size);
 
 	if (!result)
 	{
@@ -2026,7 +2005,7 @@ MpgxResult createAtlasText32(
 #endif
 	}
 	else if (api == OPENGL_GRAPHICS_API ||
-		api == OPENGL_ES_GRAPHICS_API)
+			 api == OPENGL_ES_GRAPHICS_API)
 	{
 #if MPGX_SUPPORT_OPENGL
 		GraphicsMesh mesh;
@@ -2081,57 +2060,86 @@ MpgxResult createAtlasText32(
 	{
 		free(textInstance->base.vertices);
 		textInstance->base.vertices = NULL;
-		textInstance->base.vertexCapacity = 0;
 	}
 
 	*text = textInstance;
 	return SUCCESS_MPGX_RESULT;
 }
-MpgxResult createAtlasText(
+
+MpgxResult createAtlasText32(
 	FontAtlas fontAtlas,
-	const char* string,
-	size_t stringLength,
+	const uint32_t* string,
+	size_t length,
 	AlignmentType alignment,
 	SrgbColor color,
 	bool useTags,
-	bool isBold,
-	bool isItalic,
 	bool isConstant,
 	Text* text)
 {
 	assert(fontAtlas);
 	assert(string);
-	assert(stringLength > 0);
+	assert(length > 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(text);
+	assert(textInitialized);
+
+	uint32_t* stringArray = malloc(
+		length * sizeof(uint32_t));
+
+	if (!stringArray)
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+	memcpy(stringArray, string,
+		sizeof(uint32_t) * length);
+
+	return internalCreateText(
+		fontAtlas,
+		stringArray,
+		length,
+		alignment,
+		color,
+		useTags,
+		isConstant,
+		text);
+}
+MpgxResult createAtlasText(
+	FontAtlas fontAtlas,
+	const char* string,
+	size_t length,
+	AlignmentType alignment,
+	SrgbColor color,
+	bool useTags,
+	bool isConstant,
+	Text* text)
+{
+	assert(fontAtlas);
+	assert(string);
+	assert(length > 0);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(text);
 	assert(textInitialized);
 
 	uint32_t* string32;
-	size_t stringLength32;
+	size_t length32;
 
 	MpgxResult mpgxResult = allocateStringUTF32(
 		string,
-		stringLength,
+		length,
 		&string32,
-		&stringLength32);
+		&length32);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 		return mpgxResult;
 
-	mpgxResult = createAtlasText32(
+	return internalCreateText(
 		fontAtlas,
 		string32,
-		stringLength32,
+		length32,
 		alignment,
 		color,
 		useTags,
-		isBold,
-		isItalic,
 		isConstant,
 		text);
-
-	free(string32);
-	return mpgxResult;
 }
 
 void destroyText(Text text)
@@ -2172,7 +2180,7 @@ Vec2F getTextSize(Text text)
 {
 	assert(text);
 	assert(textInitialized);
-	return text->base.textSize;
+	return text->base.size;
 }
 bool isTextConstant(Text text)
 {
@@ -2180,12 +2188,163 @@ bool isTextConstant(Text text)
 	assert(textInitialized);
 	return text->base.isConstant;
 }
-AlignmentType getTextAlignment(
-	Text text)
+
+const uint32_t* getTextString(Text text)
+{
+	assert(text);
+	assert(textInitialized);
+	return text->base.string;
+}
+uint32_t getTextLength(Text text)
+{
+	assert(text);
+	assert(textInitialized);
+	return text->base.length;
+}
+bool setTextString32(
+	Text text,
+	const uint32_t* string,
+	uint32_t length)
+{
+	assert(text);
+	assert(string);
+	assert(length > 0);
+	assert(textInitialized);
+	assert(!text->base.isConstant);
+
+	if (length > text->base.capacity)
+	{
+		uint32_t* newString = realloc(
+			text->base.string,
+			length * sizeof(uint32_t));
+
+		if (!newString)
+			return false;
+
+		text->base.string = newString;
+
+		TextVertex* newVertices = realloc(
+			text->base.vertices,
+			length * 4 * sizeof(TextVertex));
+
+		if (!newVertices)
+			return false;
+
+		text->base.vertices = newVertices;
+		text->base.capacity = length;
+	}
+
+	memcpy(text->base.string, string,
+		length * sizeof(uint32_t));
+	text->base.length = length;
+	return true;
+}
+bool setTextString(
+	Text text,
+	const char* string,
+	uint32_t length)
+{
+	assert(text);
+	assert(string);
+	assert(length > 0);
+	assert(textInitialized);
+	assert(!text->base.isConstant);
+
+	if (length > text->base.capacity)
+	{
+		uint32_t* newString = realloc(
+			text->base.string,
+			length * sizeof(uint32_t));
+
+		if (!newString)
+			return false;
+
+		text->base.string = newString;
+
+		TextVertex* newVertices = realloc(
+			text->base.vertices,
+			length * 4 * sizeof(TextVertex));
+
+		if (!newVertices)
+			return false;
+
+		text->base.vertices = newVertices;
+		text->base.capacity = length;
+	}
+
+	size_t newLength = stringUTF8toUTF32(
+		string,
+		length,
+		text->base.string);
+
+	if (newLength == 0)
+		return false;
+
+	text->base.length = (uint32_t)newLength;
+	return true;
+}
+
+bool appendTextString32(
+	Text text,
+	const uint32_t* string,
+	uint32_t length,
+	uint32_t index)
+{
+	assert(text);
+	assert(string);
+	assert(length > 0);
+	assert(index < text->base.length);
+
+	// TODO:
+}
+
+AlignmentType getTextAlignment(Text text)
 {
 	assert(text);
 	assert(textInitialized);
 	return text->base.alignment;
+}
+void setTextAlignment(
+	Text text,
+	AlignmentType alignment)
+{
+	assert(text);
+	assert(textInitialized);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(!text->base.isConstant);
+	text->base.alignment = alignment;
+}
+
+SrgbColor getTextColor(Text text)
+{
+	assert(text);
+	assert(textInitialized);
+	return text->base.color;
+}
+void setTextColor(
+	Text text,
+	SrgbColor color)
+{
+	assert(text);
+	assert(textInitialized);
+	assert(!text->base.isConstant);
+	text->base.color = color;
+}
+
+bool isTextUseTags(Text text)
+{
+	assert(text);
+	assert(textInitialized);
+	return text->base.useTags;
+}
+void setTextUseTags(
+	Text text,
+	bool useTags)
+{
+	assert(text);
+	assert(textInitialized);
+	assert(!text->base.isConstant);
+	text->base.useTags = useTags;
 }
 
 // TODO: inspect cmmt float vectors \/
@@ -2290,67 +2449,30 @@ bool getTextCaretPosition(
 	abort();
 }*/
 
-MpgxResult bakeText32(
-	Text text,
-	const uint32_t* string,
-	size_t stringLength,
-	AlignmentType alignment,
-	SrgbColor color,
-	bool useTags,
-	bool isBold,
-	bool isItalic)
+MpgxResult bakeText(Text text)
 {
 	assert(text);
-	assert(string);
-	assert(stringLength > 0);
-	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(!text->base.isConstant);
 	assert(textInitialized);
 
-	uint32_t vertexCapacity = stringLength * 4;
 	TextVertex* vertices = text->base.vertices;
-
-	if (text->base.vertexCapacity < vertexCapacity)
-	{
-		TextVertex* newVertices;
-
-		if (vertices)
-		{
-			newVertices = realloc(vertices,
-				vertexCapacity * sizeof(TextVertex));
-		}
-		else
-		{
-			newVertices = malloc(
-				vertexCapacity * sizeof(TextVertex));
-		}
-
-		if (!newVertices)
-			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
-
-		text->base.vertices = vertices = newVertices;
-		text->base.vertexCapacity = vertexCapacity;
-	}
-
 	FontAtlas fontAtlas = text->base.fontAtlas;
 
 	uint32_t vertexCount;
 	Vec2F textSize;
 
 	bool result = fillVertices(
-		string,
-		stringLength,
+		text->base.string,
+		text->base.length,
 		fontAtlas->regularGlyphs,
 		fontAtlas->boldGlyphs,
 		fontAtlas->italicGlyphs,
 		fontAtlas->boldItalicGlyphs,
 		fontAtlas->glyphCount,
 		fontAtlas->newLineAdvance,
-		alignment,
-		color,
-		useTags,
-		isBold,
-		isItalic,
+		text->base.alignment,
+		text->base.color,
+		text->base.useTags,
 		vertices,
 		&vertexCount,
 		&textSize);
@@ -2519,49 +2641,6 @@ MpgxResult bakeText32(
 
 	return SUCCESS_MPGX_RESULT;
 }
-MpgxResult bakeText(
-	Text text,
-	const char* string,
-	size_t stringLength,
-	AlignmentType alignment,
-	SrgbColor color,
-	bool useTags,
-	bool isBold,
-	bool isItalic)
-{
-	assert(text);
-	assert(string);
-	assert(stringLength > 0);
-	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(!text->base.isConstant);
-	assert(textInitialized);
-
-	uint32_t* string32;
-	size_t stringLength32;
-
-	MpgxResult mpgxResult = allocateStringUTF32(
-		string,
-		stringLength,
-		&string32,
-		&stringLength32);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-		return mpgxResult;
-
-	mpgxResult = bakeText32(
-		text,
-		string32,
-		stringLength32,
-		alignment,
-		color,
-		useTags,
-		isBold,
-		isItalic);
-
-	free(string32);
-	return mpgxResult;
-}
-
 size_t drawText(
 	Text text,
 	Vec4I scissor)
@@ -3084,6 +3163,7 @@ MpgxResult createTextPipeline(
 	assert(vertexShader);
 	assert(fragmentShader);
 	assert(sampler);
+	assert(capacity > 0);
 	assert(textPipeline);
 	assert(vertexShader->base.type == VERTEX_SHADER_TYPE);
 	assert(fragmentShader->base.type == FRAGMENT_SHADER_TYPE);
@@ -3095,9 +3175,6 @@ MpgxResult createTextPipeline(
 
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
-
-	if (capacity == 0)
-		capacity = MPGX_DEFAULT_CAPACITY;
 
 	Text* texts = malloc(
 		capacity * sizeof(Text));

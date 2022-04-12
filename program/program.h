@@ -411,7 +411,7 @@ inline static GraphicsPipeline createTextPipelineInstance(
 		fragmentShader,
 		sampler,
 		NULL,
-		0,
+		1,
 		&pipeline);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
@@ -760,7 +760,7 @@ inline static Program createProgram(
 		return NULL;
 	}
 
-	Transformer transformer = createTransformer(0, threadPool);
+	Transformer transformer = createTransformer(1, threadPool);
 
 	if (!transformer)
 	{
@@ -831,7 +831,7 @@ inline static Program createProgram(
 		logger,
 		packReader,
 		textPipeline,
-		48);
+		56);
 
 	if (!fontAtlas)
 	{
@@ -850,7 +850,7 @@ inline static Program createProgram(
 		textPipeline,
 		fontAtlas,
 		1.0f,
-		0,
+		1,
 		threadPool,
 		&ui);
 

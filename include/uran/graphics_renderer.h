@@ -117,7 +117,7 @@ typedef void(*OnGraphicsRendererItem)(
  * useCulling - use frustum culling.
  * onDestroy - on graphics render destroy function.
  * onDraw - on graphics render draw function.
- * capacity - initial render array capacity or 0.
+ * capacity - initial render array capacity .
  * threadPool - thread pool instance or NULL.
  */
 GraphicsRenderer createGraphicsRenderer(
@@ -135,7 +135,7 @@ GraphicsRenderer createGraphicsRenderer(
  * pipeline - graphics pipeline instance.
  * onDestroy - on graphics render destroy function.
  * onDraw - on graphics render draw function.
- * capacity - initial render array capacity or 0.
+ * capacity - initial render array capacity.
  * threadPool - thread pool instance or NULL.
  */
 GraphicsRenderer createDefaultGraphicsRenderer(

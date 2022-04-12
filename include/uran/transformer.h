@@ -59,7 +59,7 @@ typedef void(*OnTransformItem)(
  * Create a new transformer instance.
  * Returns transformer instance on success, otherwise NULL.
  *
- * capacity - initial transform array capacity or 0.
+ * capacity - initial transform array capacity.
  * threadPool - thread pool instance or NULL.
  */
 Transformer createTransformer(

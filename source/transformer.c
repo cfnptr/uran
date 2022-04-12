@@ -97,6 +97,8 @@ Transformer createTransformer(
 	size_t capacity,
 	ThreadPool threadPool)
 {
+	assert(capacity > 0);
+
 	Transformer transformer = calloc(1,
 		sizeof(Transformer_T));
 
@@ -109,9 +111,6 @@ Transformer createTransformer(
 #ifndef NDEBUG
 	transformer->isEnumerating = false;
 #endif
-
-	if (capacity == 0)
-		capacity = MPGX_DEFAULT_CAPACITY;
 
 	Transform* transforms = malloc(
 		sizeof(Transform) * capacity);

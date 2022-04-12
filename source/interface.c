@@ -63,6 +63,7 @@ Interface createInterface(
 {
 	assert(window);
 	assert(scale > 0.0f);
+	assert(capacity > 0);
 
 	Interface interface = calloc(1,
 		sizeof(Interface_T));
@@ -80,9 +81,6 @@ Interface createInterface(
 #ifndef NDEBUG
 	interface->isEnumerating = false;
 #endif
-
-	if (capacity == 0)
-		capacity = MPGX_DEFAULT_CAPACITY;
 
 	InterfaceElement* elements = malloc(
 		sizeof(InterfaceElement) * capacity);

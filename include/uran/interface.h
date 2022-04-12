@@ -88,7 +88,7 @@ static const InterfaceElementEvents emptyInterfaceElementEvents = {
  *
  * window - window instance.
  * scale - interface scale multiplier.
- * capacity - initial interface element capacity or 0.
+ * capacity - initial interface element capacity.
  * threadPool - thread pool instance or NULL.
  */
 Interface createInterface(

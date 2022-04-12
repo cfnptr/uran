@@ -33,6 +33,9 @@ struct UserInterface_T
 	Interface interface;
 	GraphicsRenderer panelRenderer;
 	GraphicsRenderer textRenderer;
+	GraphicsRender cursorRender;
+	InterfaceElement focusedInputField;
+	bool isPressed;
 };
 
 typedef struct UiPanelHandle_T
@@ -47,7 +50,7 @@ typedef struct UiLabelHandle_T
 } UiLabelHandle_T;
 typedef struct UiWindowHandle_T
 {
-	Window window;
+	UserInterface ui;
 	void* handle;
 	OnInterfaceElementEvent onUpdate;
 	OnInterfaceElementEvent onPress;
@@ -59,6 +62,7 @@ typedef struct UiWindowHandle_T
 } UiWindowHandle_T;
 typedef struct UiButtonHandle_T
 {
+	UserInterface ui;
 	void* handle;
 	OnInterfaceElementEvent onEnable;
 	OnInterfaceElementEvent onDisable;
@@ -76,7 +80,7 @@ typedef struct UiButtonHandle_T
 } UiButtonHandle_T;
 typedef struct UiInputFieldHandle_T
 {
-	Window window;
+	UserInterface ui;
 	void* handle;
 	OnInterfaceElementEvent onEnable;
 	OnInterfaceElementEvent onDisable;
@@ -86,11 +90,11 @@ typedef struct UiInputFieldHandle_T
 	LinearColor disabledColor;
 	LinearColor enabledColor;
 	LinearColor focusedColor;
+	size_t maxLength;
 	GraphicsRender panelRender;
 	GraphicsRender focusRender;
 	GraphicsRender textRender;
 	GraphicsRender placeholderRender;
-	bool isFocused;
 } UiInputFieldHandle_T;
 
 typedef UiPanelHandle_T* UiPanelHandle;
@@ -99,6 +103,51 @@ typedef UiWindowHandle_T* UiWindowHandle;
 typedef UiButtonHandle_T* UiButtonHandle;
 typedef UiInputFieldHandle_T* UiInputFieldHandle;
 
+// TODO: replace UTF32 conversion with fast native text creation method
+
+inline static GraphicsRender createCursorRenderInstance(
+	Transformer transformer,
+	GraphicsRenderer panelRenderer)
+{
+	assert(transformer);
+	assert(panelRenderer);
+
+	Transform transform = createTransform(
+		transformer,
+		zeroVec3F,
+		oneVec3F,
+		zeroQuat,
+		NO_ROTATION_TYPE,
+		NULL,
+		false);
+
+	if (!transform)
+		return NULL;
+
+	GraphicsRender render = createPanelRender(
+		panelRenderer,
+		transform,
+		oneSizeBox3F,
+		srgbToLinearColor(DEFAULT_UI_TEXT_COLOR));
+
+	if (!render)
+	{
+		destroyTransform(transform);
+		return NULL;
+	}
+
+	return render;
+}
+inline static void destroyCursorRenderInstance(
+	GraphicsRender cursorRender)
+{
+	if (!cursorRender)
+		return;
+
+	Transform transform = getGraphicsRenderTransform(cursorRender);
+	destroyGraphicsRender(cursorRender);
+	destroyTransform(transform);
+}
 MpgxResult createUserInterface(
 	Transformer transformer,
 	GraphicsPipeline panelPipeline,
@@ -127,6 +176,7 @@ MpgxResult createUserInterface(
 	userInterface->window = window;
 	userInterface->transformer = transformer;
 	userInterface->fontAtlas = fontAtlas;
+	userInterface->focusedInputField = NULL;
 
 	Interface interface = createInterface(
 		window,
@@ -146,7 +196,7 @@ MpgxResult createUserInterface(
 		panelPipeline,
 		DESCENDING_GRAPHICS_RENDER_SORTING,
 		false,
-		0,
+		1,
 		threadPool);
 
 	if (!panelRenderer)
@@ -161,7 +211,7 @@ MpgxResult createUserInterface(
 		textPipeline,
 		DESCENDING_GRAPHICS_RENDER_SORTING,
 		false,
-		0,
+		1,
 		threadPool);
 
 	if (!textRenderer)
@@ -172,6 +222,18 @@ MpgxResult createUserInterface(
 
 	userInterface->textRenderer = textRenderer;
 
+	GraphicsRender cursorRender = createCursorRenderInstance(
+		transformer,
+		panelRenderer);
+
+	if (!cursorRender)
+	{
+		destroyUserInterface(userInterface);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	userInterface->cursorRender = cursorRender;
+
 	*ui = userInterface;
 	return SUCCESS_MPGX_RESULT;
 }
@@ -180,6 +242,7 @@ void destroyUserInterface(UserInterface ui)
 	if (!ui)
 		return;
 
+	destroyCursorRenderInstance(ui->cursorRender);
 	destroyGraphicsRenderer(ui->textRenderer);
 	destroyGraphicsRenderer(ui->panelRenderer);
 	destroyInterface(ui->interface);
@@ -211,10 +274,88 @@ Interface getUserInterface(UserInterface ui)
 	assert(ui);
 	return ui->interface;
 }
+GraphicsRender getUserInterfaceCursor(UserInterface ui)
+{
+	assert(ui);
+	return ui->cursorRender;
+}
 
+inline static void updateUiInputFields(UserInterface ui)
+{
+	assert(ui);
+	Window window = ui->window;
+
+	if (getWindowMouseButton(window, LEFT_MOUSE_BUTTON))
+	{
+		if (!ui->isPressed)
+		{
+			if (ui->focusedInputField)
+			{
+				UiInputFieldHandle handle = getInterfaceElementHandle(
+					ui->focusedInputField);
+				setPanelRenderColor(
+					handle->focusRender,
+					handle->enabledColor);
+				ui->focusedInputField = NULL;
+			}
+
+			ui->isPressed = true;
+		}
+	}
+	else
+	{
+		ui->isPressed = false;
+	}
+
+	if (ui->focusedInputField)
+	{
+		UiInputFieldHandle handle = getInterfaceElementHandle(
+			ui->focusedInputField);
+		bool isChanged = false;
+
+		if (getWindowKeyboardKey(window, BACKSPACE_KEYBOARD_KEY) ||
+			getWindowKeyboardKey(window, DELETE_KEYBOARD_KEY))
+		{
+			// TODO:
+		}
+
+		Text text = getTextRenderText(handle->textRender);
+		size_t inputLength = getWindowInputLength(window);
+
+		if (inputLength > 0)
+		{
+			appendTextString32(
+				text,
+				getWindowInputBuffer(window),
+				inputLength,
+				getTextLength(text));
+			isChanged = true;
+		}
+
+		if (isChanged)
+		{
+			if (getTextLength(text) == 0)
+			{
+				setTransformActive(getGraphicsRenderTransform(
+					handle->textRender), false);
+				setTransformActive(getGraphicsRenderTransform(
+					handle->placeholderRender), true);
+			}
+			else
+			{
+				setTransformActive(getGraphicsRenderTransform(
+					handle->textRender), true);
+				setTransformActive(getGraphicsRenderTransform(
+					handle->placeholderRender), false);
+				bakeText(text);
+			}
+		}
+	}
+}
 void updateUserInterface(UserInterface ui)
 {
 	assert(ui);
+	updateUiInputFields(ui);
 	updateInterface(ui->interface);
 }
 GraphicsRendererResult drawUserInterface(UserInterface ui)
@@ -388,8 +529,6 @@ MpgxResult createUiLabel32(
 	cmmt_float_t scale,
 	SrgbColor color,
 	bool useTags,
-	bool isBold,
-	bool isItalic,
 	bool isConstant,
 	Transform parent,
 	const InterfaceElementEvents* events,
@@ -439,8 +578,6 @@ MpgxResult createUiLabel32(
 		alignment,
 		color,
 		useTags,
-		isBold,
-		isItalic,
 		isConstant,
 		&text);
 
@@ -507,8 +644,6 @@ MpgxResult createUiLabel(
 	cmmt_float_t scale,
 	SrgbColor color,
 	bool useTags,
-	bool isBold,
-	bool isItalic,
 	bool isConstant,
 	Transform parent,
 	const InterfaceElementEvents* events,
@@ -547,8 +682,6 @@ MpgxResult createUiLabel(
 		scale,
 		color,
 		useTags,
-		isBold,
-		isItalic,
 		isConstant,
 		parent,
 		events,
@@ -589,7 +722,7 @@ static void onUiWindowPress(InterfaceElement element)
 	if (!handle->isDragging)
 	{
 		handle->lastCursorPosition =
-			getWindowCursorPosition(handle->window);
+			getWindowCursorPosition(handle->ui->window);
 		handle->isDragging = true;
 	}
 
@@ -605,7 +738,7 @@ static void onUiWindowUpdate(InterfaceElement element)
 
 	if (handle->isDragging)
 	{
-		Window window = handle->window;
+		Window window = handle->ui->window;
 
 		if (!getWindowMouseButton(window, LEFT_MOUSE_BUTTON))
 		{
@@ -613,10 +746,8 @@ static void onUiWindowUpdate(InterfaceElement element)
 			return;
 		}
 
-		Vec2F cursorPosition = getWindowCursorPosition(
-			handle->window);
-		Vec2F offset = subVec2F(
-			cursorPosition, handle->lastCursorPosition);
+		Vec2F cursorPosition = getWindowCursorPosition(window);
+		Vec2F offset = subVec2F(cursorPosition, handle->lastCursorPosition);
 		Vec3F position = getInterfaceElementPosition(element);
 
 		position.x += offset.x;
@@ -697,7 +828,7 @@ MpgxResult createUiWindow32(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
-	handle->window = ui->window;
+	handle->ui = ui;
 	handle->handle = _handle;
 	handle->lastCursorPosition = zeroVec2F;
 	handle->isDragging = false;
@@ -805,8 +936,6 @@ MpgxResult createUiWindow32(
 		CENTER_ALIGNMENT_TYPE,
 		titleColor,
 		true,
-		true,
-		false,
 		true,
 		&text);
 
@@ -1022,9 +1151,9 @@ static void onUiButtonExit(InterfaceElement element)
 	setPanelRenderColor(
 		handle->panelRender,
 		handle->enabledColor);
+	handle->isPressed = false;
 	if (handle->onExit)
 		handle->onExit(element);
-	handle->isPressed = false;
 }
 static void onUiButtonPress(InterfaceElement element)
 {
@@ -1034,9 +1163,9 @@ static void onUiButtonPress(InterfaceElement element)
 	setPanelRenderColor(
 		handle->panelRender,
 		handle->pressedColor);
+	handle->isPressed = true;
 	if (handle->onPress)
 		handle->onPress(element);
-	handle->isPressed = true;
 }
 static void onUiButtonRelease(InterfaceElement element)
 {
@@ -1047,7 +1176,11 @@ static void onUiButtonRelease(InterfaceElement element)
 		handle->panelRender,
 		handle->hoveredColor);
 	if (handle->isPressed && handle->onRelease)
+	{
+		handle->isPressed = false;
 		handle->onRelease(element);
+		return;
+	}
 	handle->isPressed = false;
 }
 static void onUiButtonDestroy(void* _handle)
@@ -1110,6 +1243,7 @@ MpgxResult createUiButton32(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
+	handle->ui = ui;
 	handle->handle = _handle;
 	handle->disabledColor = srgbToLinearColor(DEFAULT_UI_DISABLED_BUTTON_COLOR);
 	handle->enabledColor = srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR);
@@ -1179,8 +1313,6 @@ MpgxResult createUiButton32(
 		CENTER_ALIGNMENT_TYPE,
 		textColor,
 		true,
-		false,
-		false,
 		true,
 		&textInstance);
 
@@ -1507,7 +1639,7 @@ static void onUiInputFieldEnter(InterfaceElement element)
 	UiInputFieldHandle handle = (UiInputFieldHandle)
 		getInterfaceElementHandle(element);
 	setWindowCursorType(
-		handle->window,
+		handle->ui->window,
 		IBEAM_CURSOR_TYPE);
 	if (handle->onEnter)
 		handle->onEnter(element);
@@ -1518,7 +1650,7 @@ static void onUiInputFieldExit(InterfaceElement element)
 	UiInputFieldHandle handle = (UiInputFieldHandle)
 		getInterfaceElementHandle(element);
 	setWindowCursorType(
-		handle->window,
+		handle->ui->window,
 		DEFAULT_CURSOR_TYPE);
 	if (handle->onExit)
 		handle->onExit(element);
@@ -1531,9 +1663,10 @@ static void onUiInputFieldPress(InterfaceElement element)
 	setPanelRenderColor(
 		handle->focusRender,
 		handle->focusedColor);
+	handle->ui->focusedInputField = element;
 	if (handle->onPress)
 		handle->onPress(element);
-	handle->isFocused = true;
+
 }
 static void onUiInputFieldDestroy(void* _handle)
 {
@@ -1592,12 +1725,13 @@ MpgxResult createUiInputField32(
 	Vec2F scale,
 	SrgbColor placeholderColor,
 	SrgbColor textColor,
+	size_t maxLength,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* _handle,
 	bool isEnabled,
 	bool isActive,
-	InterfaceElement* uiButton)
+	InterfaceElement* uiInputField)
 {
 	assert(ui);
 	assert(placeholder);
@@ -1605,7 +1739,8 @@ MpgxResult createUiInputField32(
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(scale.x > 0.0f);
 	assert(scale.y > 0.0f);
-	assert(uiButton);
+	assert(maxLength > 0);
+	assert(uiInputField);
 
 	assert(!parent || (parent && ui->transformer ==
 		getTransformTransformer(parent)));
@@ -1616,12 +1751,12 @@ MpgxResult createUiInputField32(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
-	handle->window = ui->window;
+	handle->ui = ui;
 	handle->handle = _handle;
 	handle->disabledColor = srgbToLinearColor(DEFAULT_UI_DISABLED_INPUT_COLOR);
 	handle->enabledColor = srgbToLinearColor(DEFAULT_UI_ENABLED_INPUT_COLOR);
 	handle->focusedColor = srgbToLinearColor(DEFAULT_UI_FOCUSED_INPUT_COLOR);
-	handle->isFocused = false;
+	handle->maxLength = maxLength;
 
 	Transformer transformer = ui->transformer;
 	GraphicsRenderer panelRenderer = ui->panelRenderer;
@@ -1646,7 +1781,7 @@ MpgxResult createUiInputField32(
 		panelRenderer,
 		panelTransform,
 		oneSizeBox3F,
-		srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR));
+		srgbToLinearColor(DEFAULT_UI_INPUT_PANEL_COLOR));
 
 	if (!panelRender)
 	{
@@ -1693,15 +1828,21 @@ MpgxResult createUiInputField32(
 
 	handle->focusRender = focusRender;
 
+	cmmt_float_t textScale = scale.y * (cmmt_float_t)(1.0 / 2.5);
+
+	cmmt_float_t textPosition =
+		(scale.x * (cmmt_float_t)-0.5) +
+		(textScale * (cmmt_float_t)0.5);
+
 	Transform textTransform = createTransform(
 		transformer,
 		vec3F(
-			(cmmt_float_t)0.0,
+			textPosition,
 			(cmmt_float_t)0.0,
 			(cmmt_float_t)-0.001),
 		vec3F(
-			DEFAULT_UI_TEXT_HEIGHT,
-			DEFAULT_UI_TEXT_HEIGHT,
+			textScale,
+			textScale,
 			(cmmt_float_t)1.0),
 		oneQuat,
 		NO_ROTATION_TYPE,
@@ -1726,8 +1867,6 @@ MpgxResult createUiInputField32(
 		textColor,
 		false,
 		false,
-		false,
-		true,
 		&textInstance);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
@@ -1760,12 +1899,12 @@ MpgxResult createUiInputField32(
 	Transform placeholderTransform = createTransform(
 		transformer,
 		vec3F(
-			(cmmt_float_t)0.0,
+			textPosition,
 			(cmmt_float_t)0.0,
 			(cmmt_float_t)-0.001),
 		vec3F(
-			DEFAULT_UI_TEXT_HEIGHT,
-			DEFAULT_UI_TEXT_HEIGHT,
+			textScale,
+			textScale,
 			(cmmt_float_t)1.0),
 		oneQuat,
 		NO_ROTATION_TYPE,
@@ -1787,8 +1926,6 @@ MpgxResult createUiInputField32(
 		LEFT_ALIGNMENT_TYPE,
 		placeholderColor,
 		true,
-		false,
-		false,
 		true,
 		&placeholderInstance);
 
@@ -1856,6 +1993,6 @@ MpgxResult createUiInputField32(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	*uiButton = element;
+	*uiInputField = element;
 	return SUCCESS_MPGX_RESULT;
 }

@@ -229,11 +229,10 @@ static void onStatsLabelUpdate(InterfaceElement element)
 	Text text = getTextRenderText(getUiLabelRender(element));
 	GraphicsRendererResult rendererResult = statsWindow->rendererResult;
 
-	char bufferUTF8[256];
-	uint32_t bufferUTF32[256];
+	char buffer[256];
 
 	size_t count = snprintf(
-		bufferUTF8,
+		buffer,
 		256,
 		"<b>FPS</b>: %d (<i>%dms</i>)\n"
 		"<b>Draw count</b>: %zu\n"
@@ -244,20 +243,18 @@ static void onStatsLabelUpdate(InterfaceElement element)
 		rendererResult.drawCount,
 		rendererResult.indexCount / 3,
 		rendererResult.passCount);
-	count = stringUTF8toUTF32(
-		bufferUTF8,
-		count,
-		bufferUTF32);
 
-	MpgxResult mpgxResult = bakeText32(
-		text,
-		bufferUTF32,
-		count,
-		LEFT_TOP_ALIGNMENT_TYPE,
-		DEFAULT_UI_TEXT_COLOR,
-		true,
-		false,
-		false);
+	bool result = setTextString(text,
+		buffer, count);
+
+	if (!result)
+	{
+		logMessage(statsWindow->logger, FATAL_LOG_LEVEL,
+			"Failed to set stats text.");
+		abort();
+	}
+
+	MpgxResult mpgxResult = bakeText(text);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
@@ -294,7 +291,7 @@ inline static StatsWindow createStatsWindow(
 		return NULL;
 
 	const uint32_t windowTitle[] = {
-		'S', 't', 'a', 't', 's',
+		'<', 'b', '>', 'S', 't', 'a', 't', 's',
 	};
 
 	BaseWindow base = createBaseWindow(ui,
@@ -335,13 +332,11 @@ inline static StatsWindow createStatsWindow(
 		sizeof(labelText) / sizeof(uint32_t),
 		LEFT_TOP_ALIGNMENT_TYPE,
 		vec3F(
-			(cmmt_float_t)8.0,
-			(cmmt_float_t)-32.0,
+			(cmmt_float_t)16.0,
+			(cmmt_float_t)-40.0,
 			(cmmt_float_t)-0.001),
 		(cmmt_float_t)DEFAULT_UI_TEXT_HEIGHT,
 		DEFAULT_UI_TEXT_COLOR,
-		true,
-		false,
 		true,
 		false,
 		windowTransform,
@@ -371,7 +366,7 @@ inline static void onMenuBarUpdate(InterfaceElement element)
 	Vec2I windowSize = getWindowSize(menuBar->window);
 	Vec3F scale = vec3F(
 		(cmmt_float_t)windowSize.x,
-		(cmmt_float_t)24.0,
+		(cmmt_float_t)28.0,
 		(cmmt_float_t)1.0);
 	setTransformScale(transform, scale);
 }
@@ -426,11 +421,11 @@ inline static MenuBar createMenuBar(
 		TOP_ALIGNMENT_TYPE,
 		vec3F(
 			(cmmt_float_t)0.0,
-			(cmmt_float_t)-12.0,
+			(cmmt_float_t)-14.0,
 			(cmmt_float_t)-0.1),
 		vec2F(
 			(cmmt_float_t)defaultWindowSize.x,
-			(cmmt_float_t)24.0),
+			(cmmt_float_t)28.0),
 		NULL,
 		&events,
 		menuBar,
@@ -470,7 +465,7 @@ inline static MenuBar createMenuBar(
 			(cmmt_float_t)-0.01),
 		vec2F(
 			(cmmt_float_t)64.0,
-			(cmmt_float_t)24.0),
+			(cmmt_float_t)28.0),
 		DEFAULT_UI_TEXT_COLOR,
 		panelTransform,
 		&events,
@@ -501,13 +496,13 @@ Editor createEditor(
 	assert(window);
 	assert(ui);
 
-	Editor editorInstance = calloc(
+	Editor editor = calloc(
 		1, sizeof(Editor_T));
 
-	if (!editorInstance)
+	if (!editor)
 		return NULL;
 
-	editorInstance->logger = logger;
+	editor->logger = logger;
 
 	StatsWindow statsWindow = createStatsWindow(
 		ui,
@@ -518,11 +513,11 @@ Editor createEditor(
 	{
 		logMessage(logger, ERROR_LOG_LEVEL,
 			"Failed to create stats window.");
-		destroyEditor(editorInstance);
+		destroyEditor(editor);
 		return NULL;
 	}
 
-	editorInstance->statsWindow = statsWindow;
+	editor->statsWindow = statsWindow;
 
 	MenuBar menuBar = createMenuBar(
 		ui,
@@ -534,12 +529,12 @@ Editor createEditor(
 	{
 		logMessage(logger, ERROR_LOG_LEVEL,
 			"Failed to create menu bar.");
-		destroyEditor(editorInstance);
+		destroyEditor(editor);
 		return NULL;
 	}
 
-	editorInstance->menuBar = menuBar;
-	return editorInstance;
+	editor->menuBar = menuBar;
+	return editor;
 }
 void destroyEditor(Editor editor)
 {
