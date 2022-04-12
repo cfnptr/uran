@@ -17,6 +17,10 @@
 
 #include <stdio.h>
 
+#if _WIN32
+#undef interface
+#endif
+
 typedef struct BaseWindow_T
 {
 	InterfaceElement window;
@@ -40,6 +44,7 @@ typedef StatsWindow_T* StatsWindow;
 typedef struct MenuBar_T
 {
 	Window window;
+	Interface interface;
 	StatsWindow statsWindow;
 	InterfaceElement panel;
 	InterfaceElement statsButton;
@@ -365,7 +370,8 @@ inline static void onMenuBarUpdate(InterfaceElement element)
 	Transform transform = getInterfaceElementTransform(menuBar->panel);
 	Vec2I windowSize = getWindowSize(menuBar->window);
 	Vec3F scale = vec3F(
-		(cmmt_float_t)windowSize.x,
+		(cmmt_float_t)windowSize.x /
+			getInterfaceScale(menuBar->interface),
 		(cmmt_float_t)28.0,
 		(cmmt_float_t)1.0);
 	setTransformScale(transform, scale);
@@ -410,6 +416,7 @@ inline static MenuBar createMenuBar(
 		return NULL;
 
 	menuBar->window = window;
+	menuBar->interface = getUserInterface(ui);
 	menuBar->statsWindow = statsWindow;
 
 	InterfaceElementEvents events = emptyInterfaceElementEvents;
@@ -424,7 +431,8 @@ inline static MenuBar createMenuBar(
 			(cmmt_float_t)-14.0,
 			(cmmt_float_t)-0.1),
 		vec2F(
-			(cmmt_float_t)defaultWindowSize.x,
+			(cmmt_float_t)defaultWindowSize.x /
+				getInterfaceScale(menuBar->interface),
 			(cmmt_float_t)28.0),
 		NULL,
 		&events,

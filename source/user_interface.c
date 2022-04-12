@@ -749,9 +749,10 @@ static void onUiWindowUpdate(InterfaceElement element)
 		Vec2F cursorPosition = getWindowCursorPosition(window);
 		Vec2F offset = subVec2F(cursorPosition, handle->lastCursorPosition);
 		Vec3F position = getInterfaceElementPosition(element);
+		cmmt_float_t scale = getInterfaceScale(handle->ui->interface);
 
-		position.x += offset.x;
-		position.y -= offset.y;
+		position.x += offset.x / scale;
+		position.y -= offset.y / scale;
 
 		setInterfaceElementPosition(element, position);
 		handle->lastCursorPosition = cursorPosition;

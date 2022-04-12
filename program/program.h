@@ -36,6 +36,7 @@
 typedef struct Settings
 {
 	GraphicsAPI graphicsAPI;
+	cmmt_float_t uiScale;
 } Settings;
 typedef struct Program_T
 {
@@ -77,6 +78,7 @@ inline static void loadSettings(
 			confResultToString(confResult), errorLine);
 
 		settings.graphicsAPI = VULKAN_GRAPHICS_API;
+		settings.uiScale = (cmmt_float_t)1.0;
 		*_settings = settings;
 		return;
 	}
@@ -108,6 +110,31 @@ inline static void loadSettings(
 		}
 	}
 
+	double floatingValue;
+
+	result = getConfReaderFloating(confReader,
+		"uiScale", &floatingValue);
+
+	if (!result)
+	{
+		logMessage(logger, WARN_LOG_LEVEL,
+			"Failed to read \"uiScale\" settings value.");
+		settings.uiScale = (cmmt_float_t)1.0;
+	}
+	else
+	{
+		if (floatingValue <= 0.0 || (int)(56 * floatingValue) % 2 != 0)
+		{
+			logMessage(logger, WARN_LOG_LEVEL,
+				"Invalid \"uiScale\" settings value.");
+			settings.uiScale = (cmmt_float_t)1.0;
+		}
+		else
+		{
+			settings.uiScale = (cmmt_float_t)floatingValue;
+		}
+	}
+
 	destroyConfReader(confReader);
 	*_settings = settings;
 
@@ -135,9 +162,14 @@ inline static void storeSettings(
 	}
 
 	bool result = writeConfComment(confWriter,
-		"Uran Editor - Settings (v" URAN_VERSION_STRING "). Apache-2.0 License.");
+		"=============  Uran Editor - Settings (v"
+		URAN_VERSION_STRING ")  ==============");
 	result &= writeConfComment(confWriter,
-		"Copyright 2022 Nikita Fediuchin. All rights reserved.");
+		"Copyright (c) 2020-2022 Nikita Fediuchin. All rights reserved.");
+	result &= writeConfComment(confWriter,
+		"Licensed under the Apache License, Version 2.0 (the \"License\")");
+	result &= writeConfComment(confWriter,
+		"==============================================================");
 	result &= writeConfNewLine(confWriter);
 
 	const char* stringValue;
@@ -151,9 +183,18 @@ inline static void storeSettings(
 	else
 		abort();
 
+	result &= writeConfComment(confWriter,
+		"Graphics rendering backend.");
+	result &= writeConfComment(confWriter,
+		"(vulkan, opengl, opengles)");
 	result &= writeConfString(confWriter,
 		"graphicsAPI", stringValue);
-	//result &= writeConfNewLine(confWriter);
+	result &= writeConfNewLine(confWriter);
+
+	result &= writeConfComment(confWriter,
+		"User interface scaling factor.");
+	result &= writeConfFloating(confWriter,
+		"uiScale", settings.uiScale);
 
 	destroyConfWriter(confWriter);
 
@@ -831,7 +872,7 @@ inline static Program createProgram(
 		logger,
 		packReader,
 		textPipeline,
-		56);
+		(int)(56 * settings->uiScale));
 
 	if (!fontAtlas)
 	{
@@ -849,7 +890,7 @@ inline static Program createProgram(
 		panelPipeline,
 		textPipeline,
 		fontAtlas,
-		1.0f,
+		settings->uiScale,
 		1,
 		threadPool,
 		&ui);
