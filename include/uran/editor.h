@@ -13,8 +13,6 @@
 // limitations under the License.
 
 #pragma once
-#include "uran/defines.h"
-#include "uran/transformer.h"
 #include "uran/user_interface.h"
 
 #include "logy/logger.h"
@@ -34,35 +32,18 @@ typedef Editor_T* Editor;
  * Returns editor instance on success, otherwise NULL.
  *
  * logger - logger instance.
- * threadPool - thread pool instance.
- * onUpdate - on window update function.
- * updateArgument - update function argument.
- * useStencilBuffer - use stencil buffer in the framebuffer.
- * useRayTracing - use ray tracing extension.
+ * window - window instance.
+ * ui - user interface instance.
  */
 Editor createEditor(
 	Logger logger,
-	ThreadPool threadPool,
-	OnWindowUpdate onUpdate,
-	void* updateArgument,
-	bool useStencilBuffer,
-	bool useRayTracing);
+	Window window,
+	UserInterface ui);
 /*
  * Destroys editor instance.
  * editor - pointer to the editor instance or NULL.
  */
 void destroyEditor(Editor editor);
-
-/*
- * Returns editor transformer.
- * editor - editor instance.
- */
-Transformer getEditorTransformer(Editor editor);
-/*
- * Returns editor window.
- * editor - editor instance.
- */
-Window getEditorWindow(Editor editor);
 
 /*
  * Sets editor stats renderer data.
@@ -73,14 +54,3 @@ Window getEditorWindow(Editor editor);
 void setEditorRendererResult(
 	Editor editor,
 	GraphicsRendererResult result);
-
-/*
- * Updates editor.
- * editor - editor instance.
- */
-void updateEditor(Editor editor);
-/*
- * Renders editor.
- * editor - editor instance.
- */
-void renderEditor(Editor editor);

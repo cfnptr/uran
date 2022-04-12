@@ -466,6 +466,7 @@ void setTransformParent(
 	assert(!parent || (parent &&
 		transform->transformer ==
 		parent->transformer));
+	assert(!parent || (parent != transform));
 	transform->parent = parent;
 }
 

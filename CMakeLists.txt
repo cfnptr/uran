@@ -97,9 +97,7 @@ set(URAN_SOURCES
 	source/shader_data.c
 	source/text.c
 	source/transformer.c
-	source/user_interface.c
-
-	${URAN_PROGRAM_SOURCES})
+	source/user_interface.c)
 
 set(URAN_LINK_LIBRARIES
 	conf-static
@@ -123,9 +121,13 @@ target_include_directories(uran-static PUBLIC
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows" AND
 	${CMAKE_BUILD_TYPE} MATCHES "Release")
-	add_executable(uran-editor WIN32 source/main.c)
+	add_executable(uran-editor WIN32
+		source/main.c
+		${URAN_PROGRAM_SOURCES})
 else ()
-	add_executable(uran-editor source/main.c)
+	add_executable(uran-editor
+		source/main.c
+		${URAN_PROGRAM_SOURCES})
 endif ()
 
 set_target_properties(uran-editor PROPERTIES

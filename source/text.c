@@ -686,10 +686,10 @@ Font createFontFromPack(
 }
 void destroyFont(Font font)
 {
-	assert(textInitialized);
-
 	if (!font)
 		return;
+
+	assert(textInitialized);
 
 	if (font->face)
 		FT_Done_Face(font->face);
@@ -1376,10 +1376,10 @@ MpgxResult createAsciiFontAtlas(
 }
 void destroyFontAtlas(FontAtlas fontAtlas)
 {
-	assert(textInitialized);
-
 	if (!fontAtlas)
 		return;
+
+	assert(textInitialized);
 
 #if MPGX_SUPPORT_VULKAN
 	GraphicsAPI api = getGraphicsAPI();
@@ -2136,10 +2136,10 @@ MpgxResult createAtlasText(
 
 void destroyText(Text text)
 {
-	assert(textInitialized);
-
 	if (!text)
 		return;
+
+	assert(textInitialized);
 
 	FontAtlas fontAtlas = text->base.fontAtlas;
 	Handle handle = fontAtlas->pipeline->base.handle;
