@@ -135,7 +135,7 @@ inline static BaseWindow createBaseWindow(
 
 	InterfaceElement window;
 
-	MpgxResult mpgxResult = createUiWindow32(ui,
+	MpgxResult mpgxResult = createUiWindow(ui,
 		title,
 		titleLength,
 		CENTER_ALIGNMENT_TYPE,
@@ -170,15 +170,15 @@ inline static BaseWindow createBaseWindow(
 
 	InterfaceElement closeButton;
 
-	mpgxResult = createUiButton32(ui,
+	mpgxResult = createUiButton(ui,
 		text,
 		sizeof(text) / sizeof(uint32_t),
 		LEFT_ALIGNMENT_TYPE,
 		vec3F(
-			(cmmt_float_t)12.0,
+			(cmmt_float_t)14.0,
 			(cmmt_float_t)0.0,
 			(cmmt_float_t)-0.01),
-		valVec2F((cmmt_float_t)16.0),
+		valVec2F((cmmt_float_t)18.0),
 		DEFAULT_UI_TEXT_COLOR,
 		windowTransform,
 		&events,
@@ -201,9 +201,9 @@ inline static BaseWindow createBaseWindow(
 	setTransformScale(
 		crossTransform,
 		vec3F(
-			(cmmt_float_t)16.0,
-			(cmmt_float_t)16.0,
-			(cmmt_float_t)0.0));
+			(cmmt_float_t)18.0,
+			(cmmt_float_t)18.0,
+			(cmmt_float_t)1.0));
 	setTransformRotationType(
 		crossTransform,
 		SPIN_ROTATION_TYPE);
@@ -249,7 +249,7 @@ static void onStatsLabelUpdate(InterfaceElement element)
 		rendererResult.indexCount / 3,
 		rendererResult.passCount);
 
-	bool result = setTextString(text,
+	bool result = setTextString8(text,
 		buffer, count);
 
 	if (!result)
@@ -332,7 +332,7 @@ inline static StatsWindow createStatsWindow(
 
 	InterfaceElement label;
 
-	MpgxResult mpgxResult = createUiLabel32(ui,
+	MpgxResult mpgxResult = createUiLabel(ui,
 		labelText,
 		sizeof(labelText) / sizeof(uint32_t),
 		LEFT_TOP_ALIGNMENT_TYPE,
@@ -372,7 +372,7 @@ inline static void onMenuBarUpdate(InterfaceElement element)
 	Vec3F scale = vec3F(
 		(cmmt_float_t)windowSize.x /
 			getInterfaceScale(menuBar->interface),
-		(cmmt_float_t)28.0,
+		(cmmt_float_t)(DEFAULT_UI_TEXT_HEIGHT * 2.0),
 		(cmmt_float_t)1.0);
 	setTransformScale(transform, scale);
 }
@@ -433,7 +433,7 @@ inline static MenuBar createMenuBar(
 		vec2F(
 			(cmmt_float_t)defaultWindowSize.x /
 				getInterfaceScale(menuBar->interface),
-			(cmmt_float_t)28.0),
+			(cmmt_float_t)(DEFAULT_UI_TEXT_HEIGHT * 2.0)),
 		NULL,
 		&events,
 		menuBar,
@@ -463,7 +463,7 @@ inline static MenuBar createMenuBar(
 	events.onUpdate = NULL;
 	events.onRelease = onMenuBarStatsRelease;
 
-	mpgxResult = createUiButton32(ui,
+	mpgxResult = createUiButton(ui,
 		statsText,
 		sizeof(statsText) / sizeof(uint32_t),
 		LEFT_ALIGNMENT_TYPE,
@@ -473,7 +473,7 @@ inline static MenuBar createMenuBar(
 			(cmmt_float_t)-0.01),
 		vec2F(
 			(cmmt_float_t)64.0,
-			(cmmt_float_t)28.0),
+			(cmmt_float_t)(DEFAULT_UI_TEXT_HEIGHT * 2.0)),
 		DEFAULT_UI_TEXT_COLOR,
 		panelTransform,
 		&events,

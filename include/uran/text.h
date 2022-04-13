@@ -327,7 +327,7 @@ uint32_t getFontAtlasFontSize(FontAtlas fontAtlas);
  * useTags - use HTML tags.
  * text - pointer to the text instance.
  */
-MpgxResult createAtlasText32(
+MpgxResult createAtlasText(
 	FontAtlas fontAtlas,
 	const uint32_t* string,
 	size_t length,
@@ -348,7 +348,7 @@ MpgxResult createAtlasText32(
  * useTags - use HTML tags.
  * text - pointer to the text instance.
  */
-MpgxResult createAtlasText(
+MpgxResult createAtlasText8(
 	FontAtlas fontAtlas,
 	const char* string,
 	size_t length,
@@ -413,6 +413,7 @@ const uint32_t* getTextString(Text text);
  * text - text instance.
  */
 uint32_t getTextLength(Text text);
+
 /*
  * Set text UTF-32 string.
  * Returns true on success.
@@ -421,7 +422,7 @@ uint32_t getTextLength(Text text);
  * string - text string.
  * length - string length
  */
-bool setTextString32(
+bool setTextString(
 	Text text,
 	const uint32_t* string,
 	uint32_t length);
@@ -433,17 +434,34 @@ bool setTextString32(
  * string - text string.
  * length - string length
  */
-bool setTextString(
+bool setTextString8(
 	Text text,
 	const char* string,
 	uint32_t length);
 
-
-// TODO: comment
+/*
+ * Addend text UTF-32 string.
+ * Returns true on success.
+ *
+ * text - text instance.
+ * string - text string.
+ * length - string length.
+ * index - insert index.
+ */
 bool appendTextString32(
 	Text text,
 	const uint32_t* string,
 	uint32_t length,
+	uint32_t index);
+/*
+ * Remove text UTF-32 char at index.
+ * Return true on success.
+ *
+ * text - text instance.
+ * index - char index.
+ */
+void removeTextChar(
+	Text text,
 	uint32_t index);
 
 /*
@@ -491,16 +509,30 @@ void setTextUseTags(
 	Text text,
 	bool useTags);
 
-/* TODO:
-bool getTextCaretAdvance(
+/*
+ * Get text cursor advance.
+ * Returns true on success.
+ *
+ * text - text instance.
+ * index - cursor index.
+ * advance - pointer to the advance.
+ */
+bool getTextCursorAdvance(
 	Text text,
-	size_t index,
+	uint32_t index,
 	Vec2F* advance);
-bool getTextCaretPosition(
+/*
+ * Get text cursor position.
+ * Returns true on success.
+ *
+ * text - text instance.
+ * advance - pointer to the advance.
+ * index - pointer to the index.
+ */
+bool getTextCursorPosition(
 	Text text,
 	Vec2F* advance,
 	size_t* index);
- */
 
 /*
  * Recreate text mesh data.

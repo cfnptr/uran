@@ -35,7 +35,11 @@ struct UserInterface_T
 	GraphicsRenderer textRenderer;
 	GraphicsRender cursorRender;
 	InterfaceElement focusedInputField;
-	bool isPressed;
+	double blinkDelay;
+	double buttonDelay;
+	uint32_t cursorIndex;
+	bool isMousePressed;
+	bool isButtonPressed;
 };
 
 typedef struct UiPanelHandle_T
@@ -177,6 +181,11 @@ MpgxResult createUserInterface(
 	userInterface->transformer = transformer;
 	userInterface->fontAtlas = fontAtlas;
 	userInterface->focusedInputField = NULL;
+	userInterface->blinkDelay = 0.0;
+	userInterface->buttonDelay = 0.0;
+	userInterface->cursorIndex = 0;
+	userInterface->isMousePressed = false;
+	userInterface->isButtonPressed = false;
 
 	Interface interface = createInterface(
 		window,
@@ -280,6 +289,55 @@ GraphicsRender getUserInterfaceCursor(UserInterface ui)
 	return ui->cursorRender;
 }
 
+inline static void updateUiCursor(
+	UserInterface ui,
+	Transform textTransform,
+	Text text)
+{
+	assert(ui);
+	assert(textTransform);
+	assert(text);
+
+	Transform cursorTransform = getGraphicsRenderTransform(ui->cursorRender);
+	Vec3F textPosition = getTranslationMat4F(
+		getTransformModel(textTransform));
+	Vec3F textScale = getTransformScale(textTransform);
+	Vec3F cursorScale = getTransformScale(cursorTransform);
+
+	Vec2F cursorOffset;
+
+	if (getTextLength(text) > 0)
+	{
+		bool result = getTextCursorAdvance(text,
+			ui->cursorIndex,
+			&cursorOffset);
+
+		if (result)
+		{
+			cursorOffset.x *= textScale.x;
+			cursorOffset.y *= textScale.y;
+		}
+		else
+		{
+			cursorOffset = zeroVec2F;
+		}
+	}
+	else
+	{
+		cursorOffset = zeroVec2F;
+	}
+
+	setTransformPosition(cursorTransform, vec3F(
+		textPosition.x + cursorOffset.x,
+		textPosition.y + cursorOffset.y,
+		textPosition.z));
+	setTransformScale(cursorTransform, vec3F(
+		cursorScale.x,
+		getTransformScale(textTransform).y * (cmmt_float_t)1.25,
+		(cmmt_float_t)1.0));
+	setTransformActive(cursorTransform, true);
+	ui->blinkDelay = getWindowUpdateTime(ui->window) + 0.5;
+}
 inline static void updateUiInputFields(UserInterface ui)
 {
 	assert(ui);
@@ -287,7 +345,7 @@ inline static void updateUiInputFields(UserInterface ui)
 
 	if (getWindowMouseButton(window, LEFT_MOUSE_BUTTON))
 	{
-		if (!ui->isPressed)
+		if (!ui->isMousePressed)
 		{
 			if (ui->focusedInputField)
 			{
@@ -296,43 +354,92 @@ inline static void updateUiInputFields(UserInterface ui)
 				setPanelRenderColor(
 					handle->focusRender,
 					handle->enabledColor);
+				Transform cursorTransform = getGraphicsRenderTransform(
+					ui->cursorRender);
+				setTransformActive(
+					cursorTransform,
+					false);
 				ui->focusedInputField = NULL;
 			}
 
-			ui->isPressed = true;
+			ui->isMousePressed = true;
 		}
 	}
 	else
 	{
-		ui->isPressed = false;
+		ui->isMousePressed = false;
 	}
 
 	if (ui->focusedInputField)
 	{
 		UiInputFieldHandle handle = getInterfaceElementHandle(
 			ui->focusedInputField);
-		bool isChanged = false;
+		Text text = getTextRenderText(handle->textRender);
+		double updateTime = getWindowUpdateTime(window);
 
-		if (getWindowKeyboardKey(window, BACKSPACE_KEYBOARD_KEY) ||
-			getWindowKeyboardKey(window, DELETE_KEYBOARD_KEY))
+		bool isTextChanged = false, isCursorChanged = false;
+		// TODO: custom delays and cursor color
+
+		if ((getWindowKeyboardKey(window, BACKSPACE_KEYBOARD_KEY) ||
+			getWindowKeyboardKey(window, DELETE_KEYBOARD_KEY)))
 		{
-			// TODO:
+			if (getTextLength(text) > 0 && ui->cursorIndex > 0 &&
+				(!ui->isButtonPressed || ui->buttonDelay < updateTime))
+			{
+				ui->cursorIndex--;
+				removeTextChar(text, ui->cursorIndex);
+				ui->buttonDelay = ui->isButtonPressed ?
+					updateTime + 0.1 : updateTime + 0.3;
+				ui->isButtonPressed = isTextChanged = isCursorChanged = true;
+			}
+		}
+		else if (getWindowKeyboardKey(window, LEFT_KEYBOARD_KEY))
+		{
+			if (ui->cursorIndex > 0 &&
+				(!ui->isButtonPressed || ui->buttonDelay < updateTime))
+			{
+				ui->cursorIndex--;
+				ui->buttonDelay = ui->isButtonPressed ?
+					updateTime + 0.1 : updateTime + 0.3;
+				ui->isButtonPressed = isCursorChanged = true;
+			}
+		}
+		else if (getWindowKeyboardKey(window, RIGHT_KEYBOARD_KEY))
+		{
+			if (ui->cursorIndex < getTextLength(text) &&
+				(!ui->isButtonPressed || ui->buttonDelay < updateTime))
+			{
+				ui->cursorIndex++;
+				ui->buttonDelay = ui->isButtonPressed ?
+					updateTime + 0.1 : updateTime + 0.3;
+				ui->isButtonPressed = isCursorChanged = true;
+			}
+		}
+		else
+		{
+			ui->isButtonPressed = false;
 		}
 
-		Text text = getTextRenderText(handle->textRender);
 		size_t inputLength = getWindowInputLength(window);
+
+		if (getTextLength(text) + inputLength > handle->maxLength)
+			inputLength = handle->maxLength - getTextLength(text);
 
 		if (inputLength > 0)
 		{
-			appendTextString32(
-				text,
+			bool result = appendTextString32(text,
 				getWindowInputBuffer(window),
 				inputLength,
-				getTextLength(text));
-			isChanged = true;
+				ui->cursorIndex);
+
+			if (result)
+			{
+				ui->cursorIndex += inputLength;
+				isTextChanged = isCursorChanged = true;
+			}
 		}
 
-		if (isChanged)
+		if (isTextChanged)
 		{
 			if (getTextLength(text) == 0)
 			{
@@ -347,8 +454,25 @@ inline static void updateUiInputFields(UserInterface ui)
 					handle->textRender), true);
 				setTransformActive(getGraphicsRenderTransform(
 					handle->placeholderRender), false);
-				bakeText(text);
+				MpgxResult mpgxResult = bakeText(text);
+				if (mpgxResult != SUCCESS_MPGX_RESULT) isCursorChanged = false;
 			}
+		}
+		if (isCursorChanged)
+		{
+			Transform textTransform = getGraphicsRenderTransform(
+				handle->placeholderRender);
+			updateUiCursor(ui, textTransform, text);
+		}
+
+		if (updateTime > ui->blinkDelay)
+		{
+			Transform cursorTransform = getGraphicsRenderTransform(
+				ui->cursorRender);
+			setTransformActive(
+				cursorTransform,
+				!isTransformActive(cursorTransform));
+			ui->blinkDelay = updateTime + 0.5;
 		}
 	}
 }
@@ -520,7 +644,7 @@ static void onUiLabelDestroy(void* _handle)
 
 	free(handle);
 }
-MpgxResult createUiLabel32(
+MpgxResult createUiLabel(
 	UserInterface ui,
 	const uint32_t* string,
 	size_t stringLength,
@@ -571,7 +695,7 @@ MpgxResult createUiLabel32(
 
 	Text text;
 
-	MpgxResult mpgxResult = createAtlasText32(
+	MpgxResult mpgxResult = createAtlasText(
 		ui->fontAtlas,
 		string,
 		stringLength,
@@ -635,7 +759,7 @@ MpgxResult createUiLabel32(
 	*uiLabel = element;
 	return SUCCESS_MPGX_RESULT;
 }
-MpgxResult createUiLabel(
+MpgxResult createUiLabel8(
 	UserInterface ui,
 	const char* string,
 	size_t stringLength,
@@ -673,7 +797,7 @@ MpgxResult createUiLabel(
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 		return mpgxResult;
 
-	mpgxResult = createUiLabel32(
+	mpgxResult = createUiLabel(
 		ui,
 		string32,
 		stringLength32,
@@ -798,7 +922,7 @@ static void onUiWindowDestroy(void* _handle)
 
 	free(handle);
 }
-MpgxResult createUiWindow32(
+MpgxResult createUiWindow(
 	UserInterface ui,
 	const uint32_t* title,
 	size_t titleLength,
@@ -930,7 +1054,7 @@ MpgxResult createUiWindow32(
 
 	Text text;
 
-	MpgxResult mpgxResult = createAtlasText32(
+	MpgxResult mpgxResult = createAtlasText(
 		ui->fontAtlas,
 		title,
 		titleLength,
@@ -1001,7 +1125,7 @@ MpgxResult createUiWindow32(
 	*uiWindow = element;
 	return SUCCESS_MPGX_RESULT;
 }
-MpgxResult createUiWindow(
+MpgxResult createUiWindow8(
 	UserInterface ui,
 	const char* title,
 	size_t titleLength,
@@ -1038,7 +1162,7 @@ MpgxResult createUiWindow(
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 		return mpgxResult;
 
-	mpgxResult = createUiWindow32(
+	mpgxResult = createUiWindow(
 		ui,
 		title32,
 		titleLength32,
@@ -1212,7 +1336,7 @@ static void onUiButtonDestroy(void* _handle)
 
 	free(handle);
 }
-MpgxResult createUiButton32(
+MpgxResult createUiButton(
 	UserInterface ui,
 	const uint32_t* text,
 	size_t textLength,
@@ -1307,7 +1431,7 @@ MpgxResult createUiButton32(
 
 	Text textInstance;
 
-	MpgxResult mpgxResult = createAtlasText32(
+	MpgxResult mpgxResult = createAtlasText(
 		ui->fontAtlas,
 		text,
 		textLength,
@@ -1327,8 +1451,7 @@ MpgxResult createUiButton32(
 	GraphicsRender textRender = createTextRender(
 		ui->textRenderer,
 		textTransform,
-		createTextBox3F(
-			alignment,
+		createTextBox3F(alignment,
 			getTextSize(textInstance)),
 		whiteLinearColor,
 		textInstance,
@@ -1386,7 +1509,7 @@ MpgxResult createUiButton32(
 	*uiButton = element;
 	return SUCCESS_MPGX_RESULT;
 }
-MpgxResult createUiButton(
+MpgxResult createUiButton8(
 	UserInterface ui,
 	const char* text,
 	size_t textLength,
@@ -1424,7 +1547,7 @@ MpgxResult createUiButton(
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 		return mpgxResult;
 
-	mpgxResult = createUiButton32(
+	mpgxResult = createUiButton(
 		ui,
 		text32,
 		textLength32,
@@ -1664,10 +1787,18 @@ static void onUiInputFieldPress(InterfaceElement element)
 	setPanelRenderColor(
 		handle->focusRender,
 		handle->focusedColor);
-	handle->ui->focusedInputField = element;
+
+	UserInterface ui = handle->ui;
+	Text text = getTextRenderText(handle->textRender);
+	Transform textTransform = getGraphicsRenderTransform(
+		handle->placeholderRender);
+	updateUiCursor(ui, textTransform, text);
+
+	ui->blinkDelay = getWindowUpdateTime(ui->window) + 0.5f;
+	ui->focusedInputField = element;
+
 	if (handle->onPress)
 		handle->onPress(element);
-
 }
 static void onUiInputFieldDestroy(void* _handle)
 {
@@ -1717,7 +1848,7 @@ static void onUiInputFieldDestroy(void* _handle)
 
 	free(handle);
 }
-MpgxResult createUiInputField32(
+MpgxResult createUiInputField(
 	UserInterface ui,
 	const uint32_t* placeholder,
 	size_t placeholderLength,
@@ -1806,9 +1937,9 @@ MpgxResult createUiInputField32(
 		oneQuat,
 		NO_ROTATION_TYPE,
 		panelTransform,
-		isActive);
+		true);
 
-	if (!panelTransform)
+	if (!focusTransform)
 	{
 		onUiInputFieldDestroy(handle);
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
@@ -1829,11 +1960,9 @@ MpgxResult createUiInputField32(
 
 	handle->focusRender = focusRender;
 
-	cmmt_float_t textScale = scale.y * (cmmt_float_t)(1.0 / 2.5);
-
 	cmmt_float_t textPosition =
 		(scale.x * (cmmt_float_t)-0.5) +
-		(textScale * (cmmt_float_t)0.5);
+		(DEFAULT_UI_TEXT_HEIGHT * (cmmt_float_t)0.5);
 
 	Transform textTransform = createTransform(
 		transformer,
@@ -1842,8 +1971,8 @@ MpgxResult createUiInputField32(
 			(cmmt_float_t)0.0,
 			(cmmt_float_t)-0.001),
 		vec3F(
-			textScale,
-			textScale,
+			DEFAULT_UI_TEXT_HEIGHT,
+			DEFAULT_UI_TEXT_HEIGHT,
 			(cmmt_float_t)1.0),
 		oneQuat,
 		NO_ROTATION_TYPE,
@@ -1858,13 +1987,13 @@ MpgxResult createUiInputField32(
 
 	Text textInstance;
 
-	const uint32_t text[] = { 'X', };
+	const uint32_t text[] = { '-', };
 
-	MpgxResult mpgxResult = createAtlasText32(
+	MpgxResult mpgxResult = createAtlasText(
 		fontAtlas,
 		text,
 		sizeof(text) / sizeof(uint32_t),
-		LEFT_ALIGNMENT_TYPE,
+		CENTER_ALIGNMENT_TYPE,
 		textColor,
 		false,
 		false,
@@ -1876,6 +2005,8 @@ MpgxResult createUiInputField32(
 		onUiInputFieldDestroy(handle);
 		return mpgxResult;
 	}
+
+	removeTextChar(textInstance, 0);
 
 	GraphicsRender textRender = createTextRender(
 		ui->textRenderer,
@@ -1904,8 +2035,8 @@ MpgxResult createUiInputField32(
 			(cmmt_float_t)0.0,
 			(cmmt_float_t)-0.001),
 		vec3F(
-			textScale,
-			textScale,
+			DEFAULT_UI_TEXT_HEIGHT,
+			DEFAULT_UI_TEXT_HEIGHT,
 			(cmmt_float_t)1.0),
 		oneQuat,
 		NO_ROTATION_TYPE,
@@ -1920,7 +2051,7 @@ MpgxResult createUiInputField32(
 
 	Text placeholderInstance;
 
-	mpgxResult = createAtlasText32(
+	mpgxResult = createAtlasText(
 		fontAtlas,
 		placeholder,
 		placeholderLength,
@@ -1997,3 +2128,5 @@ MpgxResult createUiInputField32(
 	*uiInputField = element;
 	return SUCCESS_MPGX_RESULT;
 }
+
+// TODO: possibly abort on bad text operations

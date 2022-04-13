@@ -17,8 +17,8 @@
 #include "uran/renderers/text_renderer.h"
 #include "uran/renderers/panel_renderer.h"
 
-#define DEFAULT_UI_BAR_HEIGHT 24
-#define DEFAULT_UI_TEXT_HEIGHT 12
+#define DEFAULT_UI_BAR_HEIGHT 28
+#define DEFAULT_UI_TEXT_HEIGHT 14
 
 #define DEFAULT_UI_PANEL_COLOR srgbColor(48, 48, 48, 255)
 #define DEFAULT_UI_BAR_COLOR srgbColor(80, 80, 80, 255)
@@ -171,7 +171,7 @@ GraphicsRender getUiPanelRender(InterfaceElement panel);
  * isActive - is label active.
  * uiPanel - pointer to the UI label.
  */
-MpgxResult createUiLabel32(
+MpgxResult createUiLabel(
 	UserInterface ui,
 	const uint32_t* string,
 	size_t stringLength,
@@ -205,7 +205,7 @@ MpgxResult createUiLabel32(
  * isActive - is label active.
  * uiPanel - pointer to the UI label.
  */
-MpgxResult createUiLabel(
+MpgxResult createUiLabel8(
 	UserInterface ui,
 	const char* string,
 	size_t stringLength,
@@ -249,7 +249,7 @@ GraphicsRender getUiLabelRender(InterfaceElement label);
  * isActive - is window active.
  * uiPanel - pointer to the UI window.
  */
-MpgxResult createUiWindow32(
+MpgxResult createUiWindow(
 	UserInterface ui,
 	const uint32_t* title,
 	size_t titleLength,
@@ -279,7 +279,7 @@ MpgxResult createUiWindow32(
  * isActive - is window active.
  * uiPanel - pointer to the UI window.
  */
-MpgxResult createUiWindow(
+MpgxResult createUiWindow8(
 	UserInterface ui,
 	const char* title,
 	size_t titleLength,
@@ -342,7 +342,7 @@ OnInterfaceElementEvent getUiWindowOnPressEvent(InterfaceElement window);
  * isActive - is button active.
  * uiButton - pointer to the UI button.
  */
-MpgxResult createUiButton32(
+MpgxResult createUiButton(
 	UserInterface ui,
 	const uint32_t* text,
 	size_t textLength,
@@ -374,7 +374,7 @@ MpgxResult createUiButton32(
  * isActive - is button active.
  * uiButton - pointer to the UI button.
  */
-MpgxResult createUiButton(
+MpgxResult createUiButton8(
 	UserInterface ui,
 	const char* text,
 	size_t textLength,
@@ -500,7 +500,9 @@ void setUiButtonPressedColor(
 
 // TODO: comments
 
-MpgxResult createUiInputField32(
+// TODO: allow without placeholder
+
+MpgxResult createUiInputField(
 	UserInterface ui,
 	const uint32_t* placeholder,
 	size_t placeholderLength,
@@ -516,7 +518,7 @@ MpgxResult createUiInputField32(
 	bool isEnabled,
 	bool isActive,
 	InterfaceElement* uiInputField);
-MpgxResult createUiInputField(
+MpgxResult createUiInputField8(
 	UserInterface ui,
 	const char* placeholder,
 	size_t placeholderLength,

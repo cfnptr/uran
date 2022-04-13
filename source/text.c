@@ -2062,11 +2062,13 @@ inline static MpgxResult internalCreateText(
 		textInstance->base.vertices = NULL;
 	}
 
+	// TODO: vertex buffer also can be shared across all texts
+
 	*text = textInstance;
 	return SUCCESS_MPGX_RESULT;
 }
 
-MpgxResult createAtlasText32(
+MpgxResult createAtlasText(
 	FontAtlas fontAtlas,
 	const uint32_t* string,
 	size_t length,
@@ -2102,7 +2104,7 @@ MpgxResult createAtlasText32(
 		isConstant,
 		text);
 }
-MpgxResult createAtlasText(
+MpgxResult createAtlasText8(
 	FontAtlas fontAtlas,
 	const char* string,
 	size_t length,
@@ -2201,7 +2203,8 @@ uint32_t getTextLength(Text text)
 	assert(textInitialized);
 	return text->base.length;
 }
-bool setTextString32(
+
+bool setTextString(
 	Text text,
 	const uint32_t* string,
 	uint32_t length)
@@ -2239,7 +2242,7 @@ bool setTextString32(
 	text->base.length = length;
 	return true;
 }
-bool setTextString(
+bool setTextString8(
 	Text text,
 	const char* string,
 	uint32_t length)
@@ -2293,9 +2296,66 @@ bool appendTextString32(
 	assert(text);
 	assert(string);
 	assert(length > 0);
+	assert(index <= text->base.length);
+
+	assert((size_t)text->base.length +
+		(size_t)length <= UINT32_MAX);
+
+	uint32_t baseLength = text->base.length;
+
+	if (baseLength + length > text->base.capacity)
+	{
+		uint32_t capacity = baseLength + length;
+
+		uint32_t* newString = realloc(
+			text->base.string,
+			capacity * sizeof(uint32_t));
+
+		if (!newString)
+			return false;
+
+		text->base.string = newString;
+
+		TextVertex* newVertices = realloc(
+			text->base.vertices,
+			capacity * 4 * sizeof(TextVertex));
+
+		if (!newVertices)
+			return false;
+
+		text->base.vertices = newVertices;
+		text->base.capacity = capacity;
+	}
+
+	uint32_t* baseString = text->base.string;
+
+	if (index < baseLength)
+	{
+		uint32_t offset = index + length;
+
+		for (int64_t i = baseLength - (index + 1); i >= 0; i--)
+			baseString[offset + i] = baseString[index + i];
+	}
+
+	memcpy(baseString + index, string,
+		length * sizeof(uint32_t));
+	text->base.length += length;
+	return true;
+}
+void removeTextChar(
+	Text text,
+	uint32_t index)
+{
+	assert(text);
 	assert(index < text->base.length);
 
-	// TODO:
+	uint32_t* string = text->base.string;
+	uint32_t length = text->base.length;
+
+	for (size_t i = index + 1; i < length; i++)
+		string[i - 1] = string[i];
+
+	text->base.length--;
 }
 
 AlignmentType getTextAlignment(Text text)
@@ -2347,15 +2407,13 @@ void setTextUseTags(
 	text->base.useTags = useTags;
 }
 
-// TODO: inspect cmmt float vectors \/
-
-// TODO: take into account text alignment
-/*bool getTextCaretAdvance(
+bool getTextCursorAdvance(
 	Text text,
-	size_t index,
+	uint32_t index,
 	Vec2F* _advance)
 {
 	assert(text);
+	assert(index <= text->base.length);
 	assert(_advance);
 	assert(textInitialized);
 
@@ -2365,31 +2423,24 @@ void setTextUseTags(
 		return true;
 	}
 
-	FT_Face face = text->font->face;
-	uint32_t fontSize = text->fontSize;
-
-	FT_Error ftResult = FT_Set_Pixel_Sizes(
-		face,
-		0,
-		(FT_UInt)fontSize);
-
-	if (ftResult != 0)
-		return false;
-
-	float newLineAdvance = ((float)face->size->metrics.height /
-		64.0f) / (float)fontSize;
-
-	const uint32_t* data = text->data;
-	size_t dataLength = text->dataLength;
-
-	if (index > dataLength)
-		index = dataLength;
+	FontAtlas fontAtlas = text->base.fontAtlas;
+	const Glyph* regularGlyphs = fontAtlas->regularGlyphs;
+	const Glyph* boldGlyphs = fontAtlas->boldGlyphs;
+	const Glyph* italicGlyphs = fontAtlas->italicGlyphs;
+	const Glyph* boldItalicGlyphs = fontAtlas->boldItalicGlyphs;
+	size_t glyphCount = fontAtlas->glyphCount;
+	float newLineAdvance = fontAtlas->newLineAdvance;
+	const uint32_t* string = text->base.string;
+	size_t length = text->base.length;
+	bool useTags = text->base.useTags;
+	const Glyph* glyphs = regularGlyphs;
+	bool useBold = false, useItalic = false;
 
 	Vec2F advance = zeroVec2F;
 
 	for (size_t i = 0; i < index; i++)
 	{
-		uint32_t value = data[i];
+		uint32_t value = string[i];
 
 		if (value == '\n')
 		{
@@ -2401,41 +2452,80 @@ void setTextUseTags(
 		{
 			value = ' ';
 
-			FT_UInt charIndex = FT_Get_Char_Index(
-				face,
-				value);
-			FT_Error result = FT_Load_Glyph(
-				face,
-				charIndex,
-				FT_LOAD_BITMAP_METRICS_ONLY);
+			const Glyph* glyph = bsearch(
+				&value,
+				glyphs,
+				glyphCount,
+				sizeof(Glyph),
+				compareGlyph);
 
-			if (result != 0)
+			if (!glyph)
 				return false;
 
-			advance.x += ((float)face->glyph->advance.x /
-				64.0f) / (float)fontSize * 4;
+			advance.x += glyph->advance;
 			continue;
 		}
+		else if ((value == '<') & useTags) // TODO: parse color
+		{
+			if (i + 2 < length && string[i + 2] == '>')
+			{
+				if (string[i + 1] == 'b')
+				{
+					if (useItalic) glyphs = boldItalicGlyphs;
+					else glyphs = boldGlyphs;
+					useBold = true;
+					i += 2;
+					continue;
+				}
+				else if (string[i + 1] == 'i')
+				{
+					if (useBold) glyphs = boldItalicGlyphs;
+					else glyphs = italicGlyphs;
+					useItalic = true;
+					i += 2;
+					continue;
+				}
+			}
+			else if (i + 3 < length && string[i + 1] == '/' && string[i + 3] == '>')
+			{
+				if (string[i + 2] == 'b')
+				{
+					if (useItalic) glyphs = italicGlyphs;
+					else glyphs = regularGlyphs;
+					useBold = false;
+					i += 3;
+					continue;
+				}
+				else if (string[i + 2] == 'i')
+				{
+					if (useBold) glyphs = boldGlyphs;
+					else glyphs = regularGlyphs;
+					useItalic = false;
+					i += 3;
+					continue;
+				}
+			}
+		}
 
-		FT_UInt charIndex = FT_Get_Char_Index(
-			face,
-			value);
-		FT_Error result = FT_Load_Glyph(
-			face,
-			charIndex,
-			FT_LOAD_BITMAP_METRICS_ONLY);
+		const Glyph* glyph = bsearch(
+			&value,
+			glyphs,
+			glyphCount,
+			sizeof(Glyph),
+			compareGlyph);
 
-		if (result != 0)
+		if (!glyph)
 			return false;
 
-		advance.x += ((float)face->glyph->advance.x /
-			64.0f) / (float)fontSize;
+		advance.x += glyph->advance;
 	}
+
+	// TODO: take into account text alignment
 
 	*_advance = advance;
 	return true;
 }
-bool getTextCaretPosition(
+bool getTextCursorPosition(
 	Text text,
 	Vec2F* advance,
 	size_t* index)
@@ -2445,15 +2535,19 @@ bool getTextCaretPosition(
 	assert(index);
 	assert(textInitialized);
 
-	// TODO:
-	abort();
-}*/
+
+}
+
+// TODO: inspect cmmt float vectors \/
 
 MpgxResult bakeText(Text text)
 {
 	assert(text);
 	assert(!text->base.isConstant);
 	assert(textInitialized);
+
+	if (text->base.length == 0)
+		return BAD_VALUE_MPGX_RESULT;
 
 	TextVertex* vertices = text->base.vertices;
 	FontAtlas fontAtlas = text->base.fontAtlas;
