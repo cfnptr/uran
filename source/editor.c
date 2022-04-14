@@ -141,7 +141,6 @@ inline static BaseWindow createBaseWindow(
 		CENTER_ALIGNMENT_TYPE,
 		position,
 		scale,
-		DEFAULT_UI_TEXT_COLOR,
 		NULL,
 		&events,
 		baseWindow,
@@ -162,7 +161,9 @@ inline static BaseWindow createBaseWindow(
 	Transform windowTransform =
 		getInterfaceElementTransform(window);
 
-	const uint32_t text[] = { '+' };
+	const uint32_t text[] = {
+		'<', '/', 'b', '>', '+'
+	};
 
 	events.onEnter = onBaseWindowCloseEnter;
 	events.onExit = onBaseWindowCloseExit;
@@ -179,7 +180,6 @@ inline static BaseWindow createBaseWindow(
 			(cmmt_float_t)0.0,
 			(cmmt_float_t)-0.01),
 		valVec2F((cmmt_float_t)18.0),
-		DEFAULT_UI_TEXT_COLOR,
 		windowTransform,
 		&events,
 		baseWindow,
@@ -296,7 +296,7 @@ inline static StatsWindow createStatsWindow(
 		return NULL;
 
 	const uint32_t windowTitle[] = {
-		'<', 'b', '>', 'S', 't', 'a', 't', 's',
+		'S', 't', 'a', 't', 's',
 	};
 
 	BaseWindow base = createBaseWindow(ui,
@@ -324,7 +324,8 @@ inline static StatsWindow createStatsWindow(
 		getInterfaceElementTransform(base->window);
 
 	const uint32_t labelText[] = {
-		'L', 'o', 'a', 'd', 'i', 'n', 'g',
+		'L', 'o', 'a', 'd',
+		'i', 'n', 'g', '.', '.', '.',
 	};
 
 	InterfaceElementEvents events = emptyInterfaceElementEvents;
@@ -342,6 +343,8 @@ inline static StatsWindow createStatsWindow(
 			(cmmt_float_t)-0.001),
 		(cmmt_float_t)DEFAULT_UI_TEXT_HEIGHT,
 		DEFAULT_UI_TEXT_COLOR,
+		false,
+		false,
 		true,
 		false,
 		windowTransform,
@@ -474,7 +477,6 @@ inline static MenuBar createMenuBar(
 		vec2F(
 			(cmmt_float_t)64.0,
 			(cmmt_float_t)(DEFAULT_UI_TEXT_HEIGHT * 2.0)),
-		DEFAULT_UI_TEXT_COLOR,
 		panelTransform,
 		&events,
 		menuBar,

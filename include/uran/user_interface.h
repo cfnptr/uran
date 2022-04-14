@@ -147,7 +147,7 @@ MpgxResult createUiPanel(
  */
 void* getUiPanelHandle(InterfaceElement panel);
 /*
- * Returns UI panel panel render instance.
+ * Returns UI panel render instance.
  * panel - UI panel instance.
  */
 GraphicsRender getUiPanelRender(InterfaceElement panel);
@@ -162,9 +162,11 @@ GraphicsRender getUiPanelRender(InterfaceElement panel);
  * alignment - alignment type.
  * position - label position.
  * scale - label scale.
- * color - label color.
+ * color - initial label color.
+ * isBold - is label bold initially.
+ * isItalic - is label italic initially.
  * useTags - use HTML tags.
- * isConstant - is label constant
+ * isConstant - is label constant.
  * parent - parent instance or NUL.
  * events - interface events or NULL.
  * handle - label handle or NULL.
@@ -179,6 +181,8 @@ MpgxResult createUiLabel(
 	Vec3F position,
 	cmmt_float_t scale,
 	SrgbColor color,
+	bool isBold,
+	bool isItalic,
 	bool useTags,
 	bool isConstant,
 	Transform parent,
@@ -196,7 +200,9 @@ MpgxResult createUiLabel(
  * alignment - alignment type.
  * position - label position.
  * scale - label scale.
- * color - label color.
+ * color - initial label color.
+ * isBold - is label bold initially.
+ * isItalic - is label italic initially.
  * useTags - use HTML tags.
  * isConstant - is label constant
  * parent - parent instance or NULL.
@@ -213,6 +219,8 @@ MpgxResult createUiLabel8(
 	Vec3F position,
 	cmmt_float_t scale,
 	SrgbColor color,
+	bool isBold,
+	bool isItalic,
 	bool useTags,
 	bool isConstant,
 	Transform parent,
@@ -242,7 +250,6 @@ GraphicsRender getUiLabelRender(InterfaceElement label);
  * alignment - alignment type.
  * position - window position.
  * scale - window scale.
- * titleColor - window title color.
  * parent - parent instance or NULL.
  * events - interface events or NULL.
  * handle - window handle or NULL.
@@ -256,7 +263,6 @@ MpgxResult createUiWindow(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	SrgbColor titleColor,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
@@ -272,7 +278,6 @@ MpgxResult createUiWindow(
  * alignment - alignment type.
  * position - window position.
  * scale - window scale.
- * titleColor - window title color.
  * parent - parent instance or NULL.
  * events - interface events or NULL.
  * handle - window handle or NULL.
@@ -286,7 +291,6 @@ MpgxResult createUiWindow8(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	SrgbColor titleColor,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
@@ -299,7 +303,7 @@ MpgxResult createUiWindow8(
  */
 void* getUiWindowHandle(InterfaceElement window);
 /*
- * Returns UI window panel panel render instance.
+ * Returns UI window panel render instance.
  * window - UI window instance.
  */
 GraphicsRender getUiWindowPanelRender(InterfaceElement window);
@@ -334,7 +338,6 @@ OnInterfaceElementEvent getUiWindowOnPressEvent(InterfaceElement window);
  * alignment - alignment type.
  * position - button position.
  * scale - button scale.
- * textColor - button text color.
  * parent - parent instance or NULL.
  * events - interface events or NULL.
  * handle - button handle or NULL.
@@ -349,7 +352,6 @@ MpgxResult createUiButton(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	SrgbColor textColor,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
@@ -366,7 +368,6 @@ MpgxResult createUiButton(
  * alignment - alignment type.
  * position - button position.
  * scale - button scale.
- * textColor - button text color.
  * parent - parent instance or NULL.
  * events - interface events or NULL.
  * handle - button handle or NULL.
@@ -381,7 +382,6 @@ MpgxResult createUiButton8(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	SrgbColor textColor,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
@@ -394,7 +394,7 @@ MpgxResult createUiButton8(
  */
 void* getUiButtonHandle(InterfaceElement button);
 /*
- * Returns UI button panel panel render instance.
+ * Returns UI button panel render instance.
  * button - UI button instance.
  */
 GraphicsRender getUiButtonPanelRender(InterfaceElement button);
@@ -435,22 +435,6 @@ OnInterfaceElementEvent getUiButtonOnPressEvent(InterfaceElement button);
 OnInterfaceElementEvent getUiButtonOnReleaseEvent(InterfaceElement button);
 
 /*
- * Returns UI button enabled color.
- * button - UI button instance.
- */
-LinearColor getUiButtonEnabledColor(
-	InterfaceElement button);
-/*
- * Sets UI button enabled color.
- *
- * button - UI button instance.
- * color - color value.
- */
-void setUiButtonEnabledColor(
-	InterfaceElement button,
-	LinearColor color);
-
-/*
  * Returns UI button disabled color.
  * button - UI button instance.
  */
@@ -463,6 +447,22 @@ LinearColor getUiButtonDisabledColor(
  * color - color value.
  */
 void setUiButtonDisabledColor(
+	InterfaceElement button,
+	LinearColor color);
+
+/*
+ * Returns UI button enabled color.
+ * button - UI button instance.
+ */
+LinearColor getUiButtonEnabledColor(
+	InterfaceElement button);
+/*
+ * Sets UI button enabled color.
+ *
+ * button - UI button instance.
+ * color - color value.
+ */
+void setUiButtonEnabledColor(
 	InterfaceElement button,
 	LinearColor color);
 
@@ -498,10 +498,24 @@ void setUiButtonPressedColor(
 	InterfaceElement button,
 	LinearColor color);
 
-// TODO: comments
-
-// TODO: allow without placeholder
-
+/*
+ * Create a new UTF-32 UI input field instance.
+ * Returns operation MPGX result.
+ *
+ * ui - user interface instance.
+ * placeholder - placeholder string.
+ * placeholderLength - placeholder string length.
+ * alignment - alignment type.
+ * position - input field position.
+ * scale - input field scale.
+ * maxLength - max input string length.
+ * parent - parent instance or NULL.
+ * events - interface events or NULL.
+ * handle - input field handle or NULL.
+ * isEnabled - is input field enabled.
+ * isActive - is input field active.
+ * uiInputField - pointer to the UI input field.
+ */
 MpgxResult createUiInputField(
 	UserInterface ui,
 	const uint32_t* placeholder,
@@ -509,8 +523,6 @@ MpgxResult createUiInputField(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	SrgbColor placeholderColor,
-	SrgbColor textColor,
 	size_t maxLength,
 	Transform parent,
 	const InterfaceElementEvents* events,
@@ -518,20 +530,152 @@ MpgxResult createUiInputField(
 	bool isEnabled,
 	bool isActive,
 	InterfaceElement* uiInputField);
+/*
+ * Create a new UTF-8 UI input field instance.
+ * Returns operation MPGX result.
+ *
+ * ui - user interface instance.
+ * placeholder - placeholder string.
+ * placeholderLength - placeholder string length.
+ * alignment - alignment type.
+ * position - input field position.
+ * scale - input field scale.
+ * maxLength - max input string length.
+ * parent - parent instance or NULL.
+ * events - interface events or NULL.
+ * handle - input field handle or NULL.
+ * isEnabled - is input field enabled.
+ * isActive - is input field active.
+ * uiInputField - pointer to the UI input field.
+ */
 MpgxResult createUiInputField8(
 	UserInterface ui,
-	const char* placeholder,
+	const uint32_t* placeholder,
 	size_t placeholderLength,
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	SrgbColor placeholderColor,
-	SrgbColor textColor,
+	size_t maxLength,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
 	bool isEnabled,
 	bool isActive,
 	InterfaceElement* uiInputField);
+
+/*
+ * Returns UI input field handle.
+ * inputField - UI input field instance.
+ */
+void* getUiInputFieldHandle(InterfaceElement inputField);
+/*
+ * Returns UI input field panel render instance.
+ * inputField - UI input field instance.
+ */
+GraphicsRender getUiInputFieldPanelRender(InterfaceElement inputField);
+/*
+ * Returns UI input field focus render instance.
+ * inputField - UI input field instance.
+ */
+GraphicsRender getUiInputFieldFocusRender(InterfaceElement inputField);
+/*
+ * Returns UI input field text render instance.
+ * inputField - UI input field instance.
+ */
+GraphicsRender getUiInputFieldTextRender(InterfaceElement inputField);
+/*
+ * Returns UI input field placeholder render instance.
+ * inputField - UI input field instance.
+ */
+GraphicsRender getUiInputFieldPlaceholderRender(InterfaceElement inputField);
+/*
+ * Returns UI input field on enable event function.
+ * inputField - UI input field instance.
+ */
+OnInterfaceElementEvent getUiInputFieldOnEnableEvent(InterfaceElement inputField);
+/*
+ * Returns UI input field on disable event function.
+ * inputField - UI input field instance.
+ */
+OnInterfaceElementEvent getUiInputFieldOnDisableEvent(InterfaceElement inputField);
+/*
+ * Returns UI input field on enter event function.
+ * inputField - UI input field instance.
+ */
+OnInterfaceElementEvent getUiInputFieldOnEnterEvent(InterfaceElement inputField);
+/*
+ * Returns UI input field on exit event function.
+ * inputField - UI input field instance.
+ */
+OnInterfaceElementEvent getUiInputFieldOnExitEvent(InterfaceElement inputField);
+/*
+ * Returns UI input field on press event function.
+ * inputField - UI input field instance.
+ */
+OnInterfaceElementEvent getUiInputFieldOnPressEvent(InterfaceElement inputField);
+
+/*
+ * Returns UI input field disabled color.
+ * inputField - UI input field instance.
+ */
+LinearColor getUiInputFieldDisabledColor(
+	InterfaceElement inputField);
+/*
+ * Sets UI input field disabled color.
+ *
+ * inputField - UI input field instance.
+ * color - color value.
+ */
+void setUiInputFieldDisabledColor(
+	InterfaceElement inputField,
+	LinearColor color);
+
+/*
+ * Returns UI input field enabled color.
+ * inputField - UI input field instance.
+ */
+LinearColor getUiInputFieldEnabledColor(
+	InterfaceElement inputField);
+/*
+ * Sets UI input field enabled color.
+ *
+ * inputField - UI input field instance.
+ * color - color value.
+ */
+void setUiInputFieldEnabledColor(
+	InterfaceElement inputField,
+	LinearColor color);
+
+/*
+ * Returns UI input field focused color.
+ * inputField - UI input field instance.
+ */
+LinearColor getUiInputFieldFocusedColor(
+	InterfaceElement inputField);
+/*
+ * Sets UI input field focused color.
+ *
+ * inputField - UI input field instance.
+ * color - color value.
+ */
+void setUiInputFieldFocusedColor(
+	InterfaceElement inputField,
+	LinearColor color);
+
+/*
+ * Returns UI input field maximal string length.
+ * inputField - UI input field instance.
+ */
+size_t getUiInputFieldMaxLength(
+	InterfaceElement inputField);
+/*
+ * Sets UI input field maximal string length.
+ *
+ * inputField - UI input field instance.
+ * maxLength - maxial string length.
+ */
+void setUiInputFieldMaxLength(
+	InterfaceElement inputField,
+	size_t maxLength);
 
 // TODO: InputBox, ScrollBox, Checkbox

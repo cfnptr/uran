@@ -85,12 +85,14 @@ typedef struct BaseText
 {
 	FontAtlas fontAtlas;
 	uint32_t* string;
-	uint32_t capacity;
-	uint32_t length;
+	size_t capacity;
+	size_t length;
 	TextVertex* vertices;
 	Vec2F size;
 	SrgbColor color;
 	AlignmentType alignment;
+	bool isBold;
+	bool isItalic;
 	bool useTags;
 	bool isConstant;
 } BaseText;
@@ -99,15 +101,17 @@ typedef struct VkText
 {
 	FontAtlas fontAtlas;
 	uint32_t* string;
-	uint32_t capacity;
-	uint32_t length;
+	size_t capacity;
+	size_t length;
 	TextVertex* vertices;
 	Vec2F size;
 	SrgbColor color;
 	AlignmentType alignment;
+	bool isBold;
+	bool isItalic;
 	bool useTags;
 	bool isConstant;
-	uint8_t _alignment[1];
+	uint8_t _alignment[3];
 	uint32_t indexCount;
 	Buffer vertexBuffer;
 } VkText;
@@ -117,15 +121,17 @@ typedef struct GlText
 {
 	FontAtlas fontAtlas;
 	uint32_t* string;
-	uint32_t capacity;
-	uint32_t length;
+	size_t capacity;
+	size_t length;
 	TextVertex* vertices;
 	Vec2F size;
 	SrgbColor color;
 	AlignmentType alignment;
+	bool isBold;
+	bool isItalic;
 	bool useTags;
 	bool isConstant;
-	uint8_t _alignment[1];
+	uint8_t _alignment[3];
 	GraphicsMesh mesh;
 } GlText;
 #endif
@@ -1474,6 +1480,8 @@ inline static bool fillVertices(
 	float newLineAdvance,
 	AlignmentType alignment,
 	SrgbColor color,
+	bool isBold,
+	bool isItalic,
 	bool useTags,
 	TextVertex* vertices,
 	uint32_t* vertexCount,
@@ -1492,12 +1500,34 @@ inline static bool fillVertices(
 	assert(textSize);
 
 	SrgbColor useColor = color;
-	const Glyph* glyphs = regularGlyphs;
-	bool useBold = false, useItalic = false;
-	float atlasIndex = 0.0f;
+	bool useBold = isBold, useItalic = isItalic;
 	float sizeX = 0.0f, sizeY = 0.0f;
 	float vertexOffsetX = 0.0f, vertexOffsetY = -newLineAdvance * 0.5f;
 	uint32_t vertexIndex = 0, lastNewLineIndex = 0;
+
+	const Glyph* glyphs;
+	float atlasIndex;
+
+	if (isBold & isItalic)
+	{
+		glyphs = boldItalicGlyphs;
+		atlasIndex = 3.0f;
+	}
+	else if (isItalic)
+	{
+		glyphs = italicGlyphs;
+		atlasIndex = 2.0f;
+	}
+	else if (isBold)
+	{
+		glyphs = boldGlyphs;
+		atlasIndex = 1.0f;
+	}
+	else
+	{
+		glyphs = regularGlyphs;
+		atlasIndex = 0.0f;
+	}
 
 	float offset;
 
@@ -1868,6 +1898,8 @@ inline static MpgxResult internalCreateText(
 	size_t length,
 	AlignmentType alignment,
 	SrgbColor color,
+	bool isBold,
+	bool isItalic,
 	bool useTags,
 	bool isConstant,
 	Text* text)
@@ -1884,6 +1916,8 @@ inline static MpgxResult internalCreateText(
 	textInstance->base.length = length;
 	textInstance->base.color = color;
 	textInstance->base.alignment = alignment;
+	textInstance->base.isBold = isBold;
+	textInstance->base.isItalic = isItalic;
 	textInstance->base.useTags = useTags;
 	textInstance->base.isConstant = isConstant;
 
@@ -1911,6 +1945,8 @@ inline static MpgxResult internalCreateText(
 		fontAtlas->newLineAdvance,
 		alignment,
 		color,
+		isBold,
+		isItalic,
 		useTags,
 		vertices,
 		&vertexCount,
@@ -2074,6 +2110,8 @@ MpgxResult createAtlasText(
 	size_t length,
 	AlignmentType alignment,
 	SrgbColor color,
+	bool isBold,
+	bool isItalic,
 	bool useTags,
 	bool isConstant,
 	Text* text)
@@ -2100,6 +2138,8 @@ MpgxResult createAtlasText(
 		length,
 		alignment,
 		color,
+		isBold,
+		isItalic,
 		useTags,
 		isConstant,
 		text);
@@ -2110,6 +2150,8 @@ MpgxResult createAtlasText8(
 	size_t length,
 	AlignmentType alignment,
 	SrgbColor color,
+	bool isBold,
+	bool isItalic,
 	bool useTags,
 	bool isConstant,
 	Text* text)
@@ -2139,6 +2181,8 @@ MpgxResult createAtlasText8(
 		length32,
 		alignment,
 		color,
+		isBold,
+		isItalic,
 		useTags,
 		isConstant,
 		text);
@@ -2197,7 +2241,7 @@ const uint32_t* getTextString(Text text)
 	assert(textInitialized);
 	return text->base.string;
 }
-uint32_t getTextLength(Text text)
+size_t getTextLength(Text text)
 {
 	assert(text);
 	assert(textInitialized);
@@ -2207,7 +2251,7 @@ uint32_t getTextLength(Text text)
 bool setTextString(
 	Text text,
 	const uint32_t* string,
-	uint32_t length)
+	size_t length)
 {
 	assert(text);
 	assert(string);
@@ -2245,7 +2289,7 @@ bool setTextString(
 bool setTextString8(
 	Text text,
 	const char* string,
-	uint32_t length)
+	size_t length)
 {
 	assert(text);
 	assert(string);
@@ -2283,15 +2327,15 @@ bool setTextString8(
 	if (newLength == 0)
 		return false;
 
-	text->base.length = (uint32_t)newLength;
+	text->base.length = newLength;
 	return true;
 }
 
 bool appendTextString32(
 	Text text,
 	const uint32_t* string,
-	uint32_t length,
-	uint32_t index)
+	size_t length,
+	size_t index)
 {
 	assert(text);
 	assert(string);
@@ -2301,11 +2345,11 @@ bool appendTextString32(
 	assert((size_t)text->base.length +
 		(size_t)length <= UINT32_MAX);
 
-	uint32_t baseLength = text->base.length;
+	size_t baseLength = text->base.length;
 
 	if (baseLength + length > text->base.capacity)
 	{
-		uint32_t capacity = baseLength + length;
+		size_t capacity = baseLength + length;
 
 		uint32_t* newString = realloc(
 			text->base.string,
@@ -2331,9 +2375,9 @@ bool appendTextString32(
 
 	if (index < baseLength)
 	{
-		uint32_t offset = index + length;
+		size_t offset = index + length;
 
-		for (int64_t i = baseLength - (index + 1); i >= 0; i--)
+		for (int64_t i = (int64_t)baseLength - (int64_t)(index + 1); i >= 0; i--)
 			baseString[offset + i] = baseString[index + i];
 	}
 
@@ -2344,13 +2388,13 @@ bool appendTextString32(
 }
 void removeTextChar(
 	Text text,
-	uint32_t index)
+	size_t index)
 {
 	assert(text);
 	assert(index < text->base.length);
 
 	uint32_t* string = text->base.string;
-	uint32_t length = text->base.length;
+	size_t length = text->base.length;
 
 	for (size_t i = index + 1; i < length; i++)
 		string[i - 1] = string[i];
@@ -2391,6 +2435,38 @@ void setTextColor(
 	text->base.color = color;
 }
 
+bool isTextBold(Text text)
+{
+	assert(text);
+	assert(textInitialized);
+	return text->base.isBold;
+}
+void setTextBold(
+	Text text,
+	bool isBold)
+{
+	assert(text);
+	assert(textInitialized);
+	assert(!text->base.isConstant);
+	text->base.isBold = isBold;
+}
+
+bool isTextItalic(Text text)
+{
+	assert(text);
+	assert(textInitialized);
+	return text->base.isItalic;
+}
+void setTextItalic(
+	Text text,
+	bool isItalic)
+{
+	assert(text);
+	assert(textInitialized);
+	assert(!text->base.isConstant);
+	text->base.isItalic = isItalic;
+}
+
 bool isTextUseTags(Text text)
 {
 	assert(text);
@@ -2409,19 +2485,13 @@ void setTextUseTags(
 
 bool getTextCursorAdvance(
 	Text text,
-	uint32_t index,
+	size_t index,
 	Vec2F* _advance)
 {
 	assert(text);
 	assert(index <= text->base.length);
 	assert(_advance);
 	assert(textInitialized);
-
-	if (index == 0)
-	{
-		*_advance = zeroVec2F;
-		return true;
-	}
 
 	FontAtlas fontAtlas = text->base.fontAtlas;
 	const Glyph* regularGlyphs = fontAtlas->regularGlyphs;
@@ -2432,20 +2502,25 @@ bool getTextCursorAdvance(
 	float newLineAdvance = fontAtlas->newLineAdvance;
 	const uint32_t* string = text->base.string;
 	size_t length = text->base.length;
+	bool useBold = text->base.isBold;
+	bool useItalic = text->base.isItalic;
 	bool useTags = text->base.useTags;
+
 	const Glyph* glyphs = regularGlyphs;
-	bool useBold = false, useItalic = false;
-
 	Vec2F advance = zeroVec2F;
+	float lineSizeX = 0.0f;
 
-	for (size_t i = 0; i < index; i++)
+	for (size_t i = 0; i < length; i++)
 	{
 		uint32_t value = string[i];
 
 		if (value == '\n')
 		{
-			advance.y += newLineAdvance;
-			advance.x = 0.0f;
+			if (i >= index)
+				break;
+
+			advance.y -= newLineAdvance;
+			advance.x = lineSizeX = 0.0f;
 			continue;
 		}
 		else if (value == '\t')
@@ -2517,28 +2592,99 @@ bool getTextCursorAdvance(
 		if (!glyph)
 			return false;
 
-		advance.x += glyph->advance;
+		if (i < index)
+			advance.x += glyph->advance;
+		lineSizeX += glyph->advance;
 	}
 
-	// TODO: take into account text alignment
+	AlignmentType alignment = text->base.alignment;
+	Vec2F size = text->base.size;
+
+	switch (alignment)
+	{
+	default:
+		abort();
+	case CENTER_ALIGNMENT_TYPE:
+		advance.x -= lineSizeX * (cmmt_float_t)0.5;
+		advance.y += (size.y - (newLineAdvance * 0.5f +
+			newLineAdvance * 0.25f)) * (cmmt_float_t)0.5;
+		break;
+	case LEFT_ALIGNMENT_TYPE:
+		advance.y += (size.y - (newLineAdvance * 0.5f +
+			newLineAdvance * 0.25f)) * (cmmt_float_t)0.5;
+		break;
+	case RIGHT_ALIGNMENT_TYPE:
+		advance.x -= lineSizeX;
+		advance.y += (size.y - (newLineAdvance * 0.5f +
+			newLineAdvance * 0.25f)) * (cmmt_float_t)0.5;
+		break;
+	case BOTTOM_ALIGNMENT_TYPE:
+		advance.x -= lineSizeX * (cmmt_float_t)0.5;
+		advance.y += size.y - newLineAdvance * 0.5f;
+		break;
+	case TOP_ALIGNMENT_TYPE:
+		advance.x -= lineSizeX * (cmmt_float_t)0.5;
+		advance.y -= newLineAdvance * 0.25f;
+		break;
+	case LEFT_BOTTOM_ALIGNMENT_TYPE:
+		advance.y += size.y - newLineAdvance * 0.5f;
+		break;
+	case LEFT_TOP_ALIGNMENT_TYPE:
+		advance.y -= newLineAdvance * 0.25f;
+		break;
+	case RIGHT_BOTTOM_ALIGNMENT_TYPE:
+		advance.x -= lineSizeX;
+		advance.y += size.y - newLineAdvance * 0.5f;
+		break;
+	case RIGHT_TOP_ALIGNMENT_TYPE:
+		advance.x -= lineSizeX;
+		advance.y -= newLineAdvance * 0.25f;
+		break;
+	}
 
 	*_advance = advance;
 	return true;
 }
-bool getTextCursorPosition(
+bool getTextCursorIndex(
 	Text text,
-	Vec2F* advance,
-	size_t* index)
+	Vec2F advance,
+	size_t* _index)
 {
 	assert(text);
-	assert(advance);
-	assert(index);
+	assert(_index);
 	assert(textInitialized);
+	// TODO: too heavy, use better solution
 
+	size_t length = text->base.length;
 
+	cmmt_float_t bestDistance = INFINITY;
+	size_t index = 0;
+
+	for (size_t i = 0; i <= length; i++)
+	{
+		Vec2F checkAdvance;
+
+		bool result = getTextCursorAdvance(
+			text,
+			i,
+			&checkAdvance);
+
+		if (!result)
+			return false;
+
+		float distance = distPowVec2F(
+			advance, checkAdvance);
+
+		if (distance < bestDistance)
+		{
+			bestDistance = distance;
+			index = i;
+		}
+	}
+
+	*_index = index;
+	return true;
 }
-
-// TODO: inspect cmmt float vectors \/
 
 MpgxResult bakeText(Text text)
 {
@@ -2566,6 +2712,8 @@ MpgxResult bakeText(Text text)
 		fontAtlas->newLineAdvance,
 		text->base.alignment,
 		text->base.color,
+		text->base.isBold,
+		text->base.isItalic,
 		text->base.useTags,
 		vertices,
 		&vertexCount,
@@ -2733,6 +2881,7 @@ MpgxResult bakeText(Text text)
 		}
 	}
 
+	text->base.size = textSize;
 	return SUCCESS_MPGX_RESULT;
 }
 size_t drawText(

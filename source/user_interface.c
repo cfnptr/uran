@@ -37,7 +37,7 @@ struct UserInterface_T
 	InterfaceElement focusedInputField;
 	double blinkDelay;
 	double buttonDelay;
-	uint32_t cursorIndex;
+	size_t cursorIndex;
 	bool isMousePressed;
 	bool isButtonPressed;
 };
@@ -106,8 +106,6 @@ typedef UiLabelHandle_T* UiLabelHandle;
 typedef UiWindowHandle_T* UiWindowHandle;
 typedef UiButtonHandle_T* UiButtonHandle;
 typedef UiInputFieldHandle_T* UiInputFieldHandle;
-
-// TODO: replace UTF32 conversion with fast native text creation method
 
 inline static GraphicsRender createCursorRenderInstance(
 	Transformer transformer,
@@ -380,13 +378,23 @@ inline static void updateUiInputFields(UserInterface ui)
 		bool isTextChanged = false, isCursorChanged = false;
 		// TODO: custom delays and cursor color
 
-		if ((getWindowKeyboardKey(window, BACKSPACE_KEYBOARD_KEY) ||
-			getWindowKeyboardKey(window, DELETE_KEYBOARD_KEY)))
+		if (getWindowKeyboardKey(window, BACKSPACE_KEYBOARD_KEY))
 		{
 			if (getTextLength(text) > 0 && ui->cursorIndex > 0 &&
 				(!ui->isButtonPressed || ui->buttonDelay < updateTime))
 			{
 				ui->cursorIndex--;
+				removeTextChar(text, ui->cursorIndex);
+				ui->buttonDelay = ui->isButtonPressed ?
+					updateTime + 0.1 : updateTime + 0.3;
+				ui->isButtonPressed = isTextChanged = isCursorChanged = true;
+			}
+		}
+		else if (getWindowKeyboardKey(window, DELETE_KEYBOARD_KEY))
+		{
+			if (getTextLength(text) > 0 && ui->cursorIndex < getTextLength(text) &&
+				(!ui->isButtonPressed || ui->buttonDelay < updateTime))
+			{
 				removeTextChar(text, ui->cursorIndex);
 				ui->buttonDelay = ui->isButtonPressed ?
 					updateTime + 0.1 : updateTime + 0.3;
@@ -644,32 +652,25 @@ static void onUiLabelDestroy(void* _handle)
 
 	free(handle);
 }
-MpgxResult createUiLabel(
+inline static MpgxResult internalCreateUiLabel(
 	UserInterface ui,
-	const uint32_t* string,
+	const void* string,
 	size_t stringLength,
 	AlignmentType alignment,
 	Vec3F position,
 	cmmt_float_t scale,
 	SrgbColor color,
+	bool isBold,
+	bool isItalic,
 	bool useTags,
 	bool isConstant,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* _handle,
 	bool isActive,
-	InterfaceElement* uiLabel)
+	InterfaceElement* uiLabel,
+	bool isUTF8)
 {
-	assert(ui);
-	assert(string);
-	assert(stringLength > 0);
-	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale > 0.0f);
-	assert(uiLabel);
-
-	assert(!parent || (parent && ui->transformer ==
-		getTransformTransformer(parent)));
-
 	UiLabelHandle handle = calloc(1,
 		sizeof(UiButtonHandle_T));
 
@@ -694,16 +695,36 @@ MpgxResult createUiLabel(
 	}
 
 	Text text;
+	MpgxResult mpgxResult;
 
-	MpgxResult mpgxResult = createAtlasText(
-		ui->fontAtlas,
-		string,
-		stringLength,
-		alignment,
-		color,
-		useTags,
-		isConstant,
-		&text);
+	if (isUTF8)
+	{
+		mpgxResult = createAtlasText8(
+			ui->fontAtlas,
+			string,
+			stringLength,
+			alignment,
+			color,
+			isBold,
+			isItalic,
+			useTags,
+			isConstant,
+			&text);
+	}
+	else
+	{
+		mpgxResult = createAtlasText(
+			ui->fontAtlas,
+			string,
+			stringLength,
+			alignment,
+			color,
+			isBold,
+			isItalic,
+			useTags,
+			isConstant,
+			&text);
+	}
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
@@ -759,14 +780,16 @@ MpgxResult createUiLabel(
 	*uiLabel = element;
 	return SUCCESS_MPGX_RESULT;
 }
-MpgxResult createUiLabel8(
+MpgxResult createUiLabel(
 	UserInterface ui,
-	const char* string,
+	const uint32_t* string,
 	size_t stringLength,
 	AlignmentType alignment,
 	Vec3F position,
 	cmmt_float_t scale,
 	SrgbColor color,
+	bool isBold,
+	bool isItalic,
 	bool useTags,
 	bool isConstant,
 	Transform parent,
@@ -785,36 +808,71 @@ MpgxResult createUiLabel8(
 	assert(!parent || (parent && ui->transformer ==
 		getTransformTransformer(parent)));
 
-	uint32_t* string32;
-	size_t stringLength32;
-
-	MpgxResult mpgxResult = allocateStringUTF32(
+	return internalCreateUiLabel(
+		ui,
 		string,
 		stringLength,
-		&string32,
-		&stringLength32);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-		return mpgxResult;
-
-	mpgxResult = createUiLabel(
-		ui,
-		string32,
-		stringLength32,
 		alignment,
 		position,
 		scale,
 		color,
+		isBold,
+		isItalic,
 		useTags,
 		isConstant,
 		parent,
 		events,
 		handle,
 		isActive,
-		uiLabel);
+		uiLabel,
+		false);
+}
+MpgxResult createUiLabel8(
+	UserInterface ui,
+	const char* string,
+	size_t stringLength,
+	AlignmentType alignment,
+	Vec3F position,
+	cmmt_float_t scale,
+	SrgbColor color,
+	bool isBold,
+	bool isItalic,
+	bool useTags,
+	bool isConstant,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* handle,
+	bool isActive,
+	InterfaceElement* uiLabel)
+{
+	assert(ui);
+	assert(string);
+	assert(stringLength > 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale > 0.0f);
+	assert(uiLabel);
 
-	free(string32);
-	return mpgxResult;
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
+
+	return internalCreateUiLabel(
+		ui,
+		string,
+		stringLength,
+		alignment,
+		position,
+		scale,
+		color,
+		isBold,
+		isItalic,
+		useTags,
+		isConstant,
+		parent,
+		events,
+		handle,
+		isActive,
+		uiLabel,
+		true);
 }
 
 void* getUiLabelHandle(InterfaceElement label)
@@ -922,31 +980,20 @@ static void onUiWindowDestroy(void* _handle)
 
 	free(handle);
 }
-MpgxResult createUiWindow(
+inline static MpgxResult internalCreateUiWindow(
 	UserInterface ui,
-	const uint32_t* title,
+	const void* title,
 	size_t titleLength,
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	SrgbColor titleColor,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* _handle,
 	bool isActive,
-	InterfaceElement* uiWindow)
+	InterfaceElement* uiWindow,
+	bool isUTF8)
 {
-	assert(ui);
-	assert(title);
-	assert(titleLength > 0);
-	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale.x > 0.0f);
-	assert(scale.y > 0.0f);
-	assert(uiWindow);
-
-	assert(!parent || (parent && ui->transformer ==
-		getTransformTransformer(parent)));
-
 	UiWindowHandle handle = calloc(1,
 		sizeof(UiWindowHandle_T));
 
@@ -999,7 +1046,7 @@ MpgxResult createUiWindow(
 		vec3F(
 			(cmmt_float_t)0.0,
 			-(scale.y * (cmmt_float_t)0.5 +
-				DEFAULT_UI_BAR_HEIGHT * (cmmt_float_t)0.5),
+			  DEFAULT_UI_BAR_HEIGHT * (cmmt_float_t)0.5),
 			(cmmt_float_t)0.0),
 		vec3F(
 			scale.x,
@@ -1053,16 +1100,36 @@ MpgxResult createUiWindow(
 	}
 
 	Text text;
+	MpgxResult mpgxResult;
 
-	MpgxResult mpgxResult = createAtlasText(
-		ui->fontAtlas,
-		title,
-		titleLength,
-		CENTER_ALIGNMENT_TYPE,
-		titleColor,
-		true,
-		true,
-		&text);
+	if (isUTF8)
+	{
+		mpgxResult = createAtlasText8(
+			ui->fontAtlas,
+			title,
+			titleLength,
+			CENTER_ALIGNMENT_TYPE,
+			DEFAULT_UI_TEXT_COLOR,
+			true,
+			false,
+			true,
+			true,
+			&text);
+	}
+	else
+	{
+		mpgxResult = createAtlasText(
+			ui->fontAtlas,
+			title,
+			titleLength,
+			CENTER_ALIGNMENT_TYPE,
+			DEFAULT_UI_TEXT_COLOR,
+			true,
+			false,
+			true,
+			true,
+			&text);
+	}
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
@@ -1125,14 +1192,13 @@ MpgxResult createUiWindow(
 	*uiWindow = element;
 	return SUCCESS_MPGX_RESULT;
 }
-MpgxResult createUiWindow8(
+MpgxResult createUiWindow(
 	UserInterface ui,
-	const char* title,
+	const uint32_t* title,
 	size_t titleLength,
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	SrgbColor titleColor,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
@@ -1150,34 +1216,57 @@ MpgxResult createUiWindow8(
 	assert(!parent || (parent && ui->transformer ==
 		getTransformTransformer(parent)));
 
-	uint32_t* title32;
-	size_t titleLength32;
-
-	MpgxResult mpgxResult = allocateStringUTF32(
+	return internalCreateUiWindow(
+		ui,
 		title,
 		titleLength,
-		&title32,
-		&titleLength32);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-		return mpgxResult;
-
-	mpgxResult = createUiWindow(
-		ui,
-		title32,
-		titleLength32,
 		alignment,
 		position,
 		scale,
-		titleColor,
 		parent,
 		events,
 		handle,
 		isActive,
-		uiWindow);
+		uiWindow,
+		false);
+}
+MpgxResult createUiWindow8(
+	UserInterface ui,
+	const char* title,
+	size_t titleLength,
+	AlignmentType alignment,
+	Vec3F position,
+	Vec2F scale,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* handle,
+	bool isActive,
+	InterfaceElement* uiWindow)
+{
+	assert(ui);
+	assert(title);
+	assert(titleLength > 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale.x > 0.0f);
+	assert(scale.y > 0.0f);
+	assert(uiWindow);
 
-	free(title32);
-	return mpgxResult;
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
+
+	return internalCreateUiWindow(
+		ui,
+		title,
+		titleLength,
+		alignment,
+		position,
+		scale,
+		parent,
+		events,
+		handle,
+		isActive,
+		uiWindow,
+		true);
 }
 
 void* getUiWindowHandle(InterfaceElement window)
@@ -1336,32 +1425,21 @@ static void onUiButtonDestroy(void* _handle)
 
 	free(handle);
 }
-MpgxResult createUiButton(
+inline static MpgxResult internalCreateUiButton(
 	UserInterface ui,
-	const uint32_t* text,
+	const void* text,
 	size_t textLength,
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	SrgbColor textColor,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* _handle,
 	bool isEnabled,
 	bool isActive,
-	InterfaceElement* uiButton)
+	InterfaceElement* uiButton,
+	bool isUTF8)
 {
-	assert(ui);
-	assert(text);
-	assert(textLength > 0);
-	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale.x > 0.0f);
-	assert(scale.y > 0.0f);
-	assert(uiButton);
-
-	assert(!parent || (parent && ui->transformer ==
-		getTransformTransformer(parent)));
-
 	UiButtonHandle handle = calloc(1,
 		sizeof(UiButtonHandle_T));
 
@@ -1430,16 +1508,36 @@ MpgxResult createUiButton(
 	}
 
 	Text textInstance;
+	MpgxResult mpgxResult;
 
-	MpgxResult mpgxResult = createAtlasText(
-		ui->fontAtlas,
-		text,
-		textLength,
-		CENTER_ALIGNMENT_TYPE,
-		textColor,
-		true,
-		true,
-		&textInstance);
+	if (isUTF8)
+	{
+		mpgxResult = createAtlasText8(
+			ui->fontAtlas,
+			text,
+			textLength,
+			CENTER_ALIGNMENT_TYPE,
+			DEFAULT_UI_TEXT_COLOR,
+			true,
+			false,
+			true,
+			true,
+			&textInstance);
+	}
+	else
+	{
+		mpgxResult = createAtlasText(
+			ui->fontAtlas,
+			text,
+			textLength,
+			CENTER_ALIGNMENT_TYPE,
+			DEFAULT_UI_TEXT_COLOR,
+			true,
+			false,
+			true,
+			true,
+			&textInstance);
+	}
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
@@ -1509,14 +1607,13 @@ MpgxResult createUiButton(
 	*uiButton = element;
 	return SUCCESS_MPGX_RESULT;
 }
-MpgxResult createUiButton8(
+MpgxResult createUiButton(
 	UserInterface ui,
-	const char* text,
+	const uint32_t* text,
 	size_t textLength,
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	SrgbColor textColor,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
@@ -1535,35 +1632,60 @@ MpgxResult createUiButton8(
 	assert(!parent || (parent && ui->transformer ==
 		getTransformTransformer(parent)));
 
-	uint32_t* text32;
-	size_t textLength32;
-
-	MpgxResult mpgxResult = allocateStringUTF32(
+	return internalCreateUiButton(
+		ui,
 		text,
 		textLength,
-		&text32,
-		&textLength32);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-		return mpgxResult;
-
-	mpgxResult = createUiButton(
-		ui,
-		text32,
-		textLength32,
 		alignment,
 		position,
 		scale,
-		textColor,
 		parent,
 		events,
 		handle,
 		isEnabled,
 		isActive,
-		uiButton);
+		uiButton,
+		false);
+}
+MpgxResult createUiButton8(
+	UserInterface ui,
+	const char* text,
+	size_t textLength,
+	AlignmentType alignment,
+	Vec3F position,
+	Vec2F scale,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* handle,
+	bool isEnabled,
+	bool isActive,
+	InterfaceElement* uiButton)
+{
+	assert(ui);
+	assert(text);
+	assert(textLength > 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale.x > 0.0f);
+	assert(scale.y > 0.0f);
+	assert(uiButton);
 
-	free(text32);
-	return mpgxResult;
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
+
+	return internalCreateUiButton(
+		ui,
+		text,
+		textLength,
+		alignment,
+		position,
+		scale,
+		parent,
+		events,
+		handle,
+		isEnabled,
+		isActive,
+		uiButton,
+		true);
 }
 void* getUiButtonHandle(InterfaceElement button)
 {
@@ -1647,28 +1769,6 @@ OnInterfaceElementEvent getUiButtonOnReleaseEvent(InterfaceElement button)
 	return handle->onRelease;
 }
 
-LinearColor getUiButtonEnabledColor(
-	InterfaceElement button)
-{
-	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
-	UiButtonHandle handle =
-		getInterfaceElementHandle(button);
-	return handle->enabledColor;
-}
-void setUiButtonEnabledColor(
-	InterfaceElement button,
-	LinearColor color)
-{
-	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
-	UiButtonHandle handle =
-		getInterfaceElementHandle(button);
-	handle->enabledColor = color;
-}
-
 LinearColor getUiButtonDisabledColor(
 	InterfaceElement button)
 {
@@ -1689,6 +1789,28 @@ void setUiButtonDisabledColor(
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
 	handle->disabledColor = color;
+}
+
+LinearColor getUiButtonEnabledColor(
+	InterfaceElement button)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	return handle->enabledColor;
+}
+void setUiButtonEnabledColor(
+	InterfaceElement button,
+	LinearColor color)
+{
+	assert(button);
+	assert(strcmp(getInterfaceElementName(
+		button), UI_BUTTON_NAME) == 0);
+	UiButtonHandle handle =
+		getInterfaceElementHandle(button);
+	handle->enabledColor = color;
 }
 
 LinearColor getUiButtonHoveredColor(
@@ -1789,12 +1911,35 @@ static void onUiInputFieldPress(InterfaceElement element)
 		handle->focusedColor);
 
 	UserInterface ui = handle->ui;
-	Text text = getTextRenderText(handle->textRender);
+	Window window = ui->window;
 	Transform textTransform = getGraphicsRenderTransform(
 		handle->placeholderRender);
+	Text text = getTextRenderText(handle->textRender);
+	Vec3F textPosition = getTranslationMat4F(
+		getTransformModel(textTransform));
+	cmmt_float_t interfaceScale = getInterfaceScale(
+		getUserInterface(ui));
+	Vec3F textScale = getTransformScale(textTransform);
+	Vec2I windowSize = getWindowSize(window);
+	Vec2F cursorPosition = getWindowCursorPosition(window);
+
+	Vec2F size = vec2F(
+		(cmmt_float_t)windowSize.x / interfaceScale,
+		(cmmt_float_t)windowSize.y / interfaceScale);
+	Vec2F halfSize = mulValVec2F(size, (cmmt_float_t)0.5);
+
+	cursorPosition = vec2F(
+		(cursorPosition.x / interfaceScale) - halfSize.x,
+		(size.y - (cursorPosition.y / interfaceScale)) - halfSize.y);
+	cursorPosition.x = (cursorPosition.x - textPosition.x) / textScale.x;
+	cursorPosition.y = (cursorPosition.y - textPosition.y) / textScale.y;
+
+	size_t index = 0;
+	getTextCursorIndex(text, cursorPosition, &index);
+	ui->cursorIndex = index;
 	updateUiCursor(ui, textTransform, text);
 
-	ui->blinkDelay = getWindowUpdateTime(ui->window) + 0.5f;
+	ui->blinkDelay = getWindowUpdateTime(window) + 0.5f;
 	ui->focusedInputField = element;
 
 	if (handle->onPress)
@@ -1848,35 +1993,22 @@ static void onUiInputFieldDestroy(void* _handle)
 
 	free(handle);
 }
-MpgxResult createUiInputField(
+inline static MpgxResult internalCreateUiInputField(
 	UserInterface ui,
-	const uint32_t* placeholder,
+	const void* placeholder,
 	size_t placeholderLength,
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
-	SrgbColor placeholderColor,
-	SrgbColor textColor,
 	size_t maxLength,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* _handle,
 	bool isEnabled,
 	bool isActive,
-	InterfaceElement* uiInputField)
+	InterfaceElement* uiInputField,
+	bool isUTF8)
 {
-	assert(ui);
-	assert(placeholder);
-	assert(placeholderLength > 0);
-	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale.x > 0.0f);
-	assert(scale.y > 0.0f);
-	assert(maxLength > 0);
-	assert(uiInputField);
-
-	assert(!parent || (parent && ui->transformer ==
-		getTransformTransformer(parent)));
-
 	UiInputFieldHandle handle = calloc(1,
 		sizeof(UiInputFieldHandle_T));
 
@@ -1993,8 +2125,10 @@ MpgxResult createUiInputField(
 		fontAtlas,
 		text,
 		sizeof(text) / sizeof(uint32_t),
-		CENTER_ALIGNMENT_TYPE,
-		textColor,
+		LEFT_ALIGNMENT_TYPE,
+		DEFAULT_UI_TEXT_COLOR,
+		false,
+		false,
 		false,
 		false,
 		&textInstance);
@@ -2051,15 +2185,34 @@ MpgxResult createUiInputField(
 
 	Text placeholderInstance;
 
-	mpgxResult = createAtlasText(
-		fontAtlas,
-		placeholder,
-		placeholderLength,
-		LEFT_ALIGNMENT_TYPE,
-		placeholderColor,
-		true,
-		true,
-		&placeholderInstance);
+	if (isUTF8)
+	{
+		mpgxResult = createAtlasText8(
+			fontAtlas,
+			placeholder,
+			placeholderLength,
+			LEFT_ALIGNMENT_TYPE,
+			DEFAULT_UI_PLACEHOLDER_COLOR,
+			false,
+			false,
+			true,
+			true,
+			&placeholderInstance);
+	}
+	else
+	{
+		mpgxResult = createAtlasText(
+			fontAtlas,
+			placeholder,
+			placeholderLength,
+			LEFT_ALIGNMENT_TYPE,
+			DEFAULT_UI_PLACEHOLDER_COLOR,
+			false,
+			false,
+			true,
+			true,
+			&placeholderInstance);
+	}
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
@@ -2128,5 +2281,268 @@ MpgxResult createUiInputField(
 	*uiInputField = element;
 	return SUCCESS_MPGX_RESULT;
 }
+MpgxResult createUiInputField(
+	UserInterface ui,
+	const uint32_t* placeholder,
+	size_t placeholderLength,
+	AlignmentType alignment,
+	Vec3F position,
+	Vec2F scale,
+	size_t maxLength,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* handle,
+	bool isEnabled,
+	bool isActive,
+	InterfaceElement* uiInputField)
+{
+	assert(ui);
+	assert(placeholder);
+	assert(placeholderLength > 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale.x > 0.0f);
+	assert(scale.y > 0.0f);
+	assert(maxLength > 0);
+	assert(uiInputField);
 
-// TODO: possibly abort on bad text operations
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
+
+	return internalCreateUiInputField(
+		ui,
+		placeholder,
+		placeholderLength,
+		alignment,
+		position,
+		scale,
+		maxLength,
+		parent,
+		events,
+		handle,
+		isEnabled,
+		isActive,
+		uiInputField,
+		false);
+}
+MpgxResult createUiInputField8(
+	UserInterface ui,
+	const uint32_t* placeholder,
+	size_t placeholderLength,
+	AlignmentType alignment,
+	Vec3F position,
+	Vec2F scale,
+	size_t maxLength,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* handle,
+	bool isEnabled,
+	bool isActive,
+	InterfaceElement* uiInputField)
+{
+	assert(ui);
+	assert(placeholder);
+	assert(placeholderLength > 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale.x > 0.0f);
+	assert(scale.y > 0.0f);
+	assert(maxLength > 0);
+	assert(uiInputField);
+
+	assert(!parent || (parent && ui->transformer ==
+	getTransformTransformer(parent)));
+
+	return internalCreateUiInputField(
+		ui,
+		placeholder,
+		placeholderLength,
+		alignment,
+		position,
+		scale,
+		maxLength,
+		parent,
+		events,
+		handle,
+		isEnabled,
+		isActive,
+		uiInputField,
+		true);
+}
+
+void* getUiInputFieldHandle(InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->handle;
+}
+GraphicsRender getUiInputFieldPanelRender(InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->panelRender;
+}
+GraphicsRender getUiInputFieldFocusRender(InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->focusRender;
+}
+GraphicsRender getUiInputFieldTextRender(InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->textRender;
+}
+GraphicsRender getUiInputFieldPlaceholderRender(InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->placeholderRender;
+}
+OnInterfaceElementEvent getUiInputFieldOnEnableEvent(InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->onEnable;
+}
+OnInterfaceElementEvent getUiInputFieldOnDisableEvent(InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->onDisable;
+}
+OnInterfaceElementEvent getUiInputFieldOnEnterEvent(InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->onEnter;
+}
+OnInterfaceElementEvent getUiInputFieldOnExitEvent(InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->onExit;
+}
+OnInterfaceElementEvent getUiInputFieldOnPressEvent(InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->onPress;
+}
+
+LinearColor getUiInputFieldDisabledColor(
+	InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->disabledColor;
+}
+void setUiInputFieldDisabledColor(
+	InterfaceElement inputField,
+	LinearColor color)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	handle->disabledColor = color;
+}
+
+LinearColor getUiInputFieldEnabledColor(
+	InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->enabledColor;
+}
+void setUiInputFieldEnabledColor(
+	InterfaceElement inputField,
+	LinearColor color)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	handle->enabledColor = color;
+}
+
+LinearColor getUiInputFieldFocusedColor(
+	InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->focusedColor;
+}
+void setUiInputFieldFocusedColor(
+	InterfaceElement inputField,
+	LinearColor color)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	handle->focusedColor = color;
+}
+
+size_t getUiInputFieldMaxLength(
+	InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->maxLength;
+}
+void setUiInputFieldMaxLength(
+	InterfaceElement inputField,
+	size_t maxLength)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	handle->maxLength = maxLength;
+}

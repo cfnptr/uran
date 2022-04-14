@@ -323,8 +323,11 @@ uint32_t getFontAtlasFontSize(FontAtlas fontAtlas);
  * string - text string.
  * length - string length.
  * alignment - text alignment.
- * color - default text color.
+ * color - initial text color.
+ * isBold - is text bold initially.
+ * isItalic - is text italic initially.
  * useTags - use HTML tags.
+ * isConstant - is text constant.
  * text - pointer to the text instance.
  */
 MpgxResult createAtlasText(
@@ -333,6 +336,8 @@ MpgxResult createAtlasText(
 	size_t length,
 	AlignmentType alignment,
 	SrgbColor color,
+	bool isBold,
+	bool isItalic,
 	bool useTags,
 	bool isConstant,
 	Text* text);
@@ -344,8 +349,11 @@ MpgxResult createAtlasText(
  * string - text string.
  * length - string length.
  * alignment - text alignment.
- * color - default text color.
+ * color - initial text color.
+ * isBold - is text bold initially.
+ * isItalic - is text italic initially.
  * useTags - use HTML tags.
+ * isConstant - is text constant.
  * text - pointer to the text instance.
  */
 MpgxResult createAtlasText8(
@@ -354,6 +362,8 @@ MpgxResult createAtlasText8(
 	size_t length,
 	AlignmentType alignment,
 	SrgbColor color,
+	bool isBold,
+	bool isItalic,
 	bool useTags,
 	bool isConstant,
 	Text* text);
@@ -412,7 +422,7 @@ const uint32_t* getTextString(Text text);
  * Returns text string length.
  * text - text instance.
  */
-uint32_t getTextLength(Text text);
+size_t getTextLength(Text text);
 
 /*
  * Set text UTF-32 string.
@@ -425,7 +435,7 @@ uint32_t getTextLength(Text text);
 bool setTextString(
 	Text text,
 	const uint32_t* string,
-	uint32_t length);
+	size_t length);
 /*
  * Set text UTF-8 string.
  * Returns true on success.
@@ -437,7 +447,7 @@ bool setTextString(
 bool setTextString8(
 	Text text,
 	const char* string,
-	uint32_t length);
+	size_t length);
 
 /*
  * Addend text UTF-32 string.
@@ -451,8 +461,8 @@ bool setTextString8(
 bool appendTextString32(
 	Text text,
 	const uint32_t* string,
-	uint32_t length,
-	uint32_t index);
+	size_t length,
+	size_t index);
 /*
  * Remove text UTF-32 char at index.
  * Return true on success.
@@ -462,7 +472,7 @@ bool appendTextString32(
  */
 void removeTextChar(
 	Text text,
-	uint32_t index);
+	size_t index);
 
 /*
  * Returns text alignment type.
@@ -495,6 +505,36 @@ void setTextColor(
 	SrgbColor color);
 
 /*
+ * Returns true if text is bold initially.
+ * text - text instance.
+ */
+bool isTextBold(Text text);
+/*
+ * Sets text bold initially.
+ *
+ * text - text instance.
+ * isBold - is text bold.
+ */
+void setTextBold(
+	Text text,
+	bool isBold);
+
+/*
+ * Returns true if text is italic initially.
+ * text - text instance.
+ */
+bool isTextItalic(Text text);
+/*
+ * Sets text italic initially.
+ *
+ * text - text instance.
+ * isItalic - is text italic.
+ */
+void setTextItalic(
+	Text text,
+	bool isItalic);
+
+/*
  * Returns true if text uses HTML tags.
  * text - text instance.
  */
@@ -519,19 +559,19 @@ void setTextUseTags(
  */
 bool getTextCursorAdvance(
 	Text text,
-	uint32_t index,
+	size_t index,
 	Vec2F* advance);
 /*
- * Get text cursor position.
+ * Get text cursor index.
  * Returns true on success.
  *
  * text - text instance.
- * advance - pointer to the advance.
+ * advance - cursor advance.
  * index - pointer to the index.
  */
-bool getTextCursorPosition(
+bool getTextCursorIndex(
 	Text text,
-	Vec2F* advance,
+	Vec2F advance,
 	size_t* index);
 
 /*

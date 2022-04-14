@@ -347,16 +347,16 @@ void updateInterface(Interface interface)
 
 	cmmt_float_t interfaceScale = interface->scale;
 	Vec2I windowSize = getWindowSize(window);
-	Vec2F cursor = getWindowCursorPosition(window);
+	Vec2F cursorPosition = getWindowCursorPosition(window);
 
 	Vec2F size = vec2F(
 		(cmmt_float_t)windowSize.x / interfaceScale,
 		(cmmt_float_t)windowSize.y / interfaceScale);
 	Vec2F halfSize = mulValVec2F(size, (cmmt_float_t)0.5);
 
-	Vec2F cursorPosition = vec2F(
-		(cursor.x / interfaceScale) - halfSize.x,
-		(size.y - (cursor.y / interfaceScale)) - halfSize.y);
+	cursorPosition = vec2F(
+		(cursorPosition.x / interfaceScale) - halfSize.x,
+		(size.y - (cursorPosition.y / interfaceScale)) - halfSize.y);
 
 	InterfaceElement newElement = NULL;
 	cmmt_float_t elementDistance = INFINITY;
