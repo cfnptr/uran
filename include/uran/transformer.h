@@ -264,3 +264,8 @@ void setTransformActive(
  * transform - transform instance.
  */
 Mat4F getTransformModel(Transform transform);
+/*
+ * Bake specific transform.
+ * transform - transform instance.
+ */
+void bakeTransform(Transform transform);

@@ -47,7 +47,8 @@ struct Transform_T
 
 inline static void updateTransformModel(
 	Transform transform,
-	Vec3F cameraPosition)
+	Vec3F cameraPosition,
+	bool forceUpdate)
 {
 	assert(transform);
 
@@ -57,16 +58,30 @@ inline static void updateTransformModel(
 
 	position = addVec3F(position, cameraPosition);
 
-	while (parent)
+	if (forceUpdate)
 	{
-		if (!parent->isActive)
-			return;
+		while (parent)
+		{
+			position = addVec3F(dotQuatVec3F(
+					parent->rotation, position),
+				parent->position);
+			rotation = dotQuat(rotation, parent->rotation);
+			parent = parent->parent;
+		}
+	}
+	else
+	{
+		while (parent)
+		{
+			if (!parent->isActive)
+				return;
 
-		position = addVec3F(dotQuatVec3F(
-			parent->rotation, position),
-			parent->position);
-		rotation = dotQuat(rotation, parent->rotation);
-		parent = parent->parent;
+			position = addVec3F(dotQuatVec3F(
+					parent->rotation, position),
+				parent->position);
+			rotation = dotQuat(rotation, parent->rotation);
+			parent = parent->parent;
+		}
 	}
 
 	RotationType rotationType = transform->rotationType;
@@ -228,14 +243,16 @@ static void onTransformUpdate(void* argument)
 
 		updateTransformModel(
 			transform,
-			cameraPosition);
+			cameraPosition,
+			false);
 	}
 
 	if (cameraTransform)
 	{
 		updateTransformModel(
 			cameraTransform,
-			negVec3F(cameraPosition));
+			negVec3F(cameraPosition),
+			false);
 	}
 }
 void updateTransformer(Transformer transformer)
@@ -282,14 +299,16 @@ void updateTransformer(Transformer transformer)
 
 			updateTransformModel(
 				transform,
-				cameraPosition);
+				cameraPosition,
+				false);
 		}
 
 		if (cameraTransform)
 		{
 			updateTransformModel(
 				cameraTransform,
-				negVec3F(cameraPosition));
+				negVec3F(cameraPosition),
+				false);
 		}
 	}
 }
@@ -329,7 +348,8 @@ Transform createTransform(
 
 	updateTransformModel(
 		transform,
-		cameraPosition);
+		cameraPosition,
+		true);
 
 	size_t count = transformer->transformCount;
 
@@ -487,4 +507,18 @@ Mat4F getTransformModel(Transform transform)
 {
 	assert(transform);
 	return transform->model;
+}
+void bakeTransform(Transform transform)
+{
+	assert(transform);
+
+	Transform cameraTransform =
+		transform->transformer->camera;
+	Vec3F cameraPosition = cameraTransform ?
+		cameraTransform->position : zeroVec3F;
+
+	updateTransformModel(
+		transform,
+		cameraPosition,
+		true);
 }

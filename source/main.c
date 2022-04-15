@@ -124,3 +124,15 @@ MAIN_FUNCTION
 	destroyLogger(logger);
 	return EXIT_SUCCESS;
 }
+
+// TODO:
+// 1. text color parsing. [DONE]
+// 2. input field clipboard paste. [DONE]
+// 3. text any char generation.
+// 4. input field content getter/setter. [DONE]
+// 5. checkbox.
+// 6. fix text scissors. [DONE].
+// 7. custom input field character hider. [DONE]
+// 8. input field on change and on defocus events [DONE]
+// 9. use shared vertex buffer. [DONE]
+// 10. make cursor as child of the text. [DONE]

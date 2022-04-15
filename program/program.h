@@ -452,6 +452,7 @@ inline static GraphicsPipeline createTextPipelineInstance(
 		fragmentShader,
 		sampler,
 		NULL,
+		true,
 		1,
 		&pipeline);
 
@@ -706,7 +707,16 @@ static void onProgramUpdate(void* argument)
 	updateUserInterface(ui);
 	updateTransformer(program->transformer);
 
-	beginWindowRecord(window);
+	MpgxResult mpgxResult = beginWindowRecord(window);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		logMessage(program->logger, FATAL_LOG_LEVEL,
+			"Failed to begin window record. (error: %s)",
+			mpgxResultToString(mpgxResult));
+		abort();
+	}
+
 	beginFramebufferRender(
 		framebuffer,
 		clearValues,

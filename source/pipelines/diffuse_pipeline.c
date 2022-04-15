@@ -291,7 +291,7 @@ static void onVkUniformsSet(GraphicsPipeline graphicsPipeline)
 		sizeof(VertexPushConstants),
 		&handle->vk.vpc);
 }
-static MpgxResult onVkResize(
+static void onVkResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
 	void* createData)
@@ -318,7 +318,10 @@ static MpgxResult onVkResize(
 			&descriptorPool);
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
-			return mpgxResult;
+		{
+			// TODO: log
+			abort();
+		}
 
 		Buffer* uniformBuffers;
 
@@ -329,11 +332,8 @@ static MpgxResult onVkResize(
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
 		{
-			vkDestroyDescriptorPool(
-				device,
-				descriptorPool,
-				NULL);
-			return mpgxResult;
+			// TODO: log
+			abort();
 		}
 
 		VkDescriptorSet* descriptorSets;
@@ -348,14 +348,8 @@ static MpgxResult onVkResize(
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
 		{
-			destroyVkUniformBuffers(
-				bufferCount,
-				uniformBuffers);
-			vkDestroyDescriptorPool(
-				device,
-				descriptorPool,
-				NULL);
-			return mpgxResult;
+			// TODO: log
+			abort();
 		}
 
 		free(handle->vk.descriptorSets);
@@ -400,7 +394,6 @@ static MpgxResult onVkResize(
 	};
 
 	*(VkGraphicsPipelineCreateData*)createData = _createData;
-	return SUCCESS_MPGX_RESULT;
 }
 static void onVkDestroy(
 	Window window,
@@ -625,7 +618,7 @@ static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 
 	assertOpenGL();
 }
-static MpgxResult onGlResize(
+static void onGlResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
 	void* createData)
@@ -648,7 +641,6 @@ static MpgxResult onGlResize(
 	{
 		graphicsPipeline->gl.state.scissor = size;
 	}
-	return SUCCESS_MPGX_RESULT;
 }
 static void onGlDestroy(
 	Window window,

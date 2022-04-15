@@ -87,7 +87,6 @@ typedef struct BaseText
 	uint32_t* string;
 	size_t capacity;
 	size_t length;
-	TextVertex* vertices;
 	Vec2F size;
 	SrgbColor color;
 	AlignmentType alignment;
@@ -103,7 +102,6 @@ typedef struct VkText
 	uint32_t* string;
 	size_t capacity;
 	size_t length;
-	TextVertex* vertices;
 	Vec2F size;
 	SrgbColor color;
 	AlignmentType alignment;
@@ -123,7 +121,6 @@ typedef struct GlText
 	uint32_t* string;
 	size_t capacity;
 	size_t length;
-	TextVertex* vertices;
 	Vec2F size;
 	SrgbColor color;
 	AlignmentType alignment;
@@ -163,6 +160,8 @@ typedef struct BaseHandle
 	Text* texts;
 	size_t textCapacity;
 	size_t textCount;
+	TextVertex* vertexBuffer;
+	size_t vertexCapacity;
 	Buffer indexBuffer;
 } BaseHandle;
 #if MPGX_SUPPORT_VULKAN
@@ -174,6 +173,8 @@ typedef struct VkHandle
 	Text* texts;
 	size_t textCapacity;
 	size_t textCount;
+	TextVertex* vertexBuffer;
+	size_t vertexCapacity;
 	Buffer indexBuffer;
 	VkDescriptorSetLayout descriptorSetLayout;
 } VkHandle;
@@ -187,6 +188,8 @@ typedef struct GlHandle
 	Text* texts;
 	size_t textCapacity;
 	size_t textCount;
+	TextVertex* vertexBuffer;
+	size_t vertexCapacity;
 	Buffer indexBuffer;
 	GLint mvpLocation;
 	GLint atlasLocation;
@@ -1469,6 +1472,34 @@ uint32_t getFontAtlasFontSize(FontAtlas fontAtlas)
 	return fontAtlas->fontSize;
 }
 
+inline static bool hexToColor(
+	const uint32_t* string,
+	uint8_t* _value)
+{
+	// Note: skipping assertions for debug build speed.
+
+	uint8_t value = 0;
+	uint32_t charValue = string[0];
+
+	if (charValue > '/' && charValue < ':')
+		value = (charValue - '/') << 4u;
+	else if (charValue > '`' && charValue < 'g')
+		value = (charValue - 'W') << 4u;
+	else
+		return false;
+
+	charValue = string[1];
+
+	if (charValue > '/' && charValue < ':')
+		value |= charValue - '/';
+	else if (charValue > '`' && charValue < 'g')
+		value |= charValue - 'W';
+	else
+		return false;
+
+	*_value = value;
+	return true;
+}
 inline static bool fillVertices(
 	const uint32_t* string,
 	size_t length,
@@ -1487,8 +1518,6 @@ inline static bool fillVertices(
 	uint32_t* vertexCount,
 	Vec2F* textSize)
 {
-	assert(string);
-	assert(length > 0);
 	assert(regularGlyphs);
 	assert(boldGlyphs);
 	assert(italicGlyphs);
@@ -1498,6 +1527,9 @@ inline static bool fillVertices(
 	assert(vertices);
 	assert(vertexCount);
 	assert(textSize);
+
+	assert(length == 0 ||
+		(length > 0 && string));
 
 	SrgbColor useColor = color;
 	bool useBold = isBold, useItalic = isItalic;
@@ -1610,11 +1642,13 @@ inline static bool fillVertices(
 			vertexOffsetX += glyph->advance * 4;
 			continue;
 		}
-		else if ((value == '<') & useTags) // TODO: parse color
+		else if ((value == '<') & useTags)
 		{
 			if (i + 2 < length && string[i + 2] == '>')
 			{
-				if (string[i + 1] == 'b')
+				uint32_t tag = string[i + 1];
+
+				if (tag == 'b')
 				{
 					if (useItalic)
 					{
@@ -1631,7 +1665,7 @@ inline static bool fillVertices(
 					i += 2;
 					continue;
 				}
-				else if (string[i + 1] == 'i')
+				else if (tag == 'i')
 				{
 					if (useBold)
 					{
@@ -1651,7 +1685,9 @@ inline static bool fillVertices(
 			}
 			else if (i + 3 < length && string[i + 1] == '/' && string[i + 3] == '>')
 			{
-				if (string[i + 2] == 'b')
+				uint32_t tag = string[i + 2];
+
+				if (tag == 'b')
 				{
 					if (useItalic)
 					{
@@ -1668,7 +1704,7 @@ inline static bool fillVertices(
 					i += 3;
 					continue;
 				}
-				else if (string[i + 2] == 'i')
+				else if (tag == 'i')
 				{
 					if (useBold)
 					{
@@ -1683,6 +1719,58 @@ inline static bool fillVertices(
 
 					useItalic = false;
 					i += 3;
+					continue;
+				}
+				else if (tag == '#')
+				{
+					useColor = color;
+					i += 3;
+					continue;
+				}
+			}
+			else if (i + 8 < length && string[i + 1] == '#' && string[i + 8] == '>')
+			{
+				SrgbColor newColor;
+
+				bool result = hexToColor(
+					string + 2,
+					&newColor.r);
+				result &= hexToColor(
+					string + 4,
+					&newColor.g);
+				result &= hexToColor(
+					string + 6,
+					&newColor.b);
+
+				if (result)
+				{
+					newColor.a = UINT8_MAX;
+					useColor = newColor;
+					i += 8;
+					continue;
+				}
+			}
+			else if (i + 10 < length && string[i + 1] == '#' && string[i + 10] == '>')
+			{
+				SrgbColor newColor;
+
+				bool result = hexToColor(
+					string + 2,
+					&newColor.r);
+				result &= hexToColor(
+					string + 4,
+					&newColor.g);
+				result &= hexToColor(
+					string + 6,
+					&newColor.b);
+				result &= hexToColor(
+					string + 8,
+					&newColor.a);
+
+				if (result)
+				{
+					useColor = newColor;
+					i += 10;
 					continue;
 				}
 			}
@@ -1741,9 +1829,6 @@ inline static bool fillVertices(
 
 		vertexOffsetX += glyph->advance;
 	}
-
-	if (vertexIndex == 0)
-		return false;
 
 	if (sizeX < vertexOffsetX)
 		sizeX = vertexOffsetX;
@@ -1888,7 +1973,6 @@ inline static void internalDestroyText(Text text)
 		abort();
 	}
 
-	free(text->base.vertices);
 	free(text->base.string);
 	free(text);
 }
@@ -1896,6 +1980,7 @@ inline static MpgxResult internalCreateText(
 	FontAtlas fontAtlas,
 	uint32_t* string,
 	size_t length,
+	size_t capacity,
 	AlignmentType alignment,
 	SrgbColor color,
 	bool isBold,
@@ -1904,6 +1989,15 @@ inline static MpgxResult internalCreateText(
 	bool isConstant,
 	Text* text)
 {
+	assert(fontAtlas);
+	assert(capacity > 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(text);
+	assert(textInitialized);
+
+	assert(length == 0 ||
+		(length > 0 && string));
+
 	Text textInstance = calloc(
 		1, sizeof(Text_T));
 
@@ -1912,7 +2006,7 @@ inline static MpgxResult internalCreateText(
 
 	textInstance->base.fontAtlas = fontAtlas;
 	textInstance->base.string = string;
-	textInstance->base.capacity = length;
+	textInstance->base.capacity = capacity;
 	textInstance->base.length = length;
 	textInstance->base.color = color;
 	textInstance->base.alignment = alignment;
@@ -1921,16 +2015,37 @@ inline static MpgxResult internalCreateText(
 	textInstance->base.useTags = useTags;
 	textInstance->base.isConstant = isConstant;
 
-	TextVertex* vertices = malloc(
-		length * 4 * sizeof(TextVertex));
+	GraphicsPipeline pipeline = fontAtlas->pipeline;
+	Handle handle = pipeline->base.handle;
+	TextVertex* vertexBuffer = handle->base.vertexBuffer;
+	size_t vertexCapacity = handle->base.vertexCapacity;
 
-	if (!vertices)
+	if (vertexCapacity < length * 4)
 	{
-		internalDestroyText(textInstance);
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
-	}
+		capacity = length * 4;
+		TextVertex* newVertexBuffer;
 
-	textInstance->base.vertices = vertices;
+		if (vertexBuffer)
+		{
+			newVertexBuffer = realloc(
+				vertexBuffer,
+				capacity * sizeof(TextVertex));
+		}
+		else
+		{
+			newVertexBuffer = malloc(
+				capacity * sizeof(TextVertex));
+		}
+
+		if (!newVertexBuffer)
+		{
+			internalDestroyText(textInstance);
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+		}
+
+		handle->base.vertexBuffer = vertexBuffer = newVertexBuffer;
+		handle->base.vertexCapacity = capacity;
+	}
 
 	uint32_t vertexCount;
 
@@ -1948,7 +2063,7 @@ inline static MpgxResult internalCreateText(
 		isBold,
 		isItalic,
 		useTags,
-		vertices,
+		vertexBuffer,
 		&vertexCount,
 		&textInstance->base.size);
 
@@ -1958,23 +2073,27 @@ inline static MpgxResult internalCreateText(
 		return BAD_VALUE_MPGX_RESULT;
 	}
 
-	GraphicsPipeline pipeline = fontAtlas->pipeline;
 	Window window = pipeline->base.window;
-	Handle handle = pipeline->base.handle;
+	Buffer vertexBufferInstance;
 
-	Buffer vertexBuffer;
-
-	MpgxResult mpgxResult = createBuffer(window,
-		VERTEX_BUFFER_TYPE,
-		isConstant ? GPU_ONLY_BUFFER_USAGE : CPU_TO_GPU_BUFFER_USAGE,
-		vertices,
-		vertexCount * sizeof(TextVertex),
-		&vertexBuffer);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	if (vertexCount > 0)
 	{
-		internalDestroyText(textInstance);
-		return mpgxResult;
+		MpgxResult mpgxResult = createBuffer(window,
+			VERTEX_BUFFER_TYPE,
+			isConstant ? GPU_ONLY_BUFFER_USAGE : CPU_TO_GPU_BUFFER_USAGE,
+			vertexBuffer,
+			vertexCount * sizeof(TextVertex),
+			&vertexBufferInstance);
+
+		if (mpgxResult != SUCCESS_MPGX_RESULT)
+		{
+			internalDestroyText(textInstance);
+			return mpgxResult;
+		}
+	}
+	else
+	{
+		vertexBufferInstance = NULL;
 	}
 
 	GraphicsAPI api = getGraphicsAPI();
@@ -1990,14 +2109,14 @@ inline static MpgxResult internalCreateText(
 
 		if (!indices)
 		{
-			destroyBuffer(vertexBuffer);
+			destroyBuffer(vertexBufferInstance);
 			internalDestroyText(textInstance);
 			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 		}
 
 		Buffer newIndexBuffer;
 
-		mpgxResult = createBuffer(window,
+		MpgxResult mpgxResult = createBuffer(window,
 			INDEX_BUFFER_TYPE,
 			GPU_ONLY_BUFFER_USAGE,
 			indices,
@@ -2008,7 +2127,7 @@ inline static MpgxResult internalCreateText(
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
 		{
-			destroyBuffer(vertexBuffer);
+			destroyBuffer(vertexBufferInstance);
 			internalDestroyText(textInstance);
 			return mpgxResult;
 		}
@@ -2034,30 +2153,30 @@ inline static MpgxResult internalCreateText(
 	if (api == VULKAN_GRAPHICS_API)
 	{
 #if MPGX_SUPPORT_VULKAN
-		textInstance->vk.vertexBuffer = vertexBuffer;
+		textInstance->vk.vertexBuffer = vertexBufferInstance;
 		textInstance->vk.indexCount = indexCount;
 #else
 		abort();
 #endif
 	}
 	else if (api == OPENGL_GRAPHICS_API ||
-			 api == OPENGL_ES_GRAPHICS_API)
+		api == OPENGL_ES_GRAPHICS_API)
 	{
 #if MPGX_SUPPORT_OPENGL
 		GraphicsMesh mesh;
 
-		mpgxResult = createGraphicsMesh(
+		MpgxResult mpgxResult = createGraphicsMesh(
 			window,
 			UINT32_INDEX_TYPE,
 			indexCount,
 			0,
-			vertexBuffer,
+			vertexBufferInstance,
 			handle->base.indexBuffer,
 			&mesh);
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
 		{
-			destroyBuffer(vertexBuffer);
+			destroyBuffer(vertexBufferInstance);
 			internalDestroyText(textInstance);
 			return mpgxResult;
 		}
@@ -2074,7 +2193,7 @@ inline static MpgxResult internalCreateText(
 
 	if (textCount == handle->base.textCapacity)
 	{
-		size_t capacity = handle->base.textCapacity * 2;
+		capacity = handle->base.textCapacity * 2;
 
 		Text* newTexts = realloc(texts,
 			sizeof(Text) * capacity);
@@ -2091,14 +2210,6 @@ inline static MpgxResult internalCreateText(
 
 	handle->base.texts[textCount] = textInstance;
 	handle->base.textCount = textCount + 1;
-
-	if (isConstant)
-	{
-		free(textInstance->base.vertices);
-		textInstance->base.vertices = NULL;
-	}
-
-	// TODO: vertex buffer also can be shared across all texts
 
 	*text = textInstance;
 	return SUCCESS_MPGX_RESULT;
@@ -2117,25 +2228,42 @@ MpgxResult createAtlasText(
 	Text* text)
 {
 	assert(fontAtlas);
-	assert(string);
-	assert(length > 0);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(text);
 	assert(textInitialized);
 
-	uint32_t* stringArray = malloc(
-		length * sizeof(uint32_t));
+	assert(length == 0 ||
+		(length > 0 && string));
 
-	if (!stringArray)
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	uint32_t* stringArray;
+	size_t capacity;
 
-	memcpy(stringArray, string,
-		sizeof(uint32_t) * length);
+	if (length > 0)
+	{
+		stringArray = malloc(length * sizeof(uint32_t));
+
+		if (!stringArray)
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+		memcpy(stringArray, string,
+			sizeof(uint32_t) * length);
+		capacity = length;
+	}
+	else
+	{
+		stringArray = malloc(sizeof(uint32_t));
+
+		if (!stringArray)
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+		capacity = 1;
+	}
 
 	return internalCreateText(
 		fontAtlas,
 		stringArray,
 		length,
+		capacity,
 		alignment,
 		color,
 		isBold,
@@ -2157,28 +2285,46 @@ MpgxResult createAtlasText8(
 	Text* text)
 {
 	assert(fontAtlas);
-	assert(string);
-	assert(length > 0);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(text);
 	assert(textInitialized);
 
+	assert(length == 0 ||
+		(length > 0 && string));
+
 	uint32_t* string32;
 	size_t length32;
+	size_t capacity;
 
-	MpgxResult mpgxResult = allocateStringUTF32(
-		string,
-		length,
-		&string32,
-		&length32);
+	if (length > 0)
+	{
+		MpgxResult mpgxResult = allocateStringUTF32(
+			string,
+			length,
+			&string32,
+			&length32);
 
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-		return mpgxResult;
+		if (mpgxResult != SUCCESS_MPGX_RESULT)
+			return mpgxResult;
+
+		capacity = length32;
+	}
+	else
+	{
+		string32 = malloc(sizeof(uint32_t));
+
+		if (!string32)
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+		length32 = 0;
+		capacity = 1;
+	}
 
 	return internalCreateText(
 		fontAtlas,
 		string32,
 		length32,
+		capacity,
 		alignment,
 		color,
 		isBold,
@@ -2254,10 +2400,11 @@ bool setTextString(
 	size_t length)
 {
 	assert(text);
-	assert(string);
-	assert(length > 0);
 	assert(textInitialized);
 	assert(!text->base.isConstant);
+
+	assert(length == 0 ||
+		(length > 0 && string));
 
 	if (length > text->base.capacity)
 	{
@@ -2269,15 +2416,6 @@ bool setTextString(
 			return false;
 
 		text->base.string = newString;
-
-		TextVertex* newVertices = realloc(
-			text->base.vertices,
-			length * 4 * sizeof(TextVertex));
-
-		if (!newVertices)
-			return false;
-
-		text->base.vertices = newVertices;
 		text->base.capacity = length;
 	}
 
@@ -2292,10 +2430,11 @@ bool setTextString8(
 	size_t length)
 {
 	assert(text);
-	assert(string);
-	assert(length > 0);
 	assert(textInitialized);
 	assert(!text->base.isConstant);
+
+	assert(length == 0 ||
+		(length > 0 && string));
 
 	if (length > text->base.capacity)
 	{
@@ -2307,27 +2446,23 @@ bool setTextString8(
 			return false;
 
 		text->base.string = newString;
-
-		TextVertex* newVertices = realloc(
-			text->base.vertices,
-			length * 4 * sizeof(TextVertex));
-
-		if (!newVertices)
-			return false;
-
-		text->base.vertices = newVertices;
 		text->base.capacity = length;
 	}
 
-	size_t newLength = stringUTF8toUTF32(
-		string,
-		length,
-		text->base.string);
+	if (length > 0)
+	{
+		size_t newLength = stringUTF8toUTF32(
+			string,
+			length,
+			text->base.string);
 
-	if (newLength == 0)
-		return false;
+		text->base.length = newLength;
+	}
+	else
+	{
+		text->base.length = 0;
+	}
 
-	text->base.length = newLength;
 	return true;
 }
 
@@ -2359,15 +2494,6 @@ bool appendTextString32(
 			return false;
 
 		text->base.string = newString;
-
-		TextVertex* newVertices = realloc(
-			text->base.vertices,
-			capacity * 4 * sizeof(TextVertex));
-
-		if (!newVertices)
-			return false;
-
-		text->base.vertices = newVertices;
 		text->base.capacity = capacity;
 	}
 
@@ -2540,11 +2666,13 @@ bool getTextCursorAdvance(
 			advance.x += glyph->advance;
 			continue;
 		}
-		else if ((value == '<') & useTags) // TODO: parse color
+		else if ((value == '<') & useTags)
 		{
 			if (i + 2 < length && string[i + 2] == '>')
 			{
-				if (string[i + 1] == 'b')
+				uint32_t tag = string[i + 1];
+
+				if (tag == 'b')
 				{
 					if (useItalic) glyphs = boldItalicGlyphs;
 					else glyphs = boldGlyphs;
@@ -2552,7 +2680,7 @@ bool getTextCursorAdvance(
 					i += 2;
 					continue;
 				}
-				else if (string[i + 1] == 'i')
+				else if (tag == 'i')
 				{
 					if (useBold) glyphs = boldItalicGlyphs;
 					else glyphs = italicGlyphs;
@@ -2563,7 +2691,9 @@ bool getTextCursorAdvance(
 			}
 			else if (i + 3 < length && string[i + 1] == '/' && string[i + 3] == '>')
 			{
-				if (string[i + 2] == 'b')
+				uint32_t tag = string[i + 2];
+
+				if (tag == 'b')
 				{
 					if (useItalic) glyphs = italicGlyphs;
 					else glyphs = regularGlyphs;
@@ -2571,7 +2701,7 @@ bool getTextCursorAdvance(
 					i += 3;
 					continue;
 				}
-				else if (string[i + 2] == 'i')
+				else if (tag == 'i')
 				{
 					if (useBold) glyphs = boldGlyphs;
 					else glyphs = regularGlyphs;
@@ -2579,6 +2709,21 @@ bool getTextCursorAdvance(
 					i += 3;
 					continue;
 				}
+				else if (tag == '#')
+				{
+					i += 3;
+					continue;
+				}
+			}
+			else if (i + 8 < length && string[i + 1] == '#' && string[i + 8] == '>')
+			{
+				i += 8;
+				continue;
+			}
+			else if (i + 10 < length && string[i + 1] == '#' && string[i + 10] == '>')
+			{
+				i += 10;
+				continue;
 			}
 		}
 
@@ -2653,13 +2798,13 @@ bool getTextCursorIndex(
 	assert(text);
 	assert(_index);
 	assert(textInitialized);
-	// TODO: too heavy, use better solution
 
 	size_t length = text->base.length;
 
 	cmmt_float_t bestDistance = INFINITY;
 	size_t index = 0;
 
+	// TODO: too heavy, use better solution
 	for (size_t i = 0; i <= length; i++)
 	{
 		Vec2F checkAdvance;
@@ -2692,11 +2837,36 @@ MpgxResult bakeText(Text text)
 	assert(!text->base.isConstant);
 	assert(textInitialized);
 
-	if (text->base.length == 0)
-		return BAD_VALUE_MPGX_RESULT;
-
-	TextVertex* vertices = text->base.vertices;
 	FontAtlas fontAtlas = text->base.fontAtlas;
+	size_t length = text->base.length;
+	GraphicsPipeline pipeline = fontAtlas->pipeline;
+	Handle handle = pipeline->base.handle;
+	TextVertex* vertexBuffer = handle->base.vertexBuffer;
+	size_t vertexCapacity = handle->base.vertexCapacity;
+
+	if (vertexCapacity < length * 4)
+	{
+		size_t capacity = length * 4;
+		TextVertex* newVertexBuffer;
+
+		if (vertexBuffer)
+		{
+			newVertexBuffer = realloc(
+				vertexBuffer,
+				capacity * sizeof(TextVertex));
+		}
+		else
+		{
+			newVertexBuffer = malloc(
+				capacity * sizeof(TextVertex));
+		}
+
+		if (!newVertexBuffer)
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+		handle->base.vertexBuffer = vertexBuffer = newVertexBuffer;
+		handle->base.vertexCapacity = capacity;
+	}
 
 	uint32_t vertexCount;
 	Vec2F textSize;
@@ -2715,7 +2885,7 @@ MpgxResult bakeText(Text text)
 		text->base.isBold,
 		text->base.isItalic,
 		text->base.useTags,
-		vertices,
+		vertexBuffer,
 		&vertexCount,
 		&textSize);
 
@@ -2723,8 +2893,6 @@ MpgxResult bakeText(Text text)
 		return BAD_VALUE_MPGX_RESULT;
 
 	GraphicsAPI api = getGraphicsAPI();
-	GraphicsPipeline pipeline = fontAtlas->pipeline;
-	Handle handle = pipeline->base.handle;
 	Window window = pipeline->base.window;
 	Buffer indexBuffer = handle->base.indexBuffer;
 	Text* texts = handle->base.texts;
@@ -2771,12 +2939,12 @@ MpgxResult bakeText(Text text)
 		destroyBuffer(indexBuffer);
 	}
 
-	Buffer vertexBuffer;
+	Buffer vertexBufferInstance;
 
 	if (api == VULKAN_GRAPHICS_API)
 	{
 #if MPGX_SUPPORT_VULKAN
-		vertexBuffer = text->vk.vertexBuffer;
+		vertexBufferInstance = text->vk.vertexBuffer;
 #else
 		abort();
 #endif
@@ -2785,7 +2953,7 @@ MpgxResult bakeText(Text text)
 		api == OPENGL_ES_GRAPHICS_API)
 	{
 #if MPGX_SUPPORT_OPENGL
-		vertexBuffer = text->gl.mesh->gl.vertexBuffer;
+		vertexBufferInstance = text->gl.mesh->gl.vertexBuffer;
 #else
 		abort();
 #endif
@@ -2797,14 +2965,14 @@ MpgxResult bakeText(Text text)
 
 	size_t vertexSize = vertexCount * sizeof(TextVertex);
 
-	if (vertexBuffer->base.size < vertexSize)
+	if (vertexBufferInstance->base.size < vertexSize)
 	{
 		Buffer newVertexBuffer;
 
 		MpgxResult mpgxResult = createBuffer(window,
 			VERTEX_BUFFER_TYPE,
 			CPU_TO_GPU_BUFFER_USAGE,
-			vertices,
+			vertexBuffer,
 			vertexSize,
 			&newVertexBuffer);
 
@@ -2831,30 +2999,33 @@ MpgxResult bakeText(Text text)
 #endif
 		}
 
-		destroyBuffer(vertexBuffer);
+		destroyBuffer(vertexBufferInstance);
 	}
 	else
 	{
 		if (api == VULKAN_GRAPHICS_API)
 		{
 #if MPGX_SUPPORT_VULKAN
-			VkWindow vkWindow = getVkWindow(window);
+			if (vertexSize > 0)
+			{
+				VkWindow vkWindow = getVkWindow(window);
 
-			VkResult vkResult = vkQueueWaitIdle(
-				vkWindow->graphicsQueue);
+				VkResult vkResult = vkQueueWaitIdle(
+					vkWindow->graphicsQueue);
 
-			if (vkResult != VK_SUCCESS)
-				return vkToMpgxResult(vkResult);
+				if (vkResult != VK_SUCCESS)
+					return vkToMpgxResult(vkResult);
 
-			MpgxResult mpgxResult = setVkBufferData(
-				vkWindow->allocator,
-				vertexBuffer->vk.allocation,
-				vertices,
-				vertexSize,
-				0);
+				MpgxResult mpgxResult = setVkBufferData(
+					vkWindow->allocator,
+					vertexBufferInstance->vk.allocation,
+					vertexBuffer,
+					vertexSize,
+					0);
 
-			if (mpgxResult != SUCCESS_MPGX_RESULT)
-				return mpgxResult;
+				if (mpgxResult != SUCCESS_MPGX_RESULT)
+					return mpgxResult;
+			}
 
 			text->vk.indexCount = indexCount;
 #else
@@ -2864,15 +3035,18 @@ MpgxResult bakeText(Text text)
 		else
 		{
 #if MPGX_SUPPORT_OPENGL
-			MpgxResult mpgxResult = setGlBufferData(
-				vertexBuffer->gl.glType,
-				vertexBuffer->gl.handle,
-				vertices,
-				vertexSize,
-				0);
+			if (vertexSize > 0)
+			{
+				MpgxResult mpgxResult = setGlBufferData(
+					vertexBufferInstance->gl.glType,
+					vertexBufferInstance->gl.handle,
+					vertexBuffer,
+					vertexSize,
+					0);
 
-			if (mpgxResult != SUCCESS_MPGX_RESULT)
-				return mpgxResult;
+				if (mpgxResult != SUCCESS_MPGX_RESULT)
+					return mpgxResult;
+			}
 
 			text->gl.mesh->gl.indexCount = indexCount;
 #else
@@ -2897,26 +3071,38 @@ size_t drawText(
 
 	FontAtlas fontAtlas = text->base.fontAtlas;
 	GraphicsPipeline pipeline = fontAtlas->pipeline;
+	Vec2I framebufferSize = pipeline->base.framebuffer->base.size;
 
-	bool dynamicScissor = scissor.z + scissor.w != 0;
+	assert(scissor.x + scissor.z <= framebufferSize.x);
+	assert(scissor.y + scissor.w <= framebufferSize.y);
 
+	if (scissor.z + scissor.w == 0)
+		scissor = vec4I(0, 0, framebufferSize.x, framebufferSize.y);
+
+	Vec4I stateScissor = pipeline->base.state.scissor;
 	Window window = pipeline->base.window;
+	bool dynamicScissor = stateScissor.z + stateScissor.w == 0;
 	GraphicsAPI api = getGraphicsAPI();
 
 	if (api == VULKAN_GRAPHICS_API)
 	{
 #if MPGX_SUPPORT_VULKAN
+		uint32_t indexCount = text->vk.indexCount;
+
+		if (indexCount == 0)
+			return 0;
+
 		VkWindow vkWindow = getVkWindow(window);
 		VkCommandBuffer commandBuffer = vkWindow->currenCommandBuffer;
 		VkPipelineLayout pipelineLayout = pipeline->vk.layout;
 
-		if (dynamicScissor) // TODO: fix
+		if (dynamicScissor)
 		{
 			VkRect2D vkScissor = {
 				(int32_t)scissor.x,
-				(int32_t)scissor.y,
-				scissor.z,
-				scissor.w,
+				(int32_t)((framebufferSize.y - scissor.y) - scissor.w),
+				(uint32_t)scissor.z,
+				(uint32_t)scissor.w,
 			};
 			vkCmdSetScissor(
 				commandBuffer,
@@ -2926,7 +3112,6 @@ size_t drawText(
 		}
 
 		Handle handle = pipeline->vk.handle;
-		uint32_t indexCount = text->vk.indexCount;
 		const VkDeviceSize offset = 0;
 
 		vkCmdPushConstants(
@@ -3080,7 +3265,7 @@ static void onVkBind(GraphicsPipeline graphicsPipeline)
 			VK_INDEX_TYPE_UINT32);
 	}
 }
-static MpgxResult onVkResize(
+static void onVkResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
 	void* createData)
@@ -3118,7 +3303,6 @@ static MpgxResult onVkResize(
 	};
 
 	*(VkGraphicsPipelineCreateData*)createData = _createData;
-	return SUCCESS_MPGX_RESULT;
 }
 static void onVkDestroy(
 	Window window,
@@ -3140,6 +3324,7 @@ static void onVkDestroy(
 		device,
 		handle->vk.descriptorSetLayout,
 		NULL);
+	free(handle->vk.vertexBuffer);
 	free(handle->vk.texts);
 	free(handle);
 }
@@ -3277,7 +3462,7 @@ static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 		(const void*)(sizeof(Vec2F) + sizeof(Vec3F)));
 	assertOpenGL();
 }
-static MpgxResult onGlResize(
+static void onGlResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
 	void* createData)
@@ -3300,8 +3485,6 @@ static MpgxResult onGlResize(
 	{
 		graphicsPipeline->gl.state.scissor = size;
 	}
-
-	return SUCCESS_MPGX_RESULT;
 }
 static void onGlDestroy(
 	Window window,
@@ -3316,6 +3499,7 @@ static void onGlDestroy(
 	assert(handle->gl.textCount == 0);
 
 	destroyBuffer(handle->gl.indexBuffer);
+	free(handle->gl.vertexBuffer);
 	free(handle->gl.texts);
 	free(handle);
 }
@@ -3399,6 +3583,7 @@ MpgxResult createTextPipeline(
 	Shader fragmentShader,
 	Sampler sampler,
 	const GraphicsPipelineState* state,
+	bool useScissors,
 	size_t capacity,
 	GraphicsPipeline* textPipeline)
 {
@@ -3434,6 +3619,8 @@ MpgxResult createTextPipeline(
 	handle->base.texts = texts;
 	handle->base.textCapacity = capacity;
 	handle->base.textCount = 0;
+	handle->base.vertexBuffer = NULL;
+	handle->base.vertexCapacity = 0;
 	handle->base.indexBuffer = NULL;
 
 #ifndef NDEBUG
@@ -3471,7 +3658,7 @@ MpgxResult createTextPipeline(
 		false,
 		DEFAULT_LINE_WIDTH,
 		size,
-		size, // TODO: fix scissors
+		useScissors ? zeroVec4I : size,
 		defaultDepthRange,
 		defaultDepthBias,
 		defaultBlendColor,

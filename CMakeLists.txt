@@ -68,6 +68,10 @@ set(PACK_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 set(PACK_BUILD_UTILITIES OFF CACHE BOOL "" FORCE)
 add_subdirectory(libraries/pack)
 
+set(MPNW_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(MPNW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+add_subdirectory(libraries/mpnw)
+
 set(URAN_SOURCES
 	source/pipelines/bloom_pipeline.c
 	source/pipelines/color_pipeline.c
@@ -105,7 +109,8 @@ set(URAN_LINK_LIBRARIES
 	webp
 	logy-static
 	mpgx-static
-	pack-static)
+	pack-static
+	mpnw-static)
 
 configure_file(cmake/defines.h.in uran/defines.h)
 

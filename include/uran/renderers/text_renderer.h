@@ -41,7 +41,7 @@ GraphicsRenderer createTextRenderer(
  * bounds - render bounds.
  * color - render color.
  * text - render text.
- * scissors - text scissors.
+ * scissor - text scissor or zero vector.
  */
 GraphicsRender createTextRender(
 	GraphicsRenderer textRenderer,
@@ -66,6 +66,22 @@ LinearColor getTextRenderColor(
 void setTextRenderColor(
 	GraphicsRender textRender,
 	LinearColor color);
+
+/*
+ * Returns text render scissor.
+ * textRender - text render instance.
+ */
+Vec4I getTextRenderScissor(
+	GraphicsRender textRender);
+/*
+ * Sets text render scissor.
+ *
+ * textRender - text render instance.
+ * scissor - scissor value or zero vector.
+ */
+void setTextRenderScissor(
+	GraphicsRender textRender,
+	Vec4I scissor);
 
 /*
  * Returns text render text.

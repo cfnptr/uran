@@ -23,8 +23,6 @@
 
 #define TEXT_PIPELINE_NAME "Text"
 
-// TODO: create inside texture square for the underline sampling first full symbol.
-
 /*
  * Font structure.
  */
@@ -320,8 +318,8 @@ uint32_t getFontAtlasFontSize(FontAtlas fontAtlas);
  * Returns operation MPGX result.
  *
  * fontAtlas - font atlas instance.
- * string - text string.
- * length - string length.
+ * string - text string or NULL.
+ * length - string length or 0.
  * alignment - text alignment.
  * color - initial text color.
  * isBold - is text bold initially.
@@ -346,8 +344,8 @@ MpgxResult createAtlasText(
  * Returns operation MPGX result.
  *
  * fontAtlas - font atlas instance.
- * string - text string.
- * length - string length.
+ * string - text string or NULL.
+ * length - string length or 0.
  * alignment - text alignment.
  * color - initial text color.
  * isBold - is text bold initially.
@@ -429,8 +427,8 @@ size_t getTextLength(Text text);
  * Returns true on success.
  *
  * text - text instance.
- * string - text string.
- * length - string length
+ * string - text string or NULL.
+ * length - string length or 0.
  */
 bool setTextString(
 	Text text,
@@ -441,8 +439,8 @@ bool setTextString(
  * Returns true on success.
  *
  * text - text instance.
- * string - text string.
- * length - string length
+ * string - text string or NULL.
+ * length - string length or 0.
  */
 bool setTextString8(
 	Text text,
@@ -579,7 +577,6 @@ bool getTextCursorIndex(
  * Returns operation MPGX result.
  */
 MpgxResult bakeText(Text text);
-// TODO: shrink text vertex buffer, shrink vertices buffer
 /*
  * Draw text mesh. (rendering command)
  * Returns drawn index count.
@@ -590,6 +587,8 @@ MpgxResult bakeText(Text text);
 size_t drawText(
 	Text text,
 	Vec4I scissor);
+
+// TODO: shrink text buffers
 
 /*
  * Create a new text image sampler.
@@ -612,6 +611,7 @@ MpgxResult createTextSampler(
  * sampler - image sampler instance.
  * state - sprite pipeline state or NULL.
  * capacity - initial text array capacity.
+ * useScissors - use scissors for text rendering.
  * textPipeline - pointer to the text pipeline.
  */
 MpgxResult createTextPipeline(
@@ -620,6 +620,7 @@ MpgxResult createTextPipeline(
 	Shader fragmentShader,
 	Sampler sampler,
 	const GraphicsPipelineState* state,
+	bool useScissors,
 	size_t capacity,
 	GraphicsPipeline* textPipeline);
 
@@ -762,3 +763,4 @@ inline static Box3F createTextBox3F(
 }
 
 // TODO: add enumerator and count getter
+// TODO: create inside texture square for the underline sampling first full symbol.

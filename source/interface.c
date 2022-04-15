@@ -209,16 +209,17 @@ Camera createInterfaceCamera(
 		1.0f);
 }
 
-inline static void updateInterfacePositions(
+inline static void updateInterfaceElementPosition(
 	InterfaceElement element,
 	Transform transform,
-	Vec2F halfSize)
+	Vec2F halfSize,
+	bool forceUpdate)
 {
 	assert(element);
 	assert(transform);
 
-	Vec2F offset;
 	Transform parent = getTransformParent(transform);
+	Vec2F offset;
 
 	if (parent)
 	{
@@ -231,11 +232,14 @@ inline static void updateInterfacePositions(
 		offset = halfSize;
 	}
 
-	while (parent)
+	if (!forceUpdate)
 	{
-		if (!isTransformActive(parent))
-			return;
-		parent = getTransformParent(parent);
+		while (parent)
+		{
+			if (!isTransformActive(parent))
+				return;
+			parent = getTransformParent(parent);
+		}
 	}
 
 	AlignmentType alignment = element->alignment;
@@ -328,10 +332,11 @@ static void onInterfacePositionsUpdate(void* argument)
 		if (!isTransformActive(transform))
 			continue;
 
-		updateInterfacePositions(
+		updateInterfaceElementPosition(
 			element,
 			transform,
-			halfSize);
+			halfSize,
+			false);
 	}
 }
 void updateInterface(Interface interface)
@@ -533,10 +538,11 @@ void updateInterface(Interface interface)
 			if (!isTransformActive(transform))
 				continue;
 
-			updateInterfacePositions(
+			updateInterfaceElementPosition(
 				element,
 				transform,
-				halfSize);
+				halfSize,
+				false);
 		}
 	}
 }
@@ -587,10 +593,12 @@ InterfaceElement createInterfaceElement(
 		(cmmt_float_t)windowSize.y / interfaceScale);
 	Vec2F halfSize = mulValVec2F(size, (cmmt_float_t)0.5);
 
-	updateInterfacePositions(
+	updateInterfaceElementPosition(
 		element,
 		transform,
-		halfSize);
+		halfSize,
+		true);
+	bakeTransform(transform);
 
 	size_t count = interface->elementCount;
 
@@ -753,4 +761,24 @@ void setInterfaceElementEnabled(
 			element->isEnabled = false;
 		}
 	}
+}
+
+void bakeInterfaceElement(InterfaceElement element)
+{
+	assert(element);
+
+	Interface interface = element->interface;
+	cmmt_float_t interfaceScale = interface->scale;
+	Vec2I windowSize = getWindowSize(interface->window);
+
+	Vec2F size = vec2F(
+		(cmmt_float_t)windowSize.x / interfaceScale,
+		(cmmt_float_t)windowSize.y / interfaceScale);
+	Vec2F halfSize = mulValVec2F(size, (cmmt_float_t)0.5);
+
+	updateInterfaceElementPosition(
+		element,
+		element->transform,
+		halfSize,
+		true);
 }

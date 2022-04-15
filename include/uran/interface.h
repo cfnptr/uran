@@ -295,3 +295,9 @@ bool isInterfaceElementEnabled(
 void setInterfaceElementEnabled(
 	InterfaceElement element,
 	bool isEnabled);
+
+/*
+ * Bake specific interface element.
+ * element - interface element instance.
+ */
+void bakeInterfaceElement(InterfaceElement element);

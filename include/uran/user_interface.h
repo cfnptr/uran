@@ -80,15 +80,15 @@ void destroyUserInterface(UserInterface ui);
  */
 Transformer getUserInterfaceTransformer(UserInterface ui);
 /*
- * Returns user interface panel pipeline.
+ * Returns user interface panel renderer.
  * ui - user interface instance.
  */
-GraphicsPipeline getUserInterfacePanelPipeline(UserInterface ui);
+GraphicsRenderer getUserInterfacePanelRenderer(UserInterface ui);
 /*
- * Returns user interface text pipeline.
+ * Returns user interface text renderer.
  * ui - user interface instance.
  */
-GraphicsPipeline getUserInterfaceTextPipeline(UserInterface ui);
+GraphicsRenderer getUserInterfaceTextRenderer(UserInterface ui);
 /*
  * Returns user interface font atlas.
  * ui - user interface instance.
@@ -115,6 +115,11 @@ void updateUserInterface(UserInterface ui);
  * ui - user interface instance.
  */
 GraphicsRendererResult drawUserInterface(UserInterface ui);
+/*
+ * Defocus focussed interface element.
+ * ui - user interface instance.
+ */
+void defocusUserInterface(UserInterface ui);
 
 /*
  * Create a new UI panel instance.
@@ -157,8 +162,8 @@ GraphicsRender getUiPanelRender(InterfaceElement panel);
  * Returns operation MPGX result.
  *
  * ui - user interface instance.
- * string - label string.
- * stringLength - label string length.
+ * string - label string or NULL.
+ * stringLength - label string length or 0.
  * alignment - alignment type.
  * position - label position.
  * scale - label scale.
@@ -195,8 +200,8 @@ MpgxResult createUiLabel(
  * Returns operation MPGX result.
  *
  * ui - user interface instance.
- * string - label string.
- * stringLength - label string length.
+ * string - label string or NULL.
+ * stringLength - label string length or 0.
  * alignment - alignment type.
  * position - label position.
  * scale - label scale.
@@ -245,8 +250,8 @@ GraphicsRender getUiLabelRender(InterfaceElement label);
  * Returns operation MPGX result.
  *
  * ui - user interface instance.
- * title - title string.
- * titleLength - title string length.
+ * title - title string or NULL.
+ * titleLength - title string length or 0.
  * alignment - alignment type.
  * position - window position.
  * scale - window scale.
@@ -273,8 +278,8 @@ MpgxResult createUiWindow(
  * Returns operation MPGX result.
  *
  * ui - user interface instance.
- * title - title string.
- * titleLength - title string length.
+ * title - title string or NULL.
+ * titleLength - title string length or 0.
  * alignment - alignment type.
  * position - window position.
  * scale - window scale.
@@ -333,8 +338,8 @@ OnInterfaceElementEvent getUiWindowOnPressEvent(InterfaceElement window);
  * Returns operation MPGX result.
  *
  * ui - user interface instance.
- * text - text string.
- * textLength - text string length.
+ * text - text string or NULL.
+ * textLength - text string length or 0.
  * alignment - alignment type.
  * position - button position.
  * scale - button scale.
@@ -363,8 +368,8 @@ MpgxResult createUiButton(
  * Returns operation MPGX result.
  *
  * ui - user interface instance.
- * text - text string.
- * textLength - text string length.
+ * text - text string or NULL.
+ * textLength - text string length or 0.
  * alignment - alignment type.
  * position - button position.
  * scale - button scale.
@@ -503,14 +508,17 @@ void setUiButtonPressedColor(
  * Returns operation MPGX result.
  *
  * ui - user interface instance.
- * placeholder - placeholder string.
- * placeholderLength - placeholder string length.
+ * placeholder - placeholder string or NULL.
+ * placeholderLength - placeholder string length or 0.
  * alignment - alignment type.
  * position - input field position.
  * scale - input field scale.
  * maxLength - max input string length.
+ * mask - password mask character or 0.
  * parent - parent instance or NULL.
  * events - interface events or NULL.
+ * onChange - on change event function or NULL.
+ * onDefocus - on defocus event function or NULL.
  * handle - input field handle or NULL.
  * isEnabled - is input field enabled.
  * isActive - is input field active.
@@ -524,8 +532,11 @@ MpgxResult createUiInputField(
 	Vec3F position,
 	Vec2F scale,
 	size_t maxLength,
+	uint32_t mask,
 	Transform parent,
 	const InterfaceElementEvents* events,
+	OnInterfaceElementEvent onChange,
+	OnInterfaceElementEvent onDefocus,
 	void* handle,
 	bool isEnabled,
 	bool isActive,
@@ -535,14 +546,17 @@ MpgxResult createUiInputField(
  * Returns operation MPGX result.
  *
  * ui - user interface instance.
- * placeholder - placeholder string.
- * placeholderLength - placeholder string length.
+ * placeholder - placeholder string or NULL.
+ * placeholderLength - placeholder string length or 0.
  * alignment - alignment type.
  * position - input field position.
  * scale - input field scale.
  * maxLength - max input string length.
+ * mask - password mask character or 0.
  * parent - parent instance or NULL.
  * events - interface events or NULL.
+ * onChange - on change event function or NULL.
+ * onDefocus - on defocus event function or NULL.
  * handle - input field handle or NULL.
  * isEnabled - is input field enabled.
  * isActive - is input field active.
@@ -556,8 +570,11 @@ MpgxResult createUiInputField8(
 	Vec3F position,
 	Vec2F scale,
 	size_t maxLength,
+	uint32_t mask,
 	Transform parent,
 	const InterfaceElementEvents* events,
+	OnInterfaceElementEvent onChange,
+	OnInterfaceElementEvent onDefocus,
 	void* handle,
 	bool isEnabled,
 	bool isActive,
@@ -589,6 +606,11 @@ GraphicsRender getUiInputFieldTextRender(InterfaceElement inputField);
  */
 GraphicsRender getUiInputFieldPlaceholderRender(InterfaceElement inputField);
 /*
+ * Returns UI input field on update event function.
+ * inputField - UI input field instance.
+ */
+OnInterfaceElementEvent getUiInputFieldOnUpdateEvent(InterfaceElement inputField);
+/*
  * Returns UI input field on enable event function.
  * inputField - UI input field instance.
  */
@@ -613,6 +635,21 @@ OnInterfaceElementEvent getUiInputFieldOnExitEvent(InterfaceElement inputField);
  * inputField - UI input field instance.
  */
 OnInterfaceElementEvent getUiInputFieldOnPressEvent(InterfaceElement inputField);
+/*
+ * Returns UI input field on change event function.
+ * inputField - UI input field instance.
+ */
+OnInterfaceElementEvent getUiInputFieldOnChangeEvent(InterfaceElement inputField);
+/*
+ * Returns UI input field on defocus event function.
+ * inputField - UI input field instance.
+ */
+OnInterfaceElementEvent getUiInputFieldOnDefocusEvent(InterfaceElement inputField);
+/*
+ * Returns UI input field maximal string length.
+ * inputField - UI input field instance.
+ */
+size_t getUiInputFieldMaxLength(InterfaceElement inputField);
 
 /*
  * Returns UI input field disabled color.
@@ -663,19 +700,55 @@ void setUiInputFieldFocusedColor(
 	LinearColor color);
 
 /*
- * Returns UI input field maximal string length.
+ * Returns UI input field mask.
  * inputField - UI input field instance.
  */
-size_t getUiInputFieldMaxLength(
+uint32_t getUiInputFieldMask(
 	InterfaceElement inputField);
 /*
- * Sets UI input field maximal string length.
+ * Sets UI input field mask.
  *
  * inputField - UI input field instance.
- * maxLength - maxial string length.
+ * mask - character mask.
  */
-void setUiInputFieldMaxLength(
+void setUiInputFieldMask(
 	InterfaceElement inputField,
-	size_t maxLength);
+	uint32_t mask);
+
+/*
+ * Returns UI input field text UTF-32 string.
+ * inputField - UI input field instance.
+ */
+const uint32_t* getUiInputFieldText(
+	InterfaceElement inputField);
+/*
+ * Returns UI input field text string length.
+ * inputField - UI input field instance.
+ */
+size_t getUiInputFieldTextLength(
+	InterfaceElement inputField);
+
+/*
+ * Sets UI input field text UTF-32 string.
+ *
+ * inputField - UI input field instance.
+ * string - text string or NULL.
+ * length - string length or 0.
+ */
+bool setUiInputFieldText(
+	InterfaceElement inputField,
+	const uint32_t* string,
+	size_t length);
+/*
+ * Sets UI input field text UTF-8 string.
+ *
+ * inputField - UI input field instance.
+ * string - text string or NULL.
+ * length - string length or 0.
+ */
+bool setUiInputFieldText8(
+	InterfaceElement inputField,
+	const char* string,
+	size_t length);
 
 // TODO: InputBox, ScrollBox, Checkbox

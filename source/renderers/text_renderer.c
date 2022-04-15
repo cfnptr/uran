@@ -158,6 +158,34 @@ void setTextRenderColor(
 	handle->color = color;
 }
 
+Vec4I getTextRenderScissor(
+	GraphicsRender textRender)
+{
+	assert(textRender);
+	assert(strcmp(getGraphicsPipelineName(
+		getGraphicsRendererPipeline(
+		getGraphicsRenderRenderer(
+		textRender))),
+		TEXT_PIPELINE_NAME) == 0);
+	Handle handle = getGraphicsRenderHandle(
+		textRender);
+	return handle->scissor;
+}
+void setTextRenderScissor(
+	GraphicsRender textRender,
+	Vec4I scissor)
+{
+	assert(textRender);
+	assert(strcmp(getGraphicsPipelineName(
+		getGraphicsRendererPipeline(
+		getGraphicsRenderRenderer(
+		textRender))),
+		TEXT_PIPELINE_NAME) == 0);
+	Handle handle = getGraphicsRenderHandle(
+		textRender);
+	handle->scissor = scissor;
+}
+
 Text getTextRenderText(
 	GraphicsRender textRender)
 {

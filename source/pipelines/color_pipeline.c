@@ -112,7 +112,7 @@ static void onVkUniformsSet(GraphicsPipeline graphicsPipeline)
 		sizeof(FragmentPushConstants),
 		&handle->vk.fpc);
 }
-static MpgxResult onVkResize(
+static void onVkResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
 	void* createData)
@@ -148,7 +148,6 @@ static MpgxResult onVkResize(
 	};
 
 	*(VkGraphicsPipelineCreateData*)createData = _createData;
-	return SUCCESS_MPGX_RESULT;
 }
 static void onVkDestroy(
 	Window window,
@@ -239,7 +238,7 @@ static void onGlUniformsSet(
 
 	assertOpenGL();
 }
-static MpgxResult onGlResize(
+static void onGlResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
 	void* createData)
@@ -262,7 +261,6 @@ static MpgxResult onGlResize(
 	{
 		graphicsPipeline->gl.state.scissor = size;
 	}
-	return SUCCESS_MPGX_RESULT;
 }
 static void onGlDestroy(
 	Window window,

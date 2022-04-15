@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "uran/user_interface.h"
+#include "openssl/crypto.h"
+
 #include <string.h>
 
 #if _WIN32
@@ -24,6 +26,10 @@
 #define UI_WINDOW_NAME "Window"
 #define UI_BUTTON_NAME "Button"
 #define UI_INPUT_FIELD_NAME "InputField"
+
+// TODO: custom delays and cursor color
+#define ACTION_START_DELAY 0.24
+#define ACTION_PRESS_DELAY 0.08
 
 struct UserInterface_T
 {
@@ -85,12 +91,16 @@ typedef struct UiButtonHandle_T
 typedef struct UiInputFieldHandle_T
 {
 	UserInterface ui;
+	Framebuffer framebuffer;
 	void* handle;
+	OnInterfaceElementEvent onUpdate;
 	OnInterfaceElementEvent onEnable;
 	OnInterfaceElementEvent onDisable;
 	OnInterfaceElementEvent onEnter;
 	OnInterfaceElementEvent onExit;
 	OnInterfaceElementEvent onPress;
+	OnInterfaceElementEvent onChange;
+	OnInterfaceElementEvent onDefocus;
 	LinearColor disabledColor;
 	LinearColor enabledColor;
 	LinearColor focusedColor;
@@ -99,6 +109,7 @@ typedef struct UiInputFieldHandle_T
 	GraphicsRender focusRender;
 	GraphicsRender textRender;
 	GraphicsRender placeholderRender;
+	uint32_t mask;
 } UiInputFieldHandle_T;
 
 typedef UiPanelHandle_T* UiPanelHandle;
@@ -261,15 +272,15 @@ Transformer getUserInterfaceTransformer(UserInterface ui)
 	assert(ui);
 	return ui->transformer;
 }
-GraphicsPipeline getUserInterfacePanelPipeline(UserInterface ui)
+GraphicsRenderer getUserInterfacePanelRenderer(UserInterface ui)
 {
 	assert(ui);
-	return getGraphicsRendererPipeline(ui->panelRenderer);
+	return ui->panelRenderer;
 }
-GraphicsPipeline getUserInterfaceTextPipeline(UserInterface ui)
+GraphicsRenderer getUserInterfaceTextRenderer(UserInterface ui)
 {
 	assert(ui);
-	return getGraphicsRendererPipeline(ui->textRenderer);
+	return ui->textRenderer;
 }
 FontAtlas getUserInterfaceFontAtlas(UserInterface ui)
 {
@@ -287,6 +298,45 @@ GraphicsRender getUserInterfaceCursor(UserInterface ui)
 	return ui->cursorRender;
 }
 
+inline static void bakeUiInputFieldText(
+	Text text,
+	uint32_t mask)
+{
+	size_t length = getTextLength(text);
+
+	if (length > 0 && mask != 0) // TODO: use better approach
+	{
+		const uint32_t* string = getTextString(text);
+		uint32_t* textString = malloc(length * sizeof(uint32_t));
+		uint32_t* maskString = malloc(length * sizeof(uint32_t));
+
+		if (textString && maskString)
+		{
+			memcpy(textString, string,
+				length * sizeof(uint32_t));
+
+			for (size_t i = 0; i < length; ++i)
+				maskString[i] = mask;
+
+			bool result = setTextString(text, maskString, length);
+
+			if (result)
+			{
+				bakeText(text);
+				setTextString(text, textString, length);
+			}
+
+			OPENSSL_cleanse(textString, length * sizeof(uint32_t));
+		}
+
+		free(textString);
+		free(maskString);
+	}
+	else
+	{
+		bakeText(text);
+	}
+}
 inline static void updateUiCursor(
 	UserInterface ui,
 	Transform textTransform,
@@ -297,8 +347,6 @@ inline static void updateUiCursor(
 	assert(text);
 
 	Transform cursorTransform = getGraphicsRenderTransform(ui->cursorRender);
-	Vec3F textPosition = getTranslationMat4F(
-		getTransformModel(textTransform));
 	Vec3F textScale = getTransformScale(textTransform);
 	Vec3F cursorScale = getTransformScale(cursorTransform);
 
@@ -325,10 +373,11 @@ inline static void updateUiCursor(
 		cursorOffset = zeroVec2F;
 	}
 
+	setTransformParent(cursorTransform, textTransform);
 	setTransformPosition(cursorTransform, vec3F(
-		textPosition.x + cursorOffset.x,
-		textPosition.y + cursorOffset.y,
-		textPosition.z));
+		cursorOffset.x,
+		cursorOffset.y,
+		(cmmt_float_t)0.0));
 	setTransformScale(cursorTransform, vec3F(
 		cursorScale.x,
 		getTransformScale(textTransform).y * (cmmt_float_t)1.25,
@@ -345,21 +394,7 @@ inline static void updateUiInputFields(UserInterface ui)
 	{
 		if (!ui->isMousePressed)
 		{
-			if (ui->focusedInputField)
-			{
-				UiInputFieldHandle handle = getInterfaceElementHandle(
-					ui->focusedInputField);
-				setPanelRenderColor(
-					handle->focusRender,
-					handle->enabledColor);
-				Transform cursorTransform = getGraphicsRenderTransform(
-					ui->cursorRender);
-				setTransformActive(
-					cursorTransform,
-					false);
-				ui->focusedInputField = NULL;
-			}
-
+			defocusUserInterface(ui);
 			ui->isMousePressed = true;
 		}
 	}
@@ -368,15 +403,24 @@ inline static void updateUiInputFields(UserInterface ui)
 		ui->isMousePressed = false;
 	}
 
+#if __linux__ || _WIN32
+	KeyboardKey leftSuperKey = LEFT_CONTROL_KEYBOARD_KEY;
+	KeyboardKey rightSuperKey = RIGHT_CONTROL_KEYBOARD_KEY;
+#elif __APPLE__
+	KeyboardKey leftSuperKey = LEFT_SUPER_KEYBOARD_KEY;
+	KeyboardKey rightSuperKey = RIGHT_SUPER_KEYBOARD_KEY;
+#else
+#error Unknown operating system
+#endif
+
 	if (ui->focusedInputField)
 	{
-		UiInputFieldHandle handle = getInterfaceElementHandle(
-			ui->focusedInputField);
+		InterfaceElement focusedInputField = ui->focusedInputField;
+		UiInputFieldHandle handle = getInterfaceElementHandle(focusedInputField);
 		Text text = getTextRenderText(handle->textRender);
 		double updateTime = getWindowUpdateTime(window);
 
 		bool isTextChanged = false, isCursorChanged = false;
-		// TODO: custom delays and cursor color
 
 		if (getWindowKeyboardKey(window, BACKSPACE_KEYBOARD_KEY))
 		{
@@ -386,7 +430,7 @@ inline static void updateUiInputFields(UserInterface ui)
 				ui->cursorIndex--;
 				removeTextChar(text, ui->cursorIndex);
 				ui->buttonDelay = ui->isButtonPressed ?
-					updateTime + 0.1 : updateTime + 0.3;
+					updateTime + ACTION_PRESS_DELAY : updateTime + ACTION_START_DELAY;
 				ui->isButtonPressed = isTextChanged = isCursorChanged = true;
 			}
 		}
@@ -397,7 +441,7 @@ inline static void updateUiInputFields(UserInterface ui)
 			{
 				removeTextChar(text, ui->cursorIndex);
 				ui->buttonDelay = ui->isButtonPressed ?
-					updateTime + 0.1 : updateTime + 0.3;
+					updateTime + ACTION_PRESS_DELAY : updateTime + ACTION_START_DELAY;
 				ui->isButtonPressed = isTextChanged = isCursorChanged = true;
 			}
 		}
@@ -408,7 +452,7 @@ inline static void updateUiInputFields(UserInterface ui)
 			{
 				ui->cursorIndex--;
 				ui->buttonDelay = ui->isButtonPressed ?
-					updateTime + 0.1 : updateTime + 0.3;
+					updateTime + ACTION_PRESS_DELAY : updateTime + ACTION_START_DELAY;
 				ui->isButtonPressed = isCursorChanged = true;
 			}
 		}
@@ -419,7 +463,55 @@ inline static void updateUiInputFields(UserInterface ui)
 			{
 				ui->cursorIndex++;
 				ui->buttonDelay = ui->isButtonPressed ?
-					updateTime + 0.1 : updateTime + 0.3;
+					updateTime + ACTION_PRESS_DELAY : updateTime + ACTION_START_DELAY;
+				ui->isButtonPressed = isCursorChanged = true;
+			}
+		}
+		else if (getWindowKeyboardKey(window, V_KEYBOARD_KEY) &&
+			(getWindowKeyboardKey(window, leftSuperKey) ||
+			getWindowKeyboardKey(window, rightSuperKey)))
+		{
+			if (!ui->isButtonPressed || ui->buttonDelay < updateTime)
+			{
+				const char* clipboard = getWindowClipboard(window);
+				size_t length = strlen(clipboard);
+
+				if (length > 0)
+				{
+					uint32_t* clipboard32;
+					size_t length32;
+
+					MpgxResult mpgxResult = allocateStringUTF32(
+						clipboard,
+						length,
+						&clipboard32,
+						&length32);
+
+					if (mpgxResult == SUCCESS_MPGX_RESULT)
+					{
+						if (getTextLength(text) + length32 > handle->maxLength)
+							length32 = handle->maxLength - getTextLength(text);
+
+						if (length32 > 0)
+						{
+							bool result = appendTextString32(text,
+								clipboard32,
+								length32,
+								ui->cursorIndex);
+
+							if (result)
+							{
+								ui->cursorIndex += length32;
+								isTextChanged = isCursorChanged = true;
+							}
+						}
+
+						free(clipboard32);
+					}
+				}
+
+				ui->buttonDelay = ui->isButtonPressed ?
+					updateTime + ACTION_PRESS_DELAY : updateTime + ACTION_START_DELAY;
 				ui->isButtonPressed = isCursorChanged = true;
 			}
 		}
@@ -449,27 +541,30 @@ inline static void updateUiInputFields(UserInterface ui)
 
 		if (isTextChanged)
 		{
-			if (getTextLength(text) == 0)
+			if (getTextLength(text) > 0)
+			{
+				bakeUiInputFieldText(text, handle->mask);
+				setTransformActive(getGraphicsRenderTransform(
+					handle->textRender), true);
+				setTransformActive(getGraphicsRenderTransform(
+					handle->placeholderRender), false);
+			}
+			else
 			{
 				setTransformActive(getGraphicsRenderTransform(
 					handle->textRender), false);
 				setTransformActive(getGraphicsRenderTransform(
 					handle->placeholderRender), true);
 			}
-			else
-			{
-				setTransformActive(getGraphicsRenderTransform(
-					handle->textRender), true);
-				setTransformActive(getGraphicsRenderTransform(
-					handle->placeholderRender), false);
-				MpgxResult mpgxResult = bakeText(text);
-				if (mpgxResult != SUCCESS_MPGX_RESULT) isCursorChanged = false;
-			}
+
+			if (handle->onChange)
+				handle->onChange(focusedInputField);
 		}
 		if (isCursorChanged)
 		{
 			Transform textTransform = getGraphicsRenderTransform(
-				handle->placeholderRender);
+				getTextLength(text) > 0 ?
+				handle->textRender : handle->placeholderRender);
 			updateUiCursor(ui, textTransform, text);
 		}
 
@@ -493,7 +588,6 @@ void updateUserInterface(UserInterface ui)
 GraphicsRendererResult drawUserInterface(UserInterface ui)
 {
 	assert(ui);
-
 	GraphicsRendererResult result =
 		createGraphicsRendererResult();
 	GraphicsRendererResult tmpResult;
@@ -511,6 +605,24 @@ GraphicsRendererResult drawUserInterface(UserInterface ui)
 	tmpResult = drawGraphicsRenderer(ui->textRenderer, &data);
 	result = addGraphicsRendererResult(result, tmpResult);
 	return result;
+}
+void defocusUserInterface(UserInterface ui)
+{
+	assert(ui);
+
+	if (ui->focusedInputField)
+	{
+		InterfaceElement focusedInputField = ui->focusedInputField;
+		UiInputFieldHandle handle = getInterfaceElementHandle(focusedInputField);
+		Transform cursorTransform = getGraphicsRenderTransform(ui->cursorRender);
+		setPanelRenderColor(handle->focusRender, handle->enabledColor);
+		setTransformParent(cursorTransform, NULL);
+		setTransformActive(cursorTransform, false);
+		ui->focusedInputField = NULL;
+
+		if (handle->onDefocus)
+			handle->onDefocus(focusedInputField);
+	}
 }
 
 static void onUiPanelDestroy(void* _handle)
@@ -799,12 +911,12 @@ MpgxResult createUiLabel(
 	InterfaceElement* uiLabel)
 {
 	assert(ui);
-	assert(string);
-	assert(stringLength > 0);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(scale > 0.0f);
 	assert(uiLabel);
 
+	assert(stringLength == 0 ||
+		(stringLength > 0 && string));
 	assert(!parent || (parent && ui->transformer ==
 		getTransformTransformer(parent)));
 
@@ -852,6 +964,8 @@ MpgxResult createUiLabel8(
 	assert(scale > 0.0f);
 	assert(uiLabel);
 
+	assert(stringLength == 0 ||
+		(stringLength > 0 && string));
 	assert(!parent || (parent && ui->transformer ==
 		getTransformTransformer(parent)));
 
@@ -1206,13 +1320,13 @@ MpgxResult createUiWindow(
 	InterfaceElement* uiWindow)
 {
 	assert(ui);
-	assert(title);
-	assert(titleLength > 0);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(scale.x > 0.0f);
 	assert(scale.y > 0.0f);
 	assert(uiWindow);
 
+	assert(titleLength == 0 ||
+		(titleLength > 0 && title));
 	assert(!parent || (parent && ui->transformer ==
 		getTransformTransformer(parent)));
 
@@ -1244,13 +1358,13 @@ MpgxResult createUiWindow8(
 	InterfaceElement* uiWindow)
 {
 	assert(ui);
-	assert(title);
-	assert(titleLength > 0);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(scale.x > 0.0f);
 	assert(scale.y > 0.0f);
 	assert(uiWindow);
 
+	assert(titleLength == 0 ||
+		(titleLength > 0 && title));
 	assert(!parent || (parent && ui->transformer ==
 		getTransformTransformer(parent)));
 
@@ -1622,13 +1736,13 @@ MpgxResult createUiButton(
 	InterfaceElement* uiButton)
 {
 	assert(ui);
-	assert(text);
-	assert(textLength > 0);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(scale.x > 0.0f);
 	assert(scale.y > 0.0f);
 	assert(uiButton);
 
+	assert(textLength == 0 ||
+		(textLength > 0 && text));
 	assert(!parent || (parent && ui->transformer ==
 		getTransformTransformer(parent)));
 
@@ -1662,13 +1776,13 @@ MpgxResult createUiButton8(
 	InterfaceElement* uiButton)
 {
 	assert(ui);
-	assert(text);
-	assert(textLength > 0);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(scale.x > 0.0f);
 	assert(scale.y > 0.0f);
 	assert(uiButton);
 
+	assert(textLength == 0 ||
+		(textLength > 0 && text));
 	assert(!parent || (parent && ui->transformer ==
 		getTransformTransformer(parent)));
 
@@ -1857,6 +1971,52 @@ void setUiButtonPressedColor(
 	handle->pressedColor = color;
 }
 
+static void onUiInputFieldUpdate(InterfaceElement element)
+{
+	assert(element);
+	UiInputFieldHandle handle = (UiInputFieldHandle)
+		getInterfaceElementHandle(element);
+	Framebuffer framebuffer = handle->framebuffer;
+	cmmt_float_t platformScale = getPlatformScale(framebuffer);
+	Transform panelTransform = getGraphicsRenderTransform(
+		handle->panelRender);
+	Vec3F panelPosition = mulValVec3F(getTranslationMat4F(
+		getTransformModel(panelTransform)),
+		platformScale);
+	Vec3F panelScale = mulValVec3F(
+		getTransformScale(panelTransform),
+		platformScale);
+	Vec2I framebufferSize = getFramebufferSize(handle->framebuffer);
+
+	// TODO: take scale into account.
+
+	Vec4I scissor = vec4I(
+		(cmmt_int_t)((cmmt_float_t)framebufferSize.x * (cmmt_float_t)0.5 +
+			panelPosition.x - panelScale.x * (cmmt_float_t)0.5),
+		(cmmt_int_t)((cmmt_float_t)framebufferSize.y * (cmmt_float_t)0.5 +
+			panelPosition.y - panelScale.y * (cmmt_float_t)0.5),
+		(cmmt_int_t)panelScale.x,
+		(cmmt_int_t)panelScale.y);
+
+	if (scissor.x < 0) scissor.x = 0;
+	if (scissor.y < 0) scissor.y = 0;
+	if (scissor.z <= 0) scissor.z = 1;
+	if (scissor.w <= 0) scissor.w = 1;
+
+	if (scissor.x + scissor.z > framebufferSize.x)
+	{
+		scissor.x = 0;
+		scissor.z = framebufferSize.x;
+	}
+	if (scissor.y + scissor.w > framebufferSize.y)
+	{
+		scissor.y = 0;
+		scissor.w = framebufferSize.y;
+	}
+
+	setTextRenderScissor(handle->textRender, scissor);
+	setTextRenderScissor(handle->placeholderRender, scissor);
+}
 static void onUiInputFieldEnable(InterfaceElement element)
 {
 	assert(element);
@@ -1912,9 +2072,10 @@ static void onUiInputFieldPress(InterfaceElement element)
 
 	UserInterface ui = handle->ui;
 	Window window = ui->window;
-	Transform textTransform = getGraphicsRenderTransform(
-		handle->placeholderRender);
 	Text text = getTextRenderText(handle->textRender);
+	Transform textTransform = getGraphicsRenderTransform(
+		getTextLength(text) > 0 ?
+		handle->textRender : handle->placeholderRender);
 	Vec3F textPosition = getTranslationMat4F(
 		getTransformModel(textTransform));
 	cmmt_float_t interfaceScale = getInterfaceScale(
@@ -2001,8 +2162,11 @@ inline static MpgxResult internalCreateUiInputField(
 	Vec3F position,
 	Vec2F scale,
 	size_t maxLength,
+	uint32_t mask,
 	Transform parent,
 	const InterfaceElementEvents* events,
+	OnInterfaceElementEvent onChange,
+	OnInterfaceElementEvent onDefocus,
 	void* _handle,
 	bool isEnabled,
 	bool isActive,
@@ -2016,11 +2180,16 @@ inline static MpgxResult internalCreateUiInputField(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
 	handle->ui = ui;
+	handle->framebuffer = getGraphicsPipelineFramebuffer(
+		getGraphicsRendererPipeline(ui->textRenderer));
 	handle->handle = _handle;
+	handle->onChange = onChange;
+	handle->onDefocus = onDefocus;
 	handle->disabledColor = srgbToLinearColor(DEFAULT_UI_DISABLED_INPUT_COLOR);
 	handle->enabledColor = srgbToLinearColor(DEFAULT_UI_ENABLED_INPUT_COLOR);
 	handle->focusedColor = srgbToLinearColor(DEFAULT_UI_FOCUSED_INPUT_COLOR);
 	handle->maxLength = maxLength;
+	handle->mask = mask;
 
 	Transformer transformer = ui->transformer;
 	GraphicsRenderer panelRenderer = ui->panelRenderer;
@@ -2249,11 +2418,13 @@ inline static MpgxResult internalCreateUiInputField(
 
 	InterfaceElementEvents elementEvents = events ?
 		*events : emptyInterfaceElementEvents;
+	handle->onUpdate = elementEvents.onUpdate;
 	handle->onEnable = elementEvents.onEnable;
 	handle->onDisable = elementEvents.onDisable;
 	handle->onEnter = elementEvents.onEnter;
 	handle->onExit = elementEvents.onExit;
 	handle->onPress = elementEvents.onPress;
+	elementEvents.onUpdate = onUiInputFieldUpdate;
 	elementEvents.onEnable = onUiInputFieldEnable;
 	elementEvents.onDisable = onUiInputFieldDisable;
 	elementEvents.onEnter = onUiInputFieldEnter;
@@ -2289,22 +2460,25 @@ MpgxResult createUiInputField(
 	Vec3F position,
 	Vec2F scale,
 	size_t maxLength,
+	uint32_t mask,
 	Transform parent,
 	const InterfaceElementEvents* events,
+	OnInterfaceElementEvent onChange,
+	OnInterfaceElementEvent onDefocus,
 	void* handle,
 	bool isEnabled,
 	bool isActive,
 	InterfaceElement* uiInputField)
 {
 	assert(ui);
-	assert(placeholder);
-	assert(placeholderLength > 0);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(scale.x > 0.0f);
 	assert(scale.y > 0.0f);
 	assert(maxLength > 0);
 	assert(uiInputField);
 
+	assert(placeholderLength == 0 ||
+		(placeholderLength > 0 && placeholder));
 	assert(!parent || (parent && ui->transformer ==
 		getTransformTransformer(parent)));
 
@@ -2316,8 +2490,11 @@ MpgxResult createUiInputField(
 		position,
 		scale,
 		maxLength,
+		mask,
 		parent,
 		events,
+		onChange,
+		onDefocus,
 		handle,
 		isEnabled,
 		isActive,
@@ -2332,24 +2509,27 @@ MpgxResult createUiInputField8(
 	Vec3F position,
 	Vec2F scale,
 	size_t maxLength,
+	uint32_t mask,
 	Transform parent,
 	const InterfaceElementEvents* events,
+	OnInterfaceElementEvent onChange,
+	OnInterfaceElementEvent onDefocus,
 	void* handle,
 	bool isEnabled,
 	bool isActive,
 	InterfaceElement* uiInputField)
 {
 	assert(ui);
-	assert(placeholder);
-	assert(placeholderLength > 0);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(scale.x > 0.0f);
 	assert(scale.y > 0.0f);
 	assert(maxLength > 0);
 	assert(uiInputField);
 
+	assert(placeholderLength == 0 ||
+		(placeholderLength > 0 && placeholder));
 	assert(!parent || (parent && ui->transformer ==
-	getTransformTransformer(parent)));
+		getTransformTransformer(parent)));
 
 	return internalCreateUiInputField(
 		ui,
@@ -2359,8 +2539,11 @@ MpgxResult createUiInputField8(
 		position,
 		scale,
 		maxLength,
+		mask,
 		parent,
 		events,
+		onChange,
+		onDefocus,
 		handle,
 		isEnabled,
 		isActive,
@@ -2413,6 +2596,15 @@ GraphicsRender getUiInputFieldPlaceholderRender(InterfaceElement inputField)
 		getInterfaceElementHandle(inputField);
 	return handle->placeholderRender;
 }
+OnInterfaceElementEvent getUiInputFieldOnUpdateEvent(InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->onUpdate;
+}
 OnInterfaceElementEvent getUiInputFieldOnEnableEvent(InterfaceElement inputField)
 {
 	assert(inputField);
@@ -2457,6 +2649,33 @@ OnInterfaceElementEvent getUiInputFieldOnPressEvent(InterfaceElement inputField)
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
 	return handle->onPress;
+}
+OnInterfaceElementEvent getUiInputFieldOnChangeEvent(InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->onChange;
+}
+OnInterfaceElementEvent getUiInputFieldOnDefocusEvent(InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->onDefocus;
+}
+size_t getUiInputFieldMaxLength(InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	return handle->maxLength;
 }
 
 LinearColor getUiInputFieldDisabledColor(
@@ -2525,7 +2744,7 @@ void setUiInputFieldFocusedColor(
 	handle->focusedColor = color;
 }
 
-size_t getUiInputFieldMaxLength(
+uint32_t getUiInputFieldMask(
 	InterfaceElement inputField)
 {
 	assert(inputField);
@@ -2533,16 +2752,143 @@ size_t getUiInputFieldMaxLength(
 		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
-	return handle->maxLength;
+	return handle->mask;
 }
-void setUiInputFieldMaxLength(
+void setUiInputFieldMask(
 	InterfaceElement inputField,
-	size_t maxLength)
+	uint32_t mask)
 {
 	assert(inputField);
 	assert(strcmp(getInterfaceElementName(
 		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
-	handle->maxLength = maxLength;
+	Text text = getTextRenderText(handle->textRender);
+
+	if (getTextLength(text) > 0)
+		bakeUiInputFieldText(text, mask);
+
+	handle->mask = mask;
+}
+
+const uint32_t* getUiInputFieldText(
+	InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	Text text = getTextRenderText(
+		handle->textRender);
+	return getTextString(text);
+}
+size_t getUiInputFieldTextLength(
+	InterfaceElement inputField)
+{
+	assert(inputField);
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	Text text = getTextRenderText(
+		handle->textRender);
+	return getTextLength(text);
+}
+
+bool setUiInputFieldText(
+	InterfaceElement inputField,
+	const uint32_t* string,
+	size_t length)
+{
+	assert(inputField);
+	assert(length == 0 ||
+		(length > 0 && string));
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	Text text = getTextRenderText(handle->textRender);
+
+	if (length > 0)
+	{
+		bool result = setTextString(text, string, length);
+
+		if (!result)
+			return false;
+
+		bakeUiInputFieldText(text, handle->mask);
+		setTransformActive(getGraphicsRenderTransform(
+			handle->textRender), true);
+		setTransformActive(getGraphicsRenderTransform(
+			handle->placeholderRender), false);
+	}
+	else
+	{
+		setTransformActive(getGraphicsRenderTransform(
+			handle->textRender), false);
+		setTransformActive(getGraphicsRenderTransform(
+			handle->placeholderRender), true);
+	}
+
+	UserInterface ui = handle->ui;
+
+	if (ui->focusedInputField == inputField)
+	{
+		handle->ui->cursorIndex = length;
+		Transform textTransform = getGraphicsRenderTransform(
+			getTextLength(text) > 0 ?
+			handle->textRender : handle->placeholderRender);
+		updateUiCursor(ui, textTransform, text);
+	}
+
+	return true;
+}
+bool setUiInputFieldText8(
+	InterfaceElement inputField,
+	const char* string,
+	size_t length)
+{
+	assert(inputField);
+	assert(length == 0 ||
+		(length > 0 && string));
+	assert(strcmp(getInterfaceElementName(
+		inputField), UI_INPUT_FIELD_NAME) == 0);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	Text text = getTextRenderText(handle->textRender);
+
+	if (length > 0)
+	{
+		bool result = setTextString8(text, string, length);
+
+		if (!result)
+			return false;
+
+		bakeUiInputFieldText(text, handle->mask);
+		setTransformActive(getGraphicsRenderTransform(
+			handle->textRender), true);
+		setTransformActive(getGraphicsRenderTransform(
+			handle->placeholderRender), false);
+	}
+	else
+	{
+		setTransformActive(getGraphicsRenderTransform(
+			handle->textRender), false);
+		setTransformActive(getGraphicsRenderTransform(
+			handle->placeholderRender), true);
+	}
+
+	UserInterface ui = handle->ui;
+
+	if (ui->focusedInputField == inputField)
+	{
+		handle->ui->cursorIndex = length;
+		Transform textTransform = getGraphicsRenderTransform(
+			getTextLength(text) > 0 ?
+			handle->textRender : handle->placeholderRender);
+		updateUiCursor(ui, textTransform, text);
+	}
+
+	return true;
 }
