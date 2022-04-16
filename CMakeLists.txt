@@ -33,11 +33,11 @@ set(CMAKE_C_STANDARD_REQUIRED TRUE)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
-if (NOT DEFINED URAN_PROGRAM_DIRECTORY)
-	set(URAN_PROGRAM_DIRECTORY ${PROJECT_SOURCE_DIR}/program)
-endif ()
 if (NOT DEFINED URAN_PROGRAM_NAME)
 	set(URAN_PROGRAM_NAME uran-editor)
+endif ()
+if (NOT DEFINED URAN_PROGRAM_SOURCES)
+	set(URAN_PROGRAM_SOURCES source/main.c)
 endif ()
 
 set(CONF_BUILD_SHARED OFF CACHE BOOL "" FORCE)
@@ -127,11 +127,9 @@ target_include_directories(uran-static PUBLIC
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows" AND
 	${CMAKE_BUILD_TYPE} MATCHES "Release")
 	add_executable(uran-editor WIN32
-		source/main.c
 		${URAN_PROGRAM_SOURCES})
 else ()
 	add_executable(uran-editor
-		source/main.c
 		${URAN_PROGRAM_SOURCES})
 endif ()
 
@@ -142,7 +140,7 @@ target_link_libraries(uran-editor PRIVATE
 target_include_directories(uran-editor PRIVATE
 	${PROJECT_BINARY_DIR}
 	${PROJECT_SOURCE_DIR}/include
-	${URAN_PROGRAM_DIRECTORY})
+	${URAN_PROGRAM_INCLUDES})
 
 if (${CMAKE_BUILD_TYPE} MATCHES "Release" AND
 	(${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR
