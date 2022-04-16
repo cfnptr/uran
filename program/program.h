@@ -103,8 +103,7 @@ inline static void loadSettings(
 			settings.graphicsAPI = VULKAN_GRAPHICS_API;
 			settings.isAutoGraphicsAPI = true;
 		}
-		if (strcmp(stringValue, "vulkan") == 0 ||
-			strcmp(stringValue, "auto") == 0)
+		if (strcmp(stringValue, "vulkan") == 0)
 		{
 			settings.graphicsAPI = VULKAN_GRAPHICS_API;
 			settings.isAutoGraphicsAPI = false;
