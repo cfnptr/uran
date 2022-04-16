@@ -859,13 +859,15 @@ inline static Program createProgram(
 				}
 			}
 		}
-
-		logMessage(logger, ERROR_LOG_LEVEL,
-			"Failed to initialize graphics subsystems. "
-			"(error: %s)", mpgxResultToString(mpgxResult));
-		destroyPackReader(packReader);
-		destroyProgram(program);
-		return NULL;
+		else
+		{
+			logMessage(logger, ERROR_LOG_LEVEL,
+				"Failed to initialize graphics subsystems. "
+				"(error: %s)", mpgxResultToString(mpgxResult));
+			destroyPackReader(packReader);
+			destroyProgram(program);
+			return NULL;
+		}
 	}
 
 	if (!initializeText(logger))
