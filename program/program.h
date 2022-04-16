@@ -37,6 +37,7 @@ typedef struct Settings
 {
 	GraphicsAPI graphicsAPI;
 	cmmt_float_t uiScale;
+	bool isAutoGraphicsAPI;
 } Settings;
 typedef struct Program_T
 {
@@ -79,6 +80,7 @@ inline static void loadSettings(
 
 		settings.graphicsAPI = VULKAN_GRAPHICS_API;
 		settings.uiScale = (cmmt_float_t)1.0;
+		settings.isAutoGraphicsAPI = true;
 		*_settings = settings;
 		return;
 	}
@@ -96,12 +98,27 @@ inline static void loadSettings(
 	}
 	else
 	{
-		if (strcmp(stringValue, "vulkan") == 0)
+		if (strcmp(stringValue, "auto") == 0)
+		{
 			settings.graphicsAPI = VULKAN_GRAPHICS_API;
+			settings.isAutoGraphicsAPI = true;
+		}
+		if (strcmp(stringValue, "vulkan") == 0 ||
+			strcmp(stringValue, "auto") == 0)
+		{
+			settings.graphicsAPI = VULKAN_GRAPHICS_API;
+			settings.isAutoGraphicsAPI = false;
+		}
 		else if (strcmp(stringValue, "opengl") == 0)
+		{
 			settings.graphicsAPI = OPENGL_GRAPHICS_API;
+			settings.isAutoGraphicsAPI = false;
+		}
 		else if (strcmp(stringValue, "opengles") == 0)
+		{
 			settings.graphicsAPI = OPENGL_ES_GRAPHICS_API;
+			settings.isAutoGraphicsAPI = false;
+		}
 		else
 		{
 			logMessage(logger, WARN_LOG_LEVEL,
@@ -174,7 +191,9 @@ inline static void storeSettings(
 
 	const char* stringValue;
 
-	if (settings.graphicsAPI == VULKAN_GRAPHICS_API)
+	if (settings.isAutoGraphicsAPI == true)
+		stringValue = "auto";
+	else if (settings.graphicsAPI == VULKAN_GRAPHICS_API)
 		stringValue = "vulkan";
 	else if (settings.graphicsAPI == OPENGL_GRAPHICS_API)
 		stringValue = "opengl";
@@ -186,7 +205,7 @@ inline static void storeSettings(
 	result &= writeConfComment(confWriter,
 		"Graphics rendering backend.");
 	result &= writeConfComment(confWriter,
-		"(vulkan, opengl, opengles)");
+		"(auto, vulkan, opengl, opengles)");
 	result &= writeConfString(confWriter,
 		"graphicsAPI", stringValue);
 	result &= writeConfNewLine(confWriter);
@@ -794,6 +813,54 @@ inline static Program createProgram(
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
+		if (settings->isAutoGraphicsAPI)
+		{
+			logMessage(logger, WARN_LOG_LEVEL,
+				"Failed to initialize Vulkan graphics subsystems, "
+				"trying OpenGL... (error: %s)",
+				mpgxResultToString(mpgxResult));
+
+			mpgxResult = initializeGraphics(
+				OPENGL_GRAPHICS_API,
+				ENGINE_NAME,
+				URAN_VERSION_MAJOR,
+				URAN_VERSION_MINOR,
+				URAN_VERSION_PATCH,
+				APPLICATION_NAME,
+				URAN_VERSION_MAJOR,
+				URAN_VERSION_MINOR,
+				URAN_VERSION_PATCH);
+
+			if (mpgxResult != SUCCESS_MPGX_RESULT)
+			{
+				logMessage(logger, WARN_LOG_LEVEL,
+					"Failed to initialize OpenGL graphics subsystems, "
+					"trying OpenGLES... (error: %s)",
+					mpgxResultToString(mpgxResult));
+
+				mpgxResult = initializeGraphics(
+					OPENGL_ES_GRAPHICS_API,
+					ENGINE_NAME,
+					URAN_VERSION_MAJOR,
+					URAN_VERSION_MINOR,
+					URAN_VERSION_PATCH,
+					APPLICATION_NAME,
+					URAN_VERSION_MAJOR,
+					URAN_VERSION_MINOR,
+					URAN_VERSION_PATCH);
+
+				if (mpgxResult != SUCCESS_MPGX_RESULT)
+				{
+					logMessage(logger, ERROR_LOG_LEVEL,
+						"Failed to initialize graphics subsystems. "
+						"(error: %s)", mpgxResultToString(mpgxResult));
+					destroyPackReader(packReader);
+					destroyProgram(program);
+					return NULL;
+				}
+			}
+		}
+
 		logMessage(logger, ERROR_LOG_LEVEL,
 			"Failed to initialize graphics subsystems. "
 			"(error: %s)", mpgxResultToString(mpgxResult));
