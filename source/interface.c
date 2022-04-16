@@ -635,7 +635,7 @@ void destroyInterfaceElement(InterfaceElement element)
 	InterfaceElement* elements = interface->elements;
 	size_t elementCount = interface->elementCount;
 
-	for (size_t i = 0; i < elementCount; i++)
+	for (int64_t i = (int64_t)elementCount - 1; i >= 0; i--)
 	{
 		if (elements[i] != element)
 			continue;

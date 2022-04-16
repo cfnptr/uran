@@ -783,6 +783,16 @@ inline static MpgxResult internalCreateUiLabel(
 	InterfaceElement* uiLabel,
 	bool isUTF8)
 {
+	assert(ui);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale > 0.0f);
+	assert(uiLabel);
+
+	assert(stringLength == 0 ||
+		(stringLength > 0 && string));
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
+
 	UiLabelHandle handle = calloc(1,
 		sizeof(UiButtonHandle_T));
 
@@ -958,8 +968,6 @@ MpgxResult createUiLabel8(
 	InterfaceElement* uiLabel)
 {
 	assert(ui);
-	assert(string);
-	assert(stringLength > 0);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(scale > 0.0f);
 	assert(uiLabel);
@@ -1108,6 +1116,17 @@ inline static MpgxResult internalCreateUiWindow(
 	InterfaceElement* uiWindow,
 	bool isUTF8)
 {
+	assert(ui);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale.x > 0.0f);
+	assert(scale.y > 0.0f);
+	assert(uiWindow);
+
+	assert(titleLength == 0 ||
+		(titleLength > 0 && title));
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
+
 	UiWindowHandle handle = calloc(1,
 		sizeof(UiWindowHandle_T));
 
@@ -1549,11 +1568,21 @@ inline static MpgxResult internalCreateUiButton(
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* _handle,
-	bool isEnabled,
 	bool isActive,
 	InterfaceElement* uiButton,
 	bool isUTF8)
 {
+	assert(ui);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale.x > 0.0f);
+	assert(scale.y > 0.0f);
+	assert(uiButton);
+
+	assert(textLength == 0 ||
+		(textLength > 0 && text));
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
+
 	UiButtonHandle handle = calloc(1,
 		sizeof(UiButtonHandle_T));
 
@@ -1707,7 +1736,7 @@ inline static MpgxResult internalCreateUiButton(
 		alignment,
 		position,
 		oneSizeBox2F,
-		isEnabled,
+		true,
 		onUiButtonDestroy,
 		&elementEvents,
 		handle);
@@ -1731,7 +1760,6 @@ MpgxResult createUiButton(
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
-	bool isEnabled,
 	bool isActive,
 	InterfaceElement* uiButton)
 {
@@ -1756,7 +1784,6 @@ MpgxResult createUiButton(
 		parent,
 		events,
 		handle,
-		isEnabled,
 		isActive,
 		uiButton,
 		false);
@@ -1771,7 +1798,6 @@ MpgxResult createUiButton8(
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
-	bool isEnabled,
 	bool isActive,
 	InterfaceElement* uiButton)
 {
@@ -1796,7 +1822,6 @@ MpgxResult createUiButton8(
 		parent,
 		events,
 		handle,
-		isEnabled,
 		isActive,
 		uiButton,
 		true);
@@ -1980,15 +2005,15 @@ static void onUiInputFieldUpdate(InterfaceElement element)
 	cmmt_float_t platformScale = getPlatformScale(framebuffer);
 	Transform panelTransform = getGraphicsRenderTransform(
 		handle->panelRender);
+	cmmt_float_t interfaceScale = getInterfaceScale(
+		getUserInterface(handle->ui));
 	Vec3F panelPosition = mulValVec3F(getTranslationMat4F(
 		getTransformModel(panelTransform)),
-		platformScale);
+		platformScale * interfaceScale);
 	Vec3F panelScale = mulValVec3F(
 		getTransformScale(panelTransform),
-		platformScale);
+		platformScale * interfaceScale);
 	Vec2I framebufferSize = getFramebufferSize(handle->framebuffer);
-
-	// TODO: take scale into account.
 
 	Vec4I scissor = vec4I(
 		(cmmt_int_t)((cmmt_float_t)framebufferSize.x * (cmmt_float_t)0.5 +
@@ -2168,11 +2193,22 @@ inline static MpgxResult internalCreateUiInputField(
 	OnInterfaceElementEvent onChange,
 	OnInterfaceElementEvent onDefocus,
 	void* _handle,
-	bool isEnabled,
 	bool isActive,
 	InterfaceElement* uiInputField,
 	bool isUTF8)
 {
+	assert(ui);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale.x > 0.0f);
+	assert(scale.y > 0.0f);
+	assert(maxLength > 0);
+	assert(uiInputField);
+
+	assert(placeholderLength == 0 ||
+		(placeholderLength > 0 && placeholder));
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
+
 	UiInputFieldHandle handle = calloc(1,
 		sizeof(UiInputFieldHandle_T));
 
@@ -2438,7 +2474,7 @@ inline static MpgxResult internalCreateUiInputField(
 		alignment,
 		position,
 		oneSizeBox2F,
-		isEnabled,
+		true,
 		onUiInputFieldDestroy,
 		&elementEvents,
 		handle);
@@ -2466,7 +2502,6 @@ MpgxResult createUiInputField(
 	OnInterfaceElementEvent onChange,
 	OnInterfaceElementEvent onDefocus,
 	void* handle,
-	bool isEnabled,
 	bool isActive,
 	InterfaceElement* uiInputField)
 {
@@ -2496,7 +2531,6 @@ MpgxResult createUiInputField(
 		onChange,
 		onDefocus,
 		handle,
-		isEnabled,
 		isActive,
 		uiInputField,
 		false);
@@ -2515,7 +2549,6 @@ MpgxResult createUiInputField8(
 	OnInterfaceElementEvent onChange,
 	OnInterfaceElementEvent onDefocus,
 	void* handle,
-	bool isEnabled,
 	bool isActive,
 	InterfaceElement* uiInputField)
 {
@@ -2545,7 +2578,6 @@ MpgxResult createUiInputField8(
 		onChange,
 		onDefocus,
 		handle,
-		isEnabled,
 		isActive,
 		uiInputField,
 		true);

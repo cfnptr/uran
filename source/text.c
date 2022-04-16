@@ -51,26 +51,19 @@ typedef struct Glyph
 struct FontAtlas_T
 {
 	GraphicsPipeline pipeline;
-	Font* regularFonts;
-	Font* boldFonts;
-	Font* italicFonts;
-	Font* boldItalicFonts;
+	Font* fonts;
 	size_t fontCount;
-	Glyph* regularGlyphs;
-	Glyph* boldGlyphs;
-	Glyph* italicGlyphs;
-	Glyph* boldItalicGlyphs;
+	Glyph* glyphs;
+	size_t glyphCapacity;
 	size_t glyphCount;
-	Image atlasImage;
+	Image image;
 	uint32_t fontSize;
 	float newLineAdvance;
+	bool isGenerated;
 #if MPGX_SUPPORT_VULKAN
-	uint8_t _alignment[3];
+	uint8_t _alignment[7];
 	VkDescriptorPool descriptorPool;
 	VkDescriptorSet descriptorSet;
-#endif
-#ifndef NDEBUG
-	bool isGenerated; // TODO: do not allow to use generated atlas
 #endif
 };
 
@@ -723,32 +716,24 @@ static int compareGlyph(const void* a, const void* b)
 	// NOTE: a and b should not be NULL!
 	// Skipping assertion for debug build speed.
 
-	if (((Glyph*)a)->value < ((Glyph*)b)->value)
-		return -1;
-	if (((Glyph*)a)->value > ((Glyph*)b)->value)
-		return 1;
+	uint32_t av = ((Glyph*)a)->value;
+	uint32_t bv = ((Glyph*)b)->value;
+	if (av < bv) return -1;
+	if (av > bv) return 1;
 	return 0;
 }
-inline static MpgxResult createGlyphs(
+inline static size_t bakeGlyphs(
 	const uint32_t* string,
-	size_t stringLength,
-	Glyph** glyphs,
-	size_t* glyphCount)
+	size_t length,
+	Glyph* glyphs)
 {
 	assert(string);
-	assert(stringLength > 0);
+	assert(length > 0);
 	assert(glyphs);
-	assert(glyphCount > 0);
-
-	Glyph* glyphArray = malloc(
-		stringLength * sizeof(Glyph));
-
-	if (!glyphArray)
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
 	size_t count = 0;
 
-	for (size_t i = 0; i < stringLength; i++)
+	for (size_t i = 0; i < length; i++)
 	{
 		uint32_t value = string[i];
 
@@ -757,31 +742,23 @@ inline static MpgxResult createGlyphs(
 
 		Glyph* glyph = bsearch(
 			&value,
-			glyphArray,
+			glyphs,
 			count,
 			sizeof(Glyph),
 			compareGlyph);
 
 		if (!glyph)
 		{
-			glyphArray[count++].value = value;
+			glyphs[count++].value = value;
 
-			qsort(glyphArray,
+			qsort(glyphs,
 				count,
 				sizeof(Glyph),
 				compareGlyph);
 		}
 	}
 
-	if (count == 0)
-	{
-		free(glyphArray);
-		return BAD_VALUE_MPGX_RESULT;
-	}
-
-	*glyphs = glyphArray;
-	*glyphCount = count;
-	return SUCCESS_MPGX_RESULT;
+	return count;
 }
 
 inline static bool setFtPixelSize(
@@ -810,7 +787,7 @@ inline static bool setFtPixelSize(
 
 	return true;
 }
-inline static bool fillAtlasPixels(
+inline static bool fillPixels(
 	Font* fonts,
 	size_t fontCount,
 	uint32_t fontSize,
@@ -853,7 +830,7 @@ inline static bool fillAtlasPixels(
 			glyph.value);
 		FT_Face charFace = mainFace;
 
-		if (charIndex == 0)
+		if (charIndex == 0 && glyph.value != '\0')
 		{
 			for (size_t j = 1; j < fontCount; j++)
 			{
@@ -1037,7 +1014,7 @@ inline static MpgxResult createVkDescriptorSet(
 }
 #endif
 
-MpgxResult createFontAtlas(
+inline static MpgxResult internalCreateFontAtlas(
 	GraphicsPipeline textPipeline,
 	Font* regularFonts,
 	Font* boldFonts,
@@ -1048,7 +1025,9 @@ MpgxResult createFontAtlas(
 	const uint32_t* chars,
 	size_t charCount,
 	Logger logger,
-	FontAtlas* fontAtlas)
+	FontAtlas* fontAtlas,
+	bool isGenerated,
+	bool isConstant)
 {
 	assert(textPipeline);
 	assert(regularFonts);
@@ -1071,6 +1050,7 @@ MpgxResult createFontAtlas(
 
 	fontAtlasInstance->pipeline = textPipeline;
 	fontAtlasInstance->fontSize = fontSize;
+	fontAtlasInstance->isGenerated = isGenerated;
 
 	FT_Face defaultFace = regularFonts[0]->face;
 
@@ -1089,109 +1069,58 @@ MpgxResult createFontAtlas(
 		((float)defaultFace->size->metrics.height /
 		64.0f) / (float)fontSize;
 
-	Font* regularFontArray = malloc(
-		fontCount * sizeof(Font));
+	Font* fontArray = malloc(
+		fontCount * 4 * sizeof(Font));
 
-	if (!regularFontArray)
+	if (!fontArray)
 	{
 		destroyFontAtlas(fontAtlasInstance);
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	memcpy(regularFontArray, regularFonts,
-		fontCount * sizeof(Font));
-	fontAtlasInstance->regularFonts = regularFontArray;
+	fontAtlasInstance->fonts = fontArray;
 	fontAtlasInstance->fontCount = fontCount;
 
-	Font* boldFontArray = malloc(fontCount * sizeof(Font));
+	memcpy(fontArray, regularFonts,
+		fontCount * sizeof(Font));
+	memcpy(fontArray + fontCount, boldFonts,
+		fontCount * sizeof(Font));
+	memcpy(fontArray + fontCount * 2, italicFonts,
+		fontCount * sizeof(Font));
+	memcpy(fontArray + fontCount * 3, boldItalicFonts,
+		fontCount * sizeof(Font));
 
-	if (!boldFontArray)
+	Glyph* glyphArray = malloc(
+		charCount * 4 * sizeof(Glyph));
+
+	if (!glyphArray)
 	{
 		destroyFontAtlas(fontAtlasInstance);
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	memcpy(boldFontArray, boldFonts,
-		fontCount * sizeof(Font));
-	fontAtlasInstance->boldFonts = boldFontArray;
+	fontAtlasInstance->glyphs = glyphArray;
+	fontAtlasInstance->glyphCapacity = charCount;
 
-	Font* italicFontArray = malloc(fontCount * sizeof(Font));
-
-	if (!italicFontArray)
-	{
-		destroyFontAtlas(fontAtlasInstance);
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
-	}
-
-	memcpy(italicFontArray, italicFonts,
-		fontCount * sizeof(Font));
-	fontAtlasInstance->italicFonts = italicFontArray;
-
-	Font* boldItalicFontArray = malloc(fontCount * sizeof(Font));
-
-	if (!boldItalicFontArray)
-	{
-		destroyFontAtlas(fontAtlasInstance);
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
-	}
-
-	memcpy(boldItalicFontArray, boldItalicFonts,
-		fontCount * sizeof(Font));
-	fontAtlasInstance->boldItalicFonts = boldItalicFontArray;
-
-	Glyph* regularGlyphs;
-	size_t glyphCount;
-
-	MpgxResult mpgxResult = createGlyphs(
+	size_t glyphCount = bakeGlyphs(
 		chars,
 		charCount,
-		&regularGlyphs,
-		&glyphCount);
+		glyphArray);
 
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	if (glyphCount == 0)
 	{
 		destroyFontAtlas(fontAtlasInstance);
-		return mpgxResult;
+		return BAD_VALUE_MPGX_RESULT;
 	}
 
-	fontAtlasInstance->regularGlyphs = regularGlyphs;
 	fontAtlasInstance->glyphCount = glyphCount;
 
-	Glyph* boldGlyphs = malloc(glyphCount * sizeof(Glyph));
-
-	if (!boldGlyphs)
-	{
-		destroyFontAtlas(fontAtlasInstance);
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
-	}
-
-	memcpy(boldGlyphs, regularGlyphs,
+	memcpy(glyphArray + charCount, glyphArray,
 		glyphCount * sizeof(Glyph));
-	fontAtlasInstance->boldGlyphs = boldGlyphs;
-
-	Glyph* italicGlyphs = malloc(glyphCount * sizeof(Glyph));
-
-	if (!italicGlyphs)
-	{
-		destroyFontAtlas(fontAtlasInstance);
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
-	}
-
-	memcpy(italicGlyphs, regularGlyphs,
+	memcpy(glyphArray + charCount * 2, glyphArray,
 		glyphCount * sizeof(Glyph));
-	fontAtlasInstance->italicGlyphs = italicGlyphs;
-
-	Glyph* boldItalicGlyphs = malloc(glyphCount * sizeof(Glyph));
-
-	if (!boldItalicGlyphs)
-	{
-		destroyFontAtlas(fontAtlasInstance);
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
-	}
-
-	memcpy(boldItalicGlyphs, regularGlyphs,
+	memcpy(glyphArray + charCount * 3, glyphArray,
 		glyphCount * sizeof(Glyph));
-	fontAtlasInstance->boldItalicGlyphs = boldItalicGlyphs;
 
 	uint32_t glyphLength = (uint32_t)ceil(sqrt((double)glyphCount));
 	uint32_t pixelLength = glyphLength * fontSize;
@@ -1206,11 +1135,11 @@ MpgxResult createFontAtlas(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	result = fillAtlasPixels(
+	result = fillPixels(
 		regularFonts,
 		fontCount,
 		fontSize,
-		regularGlyphs,
+		glyphArray,
 		glyphCount,
 		glyphLength,
 		pixelLength,
@@ -1225,11 +1154,11 @@ MpgxResult createFontAtlas(
 		return UNKNOWN_ERROR_MPGX_RESULT;
 	}
 
-	result = fillAtlasPixels(
+	result = fillPixels(
 		boldFonts,
 		fontCount,
 		fontSize,
-		boldGlyphs,
+		glyphArray + charCount,
 		glyphCount,
 		glyphLength,
 		pixelLength,
@@ -1244,11 +1173,11 @@ MpgxResult createFontAtlas(
 		return UNKNOWN_ERROR_MPGX_RESULT;
 	}
 
-	result = fillAtlasPixels(
+	result = fillPixels(
 		italicFonts,
 		fontCount,
 		fontSize,
-		italicGlyphs,
+		glyphArray + charCount * 2,
 		glyphCount,
 		glyphLength,
 		pixelLength,
@@ -1260,14 +1189,14 @@ MpgxResult createFontAtlas(
 	{
 		free(pixels);
 		destroyFontAtlas(fontAtlasInstance);
-		return mpgxResult;
+		return UNKNOWN_ERROR_MPGX_RESULT;
 	}
 
-	result = fillAtlasPixels(
+	result = fillPixels(
 		boldItalicFonts,
 		fontCount,
 		fontSize,
-		boldItalicGlyphs,
+		glyphArray + charCount * 3,
 		glyphCount,
 		glyphLength,
 		pixelLength,
@@ -1279,14 +1208,14 @@ MpgxResult createFontAtlas(
 	{
 		free(pixels);
 		destroyFontAtlas(fontAtlasInstance);
-		return mpgxResult;
+		return UNKNOWN_ERROR_MPGX_RESULT;
 	}
 
 	Window window = textPipeline->base.window;
 
-	Image atlasImage;
+	Image image;
 
-	mpgxResult = createImage(
+	MpgxResult mpgxResult = createImage(
 		window,
 		SAMPLED_IMAGE_TYPE,
 		IMAGE_2D,
@@ -1297,8 +1226,8 @@ MpgxResult createFontAtlas(
 			(cmmt_int_t)pixelLength,
 			1),
 		1,
-		true,
-		&atlasImage);
+		isConstant,
+		&image);
 
 	free(pixels);
 
@@ -1308,7 +1237,7 @@ MpgxResult createFontAtlas(
 		return mpgxResult;
 	}
 
-	fontAtlasInstance->atlasImage = atlasImage;
+	fontAtlasInstance->image = image;
 
 #if MPGX_SUPPORT_VULKAN
 	GraphicsAPI api = getGraphicsAPI();
@@ -1339,7 +1268,7 @@ MpgxResult createFontAtlas(
 			pipelineHandle->vk.descriptorSetLayout,
 			descriptorPool,
 			pipelineHandle->vk.sampler->vk.handle,
-			atlasImage->vk.imageView,
+			image->vk.imageView,
 			&descriptorSet);
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
@@ -1359,6 +1288,47 @@ MpgxResult createFontAtlas(
 
 	*fontAtlas = fontAtlasInstance;
 	return SUCCESS_MPGX_RESULT;
+}
+MpgxResult createFontAtlas(
+	GraphicsPipeline textPipeline,
+	Font* regularFonts,
+	Font* boldFonts,
+	Font* italicFonts,
+	Font* boldItalicFonts,
+	size_t fontCount,
+	uint32_t fontSize,
+	const uint32_t* chars,
+	size_t charCount,
+	Logger logger,
+	FontAtlas* fontAtlas)
+{
+	assert(textPipeline);
+	assert(regularFonts);
+	assert(boldFonts);
+	assert(italicFonts);
+	assert(boldItalicFonts);
+	assert(fontCount > 0);
+	assert(fontSize > 0);
+	assert(chars);
+	assert(charCount > 0);
+	assert(fontAtlas);
+	assert(fontSize % 2 == 0);
+	assert(textInitialized);
+
+	return internalCreateFontAtlas(
+		textPipeline,
+		regularFonts,
+		boldFonts,
+		italicFonts,
+		boldItalicFonts,
+		fontCount,
+		fontSize,
+		chars,
+		charCount,
+		logger,
+		fontAtlas,
+		false,
+		true);
 }
 MpgxResult createAsciiFontAtlas(
 	GraphicsPipeline textPipeline,
@@ -1417,15 +1387,9 @@ void destroyFontAtlas(FontAtlas fontAtlas)
 	}
 #endif
 
-	destroyImage(fontAtlas->atlasImage);
-	free(fontAtlas->boldItalicGlyphs);
-	free(fontAtlas->italicGlyphs);
-	free(fontAtlas->boldGlyphs);
-	free(fontAtlas->regularGlyphs);
-	free(fontAtlas->boldItalicFonts);
-	free(fontAtlas->italicFonts);
-	free(fontAtlas->boldFonts);
-	free(fontAtlas->regularFonts);
+	destroyImage(fontAtlas->image);
+	free(fontAtlas->glyphs);
+	free(fontAtlas->fonts);
 	free(fontAtlas);
 }
 
@@ -1439,25 +1403,25 @@ Font* getFontAtlasRegularFonts(FontAtlas fontAtlas)
 {
 	assert(fontAtlas);
 	assert(textInitialized);
-	return fontAtlas->regularFonts;
+	return fontAtlas->fonts;
 }
 Font* getFontAtlasBoldFonts(FontAtlas fontAtlas)
 {
 	assert(fontAtlas);
 	assert(textInitialized);
-	return fontAtlas->boldFonts;
+	return fontAtlas->fonts + fontAtlas->fontCount;
 }
 Font* getFontAtlasItalicFonts(FontAtlas fontAtlas)
 {
 	assert(fontAtlas);
 	assert(textInitialized);
-	return fontAtlas->italicFonts;
+	return fontAtlas->fonts + fontAtlas->fontCount * 2;
 }
 Font* getFontAtlasBoldItalicFonts(FontAtlas fontAtlas)
 {
 	assert(fontAtlas);
 	assert(textInitialized);
-	return fontAtlas->boldItalicFonts;
+	return fontAtlas->fonts + fontAtlas->fontCount * 3;
 }
 size_t getFontAtlasFontCount(FontAtlas fontAtlas)
 {
@@ -1470,6 +1434,72 @@ uint32_t getFontAtlasFontSize(FontAtlas fontAtlas)
 	assert(fontAtlas);
 	assert(textInitialized);
 	return fontAtlas->fontSize;
+}
+
+inline static MpgxResult bakeFontAtlas(
+	FontAtlas fontAtlas,
+	const uint32_t* string,
+	size_t length)
+{
+	assert(fontAtlas);
+
+	assert(length == 0 ||
+		(length > 0 && string));
+
+	if (length == 0)
+		return SUCCESS_MPGX_RESULT;
+
+	Glyph* glyphs = fontAtlas->glyphs;
+	size_t glyphCapacity = fontAtlas->glyphCapacity;
+
+	if (fontAtlas->glyphCapacity < length)
+	{
+		glyphCapacity = length;
+
+		Glyph* newGlyphs = realloc(glyphs,
+			glyphCapacity * 4 * sizeof(Glyph));
+
+		if (!newGlyphs)
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+		fontAtlas->glyphs = glyphs = newGlyphs;
+	}
+
+	size_t glyphCount = bakeGlyphs(
+		string,
+		length,
+		glyphs);
+
+	if (glyphCount == 0)
+		return BAD_VALUE_MPGX_RESULT;
+
+	fontAtlas->glyphCount = glyphCount;
+	fontAtlas->glyphCapacity = glyphCapacity;
+
+	memcpy(glyphs + glyphCapacity, glyphs,
+		glyphCount * sizeof(Glyph));
+	memcpy(glyphs + glyphCapacity * 2, glyphs,
+		glyphCount * sizeof(Glyph));
+	memcpy(glyphs + glyphCapacity * 3, glyphs,
+		glyphCount * sizeof(Glyph));
+
+	uint32_t glyphLength = (uint32_t)ceil(sqrt((double)glyphCount));
+	uint32_t pixelLength = glyphLength * fontAtlas->fontSize;
+	Image image = fontAtlas->image;
+	uint32_t oldPixelLength = (uint32_t)image->base.size.x;
+
+	if (pixelLength > oldPixelLength)
+	{
+		// TODO: resize image
+	}
+
+
+
+
+	// TODO:
+
+
+	return SUCCESS_MPGX_RESULT;
 }
 
 inline static bool hexToColor(
@@ -1784,7 +1814,19 @@ inline static bool fillVertices(
 			compareGlyph);
 
 		if (!glyph)
-			return false;
+		{
+			value = '\0';
+
+			glyph = bsearch(
+				&value,
+				glyphs,
+				glyphCount,
+				sizeof(Glyph),
+				compareGlyph);
+
+			if (!glyph)
+				return false;
+		}
 
 		if (glyph->isVisible)
 		{
@@ -1973,6 +2015,11 @@ inline static void internalDestroyText(Text text)
 		abort();
 	}
 
+	FontAtlas fontAtlas = text->base.fontAtlas;
+
+	if (fontAtlas && fontAtlas->isGenerated)
+		destroyFontAtlas(fontAtlas);
+
 	free(text->base.string);
 	free(text);
 }
@@ -2047,15 +2094,18 @@ inline static MpgxResult internalCreateText(
 		handle->base.vertexCapacity = capacity;
 	}
 
+	size_t glyphCapacity = fontAtlas->glyphCapacity;
+	const Glyph* glyphs = fontAtlas->glyphs;
+
 	uint32_t vertexCount;
 
 	bool result = fillVertices(
 		string,
 		length,
-		fontAtlas->regularGlyphs,
-		fontAtlas->boldGlyphs,
-		fontAtlas->italicGlyphs,
-		fontAtlas->boldItalicGlyphs,
+		glyphs,
+		glyphs + glyphCapacity,
+		glyphs + glyphCapacity * 2,
+		glyphs + glyphCapacity * 2,
 		fontAtlas->glyphCount,
 		fontAtlas->newLineAdvance,
 		alignment,
@@ -2230,6 +2280,7 @@ MpgxResult createAtlasText(
 	assert(fontAtlas);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(text);
+	assert(!fontAtlas->isGenerated);
 	assert(textInitialized);
 
 	assert(length == 0 ||
@@ -2287,6 +2338,7 @@ MpgxResult createAtlasText8(
 	assert(fontAtlas);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(text);
+	assert(!fontAtlas->isGenerated);
 	assert(textInitialized);
 
 	assert(length == 0 ||
@@ -2334,6 +2386,83 @@ MpgxResult createAtlasText8(
 		text);
 }
 
+MpgxResult createFontText(
+	GraphicsPipeline textPipeline,
+	Font* regularFonts,
+	Font* boldFonts,
+	Font* italicFonts,
+	Font* boldItalicFonts,
+	size_t fontCount,
+	uint32_t fontSize,
+	const uint32_t* string,
+	size_t length,
+	AlignmentType alignment,
+	SrgbColor color,
+	bool isBold,
+	bool isItalic,
+	bool useTags,
+	bool isConstant,
+	Logger logger,
+	Text* text)
+{
+	assert(textPipeline);
+	assert(regularFonts);
+	assert(boldFonts);
+	assert(italicFonts);
+	assert(boldItalicFonts);
+	assert(fontCount > 0);
+	assert(fontSize > 0);
+	assert(fontSize % 2 == 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(text);
+	assert(textInitialized);
+
+	assert(length == 0 ||
+		(length > 0 && string));
+
+	const uint32_t chars[] = { '\0' };
+
+	FontAtlas fontAtlas;
+
+	MpgxResult mpgxResult = internalCreateFontAtlas(
+		textPipeline,
+		regularFonts,
+		boldFonts,
+		italicFonts,
+		boldItalicFonts,
+		fontCount,
+		fontSize,
+		length > 0 ? string : chars,
+		length > 0 ? length : 1,
+		logger,
+		&fontAtlas,
+		true,
+		isConstant);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+		return mpgxResult;
+
+	mpgxResult = createAtlasText(
+		fontAtlas,
+		string,
+		length,
+		alignment,
+		color,
+		isBold,
+		isItalic,
+		useTags,
+		isConstant,
+		text);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		destroyFontAtlas(fontAtlas);
+		return mpgxResult;
+	}
+
+	return SUCCESS_MPGX_RESULT;
+}
+
 void destroyText(Text text)
 {
 	if (!text)
@@ -2346,7 +2475,7 @@ void destroyText(Text text)
 	Text* texts = handle->base.texts;
 	size_t textCount = handle->base.textCount;
 
-	for (size_t i = 0; i < textCount; i++)
+	for (int64_t i = (int64_t)textCount - 1; i >= 0; i--)
 	{
 		if (texts[i] != text)
 			continue;
@@ -2620,10 +2749,12 @@ bool getTextCursorAdvance(
 	assert(textInitialized);
 
 	FontAtlas fontAtlas = text->base.fontAtlas;
-	const Glyph* regularGlyphs = fontAtlas->regularGlyphs;
-	const Glyph* boldGlyphs = fontAtlas->boldGlyphs;
-	const Glyph* italicGlyphs = fontAtlas->italicGlyphs;
-	const Glyph* boldItalicGlyphs = fontAtlas->boldItalicGlyphs;
+	size_t glyphCapacity = fontAtlas->glyphCapacity;
+	const Glyph* _glyphs = fontAtlas->glyphs;
+	const Glyph* regularGlyphs = _glyphs;
+	const Glyph* boldGlyphs = _glyphs + glyphCapacity;
+	const Glyph* italicGlyphs = _glyphs + glyphCapacity * 2;
+	const Glyph* boldItalicGlyphs = _glyphs + glyphCapacity * 3;
 	size_t glyphCount = fontAtlas->glyphCount;
 	float newLineAdvance = fontAtlas->newLineAdvance;
 	const uint32_t* string = text->base.string;
@@ -2735,7 +2866,19 @@ bool getTextCursorAdvance(
 			compareGlyph);
 
 		if (!glyph)
-			return false;
+		{
+			value = '\0';
+
+			glyph = bsearch(
+				&value,
+				glyphs,
+				glyphCount,
+				sizeof(Glyph),
+				compareGlyph);
+
+			if (!glyph)
+				return false;
+		}
 
 		if (i < index)
 			advance.x += glyph->advance;
@@ -2838,7 +2981,20 @@ MpgxResult bakeText(Text text)
 	assert(textInitialized);
 
 	FontAtlas fontAtlas = text->base.fontAtlas;
+	const uint32_t* string = text->base.string;
 	size_t length = text->base.length;
+
+	if (fontAtlas->isGenerated)
+	{
+		MpgxResult mpgxResult = bakeFontAtlas(
+			fontAtlas,
+			string,
+			length);
+
+		if (mpgxResult != SUCCESS_MPGX_RESULT)
+			return mpgxResult;
+	}
+
 	GraphicsPipeline pipeline = fontAtlas->pipeline;
 	Handle handle = pipeline->base.handle;
 	TextVertex* vertexBuffer = handle->base.vertexBuffer;
@@ -2868,16 +3024,19 @@ MpgxResult bakeText(Text text)
 		handle->base.vertexCapacity = capacity;
 	}
 
+	const Glyph* glyphs = fontAtlas->glyphs;
+	size_t glyphCapacity = fontAtlas->glyphCapacity;
+
 	uint32_t vertexCount;
 	Vec2F textSize;
 
 	bool result = fillVertices(
 		text->base.string,
 		text->base.length,
-		fontAtlas->regularGlyphs,
-		fontAtlas->boldGlyphs,
-		fontAtlas->italicGlyphs,
-		fontAtlas->boldItalicGlyphs,
+		glyphs,
+		glyphs + glyphCapacity,
+		glyphs + glyphCapacity * 2,
+		glyphs + glyphCapacity * 3,
 		fontAtlas->glyphCount,
 		fontAtlas->newLineAdvance,
 		text->base.alignment,
@@ -3170,7 +3329,7 @@ size_t drawText(
 
 		glBindTexture(
 			GL_TEXTURE_2D,
-			fontAtlas->atlasImage->gl.handle);
+			fontAtlas->image->gl.handle);
 		assertOpenGL();
 
 		return drawGraphicsMesh(

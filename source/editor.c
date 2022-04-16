@@ -184,7 +184,6 @@ inline static BaseWindow createBaseWindow(
 		&events,
 		baseWindow,
 		true,
-		true,
 		&closeButton);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
@@ -480,7 +479,6 @@ inline static MenuBar createMenuBar(
 		panelTransform,
 		&events,
 		menuBar,
-		true,
 		true,
 		&element);
 

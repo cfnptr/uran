@@ -80,7 +80,7 @@ static const char printableAscii[] = {
 	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
 	'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '[', '\\', ']', '^', '_', '`',
 	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
-	'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~',
+	'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~', '\0',
 };
 /*
  * String containing all printable ASCII UTF-32 characters.
@@ -91,7 +91,7 @@ static const uint32_t printableAscii32[] = {
 	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
 	'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '[', '\\', ']', '^', '_', '`',
 	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
-	'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~',
+	'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~', '\0',
 };
 
 /*
@@ -257,7 +257,6 @@ MpgxResult createFontAtlas(
  * boldItalicFonts - bold italic font array.
  * fontCount - font array size.
  * fontSize - font pixel size.
- * isConstant - is font atlas constant.
  * logger - logger instance or NULL.
  * fontAtlas - pointer to the font atlas instance.
  */
@@ -313,6 +312,8 @@ size_t getFontAtlasFontCount(FontAtlas fontAtlas);
  */
 uint32_t getFontAtlasFontSize(FontAtlas fontAtlas);
 
+// TODO: shrinkAtlasIndexBuffer
+
 /*
  * Create a new UTF-32 atlas text instance.
  * Returns operation MPGX result.
@@ -366,28 +367,64 @@ MpgxResult createAtlasText8(
 	bool isConstant,
 	Text* text);
 
-// TODO: shrinkAtlasIndexBuffer
-
-/* TODO:
-MpgxResult createText32(
-	GraphicsPipeline textPipeline,
-	Font font,
-	uint32_t fontSize,
-	AlignmentType alignment,
-	const uint32_t* data,
-	size_t dataLength,
-	bool isConstant,
-	Text* text);
-MpgxResult createText(
-	GraphicsPipeline textPipeline,
-	Font font,
-	uint32_t fontSize,
-	AlignmentType alignment,
-	const char* data,
-	size_t dataLength,
-	bool isConstant,
-	Text* text);
+/*
+ * Create a new UTF-32 font text instance.
+ * Returns operation MPGX result.
+ *
+ * textPipeline - text pipeline instance.
+ * regularFonts - regular font array.
+ * boldFonts - bold font array.
+ * italicFonts - italic font array.
+ * boldItalicFonts - bold italic font array.
+ * fontCount - font array size.
+ * fontSize - font pixel size.
+ * string - text string or NULL.
+ * length - string length or 0.
+ * alignment - text alignment.
+ * color - initial text color.
+ * isBold - is text bold initially.
+ * isItalic - is text italic initially.
+ * useTags - use HTML tags.
+ * isConstant - is text constant.
+ * logger - logger instance or NULL.
+ * text - pointer to the text instance.
  */
+MpgxResult createFontText(
+	GraphicsPipeline textPipeline,
+	Font* regularFonts,
+	Font* boldFonts,
+	Font* italicFonts,
+	Font* boldItalicFonts,
+	size_t fontCount,
+	uint32_t fontSize,
+	const uint32_t* string,
+	size_t length,
+	AlignmentType alignment,
+	SrgbColor color,
+	bool isBold,
+	bool isItalic,
+	bool useTags,
+	bool isConstant,
+	Logger logger,
+	Text* text);
+MpgxResult createFontText8(
+	GraphicsPipeline textPipeline,
+	Font* regularFonts,
+	Font* boldFonts,
+	Font* italicFonts,
+	Font* boldItalicFonts,
+	size_t fontCount,
+	uint32_t fontSize,
+	const char* string,
+	size_t length,
+	AlignmentType alignment,
+	SrgbColor color,
+	bool isBold,
+	bool isItalic,
+	bool useTags,
+	bool isConstant,
+	Logger logger,
+	Text* text);
 
 /*
  * Destroys text instance.
@@ -641,7 +678,7 @@ Mat4F getTextPipelineMVP(
  * Sets text pipeline image sampler.
  *
  * textPipeline - text pipeline instance.
- * mvp - model view prokection matrix value.
+ * mvp - model view projection matrix value.
  */
 void setTextPipelineMVP(
 	GraphicsPipeline textPipeline,

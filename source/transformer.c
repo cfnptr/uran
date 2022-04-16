@@ -386,7 +386,7 @@ void destroyTransform(Transform transform)
 	Transform* transforms = transformer->transforms;
 	size_t transformCount = transformer->transformCount;
 
-	for (size_t i = 0; i < transformCount; i++)
+	for (int64_t i = (int64_t)transformCount - 1; i >= 0; i--)
 	{
 		if (transforms[i] != transform)
 			continue;

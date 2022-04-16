@@ -346,7 +346,6 @@ OnInterfaceElementEvent getUiWindowOnPressEvent(InterfaceElement window);
  * parent - parent instance or NULL.
  * events - interface events or NULL.
  * handle - button handle or NULL.
- * isEnabled - is button enabled.
  * isActive - is button active.
  * uiButton - pointer to the UI button.
  */
@@ -360,7 +359,6 @@ MpgxResult createUiButton(
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
-	bool isEnabled,
 	bool isActive,
 	InterfaceElement* uiButton);
 /*
@@ -376,7 +374,6 @@ MpgxResult createUiButton(
  * parent - parent instance or NULL.
  * events - interface events or NULL.
  * handle - button handle or NULL.
- * isEnabled - is button enabled.
  * isActive - is button active.
  * uiButton - pointer to the UI button.
  */
@@ -390,7 +387,6 @@ MpgxResult createUiButton8(
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
-	bool isEnabled,
 	bool isActive,
 	InterfaceElement* uiButton);
 /*
@@ -520,7 +516,6 @@ void setUiButtonPressedColor(
  * onChange - on change event function or NULL.
  * onDefocus - on defocus event function or NULL.
  * handle - input field handle or NULL.
- * isEnabled - is input field enabled.
  * isActive - is input field active.
  * uiInputField - pointer to the UI input field.
  */
@@ -538,7 +533,6 @@ MpgxResult createUiInputField(
 	OnInterfaceElementEvent onChange,
 	OnInterfaceElementEvent onDefocus,
 	void* handle,
-	bool isEnabled,
 	bool isActive,
 	InterfaceElement* uiInputField);
 /*
@@ -558,7 +552,6 @@ MpgxResult createUiInputField(
  * onChange - on change event function or NULL.
  * onDefocus - on defocus event function or NULL.
  * handle - input field handle or NULL.
- * isEnabled - is input field enabled.
  * isActive - is input field active.
  * uiInputField - pointer to the UI input field.
  */
@@ -576,7 +569,6 @@ MpgxResult createUiInputField8(
 	OnInterfaceElementEvent onChange,
 	OnInterfaceElementEvent onDefocus,
 	void* handle,
-	bool isEnabled,
 	bool isActive,
 	InterfaceElement* uiInputField);
 

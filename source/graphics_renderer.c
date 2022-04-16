@@ -625,7 +625,7 @@ void destroyGraphicsRender(GraphicsRender render)
 	GraphicsRender* renders = renderer->renders;
 	size_t renderCount = renderer->renderCount;
 
-	for (size_t i = 0; i < renderCount; i++)
+	for (int64_t i = (int64_t)renderCount - 1; i >= 0 ; i--)
 	{
 		if (renders[i] != render)
 			continue;
