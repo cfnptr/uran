@@ -1541,13 +1541,12 @@ inline static MpgxResult bakeFontAtlas(
 	Logger logger = fontAtlas->logger;
 	Image image = fontAtlas->image;
 	uint32_t pixelLength = (uint32_t)image->base.size.x;
-	// TODO: check if this way will work, or we should change glyphLength
 
 	uint32_t targetPixelLength =
 		newPixelLength > pixelLength ?
 		newPixelLength : pixelLength;
-	/*memset(pixelBuffer, 0,
-		targetPixelLength * targetPixelLength * 4);*/
+	memset(pixelBuffer, 0,
+		targetPixelLength * targetPixelLength * 4);
 
 	bool result = fillPixels(
 		fonts,
