@@ -346,6 +346,7 @@ inline static StatsWindow createStatsWindow(
 		false,
 		true,
 		false,
+		false,
 		windowTransform,
 		&events,
 		statsWindow,

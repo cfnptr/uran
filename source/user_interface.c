@@ -91,7 +91,6 @@ typedef struct UiButtonHandle_T
 typedef struct UiInputFieldHandle_T
 {
 	UserInterface ui;
-	Framebuffer framebuffer;
 	void* handle;
 	OnInterfaceElementEvent onUpdate;
 	OnInterfaceElementEvent onEnable;
@@ -168,7 +167,6 @@ MpgxResult createUserInterface(
 	FontAtlas fontAtlas,
 	cmmt_float_t scale,
 	size_t capacity,
-	ThreadPool threadPool,
 	UserInterface* ui)
 {
 	assert(transformer);
@@ -195,6 +193,9 @@ MpgxResult createUserInterface(
 	userInterface->cursorIndex = 0;
 	userInterface->isMousePressed = false;
 	userInterface->isButtonPressed = false;
+
+	ThreadPool threadPool =
+		getTransformerThreadPool(transformer);
 
 	Interface interface = createInterface(
 		window,
@@ -300,8 +301,12 @@ GraphicsRender getUserInterfaceCursor(UserInterface ui)
 
 inline static void bakeUiInputFieldText(
 	Text text,
-	uint32_t mask)
+	uint32_t mask,
+	Logger logger)
 {
+	assert(text);
+
+	MpgxResult mpgxResult = OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	size_t length = getTextLength(text);
 
 	if (length > 0 && mask != 0) // TODO: use better approach
@@ -322,7 +327,7 @@ inline static void bakeUiInputFieldText(
 
 			if (result)
 			{
-				bakeText(text);
+				mpgxResult = bakeText(text);
 				setTextString(text, textString, length);
 			}
 
@@ -334,7 +339,14 @@ inline static void bakeUiInputFieldText(
 	}
 	else
 	{
-		bakeText(text);
+		mpgxResult = bakeText(text);
+	}
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT && logger)
+	{
+		logMessage(logger, ERROR_LOG_LEVEL,
+			"Failed to bake text. (error: %s)",
+			mpgxResultToString(mpgxResult));
 	}
 }
 inline static void updateUiCursor(
@@ -543,7 +555,9 @@ inline static void updateUiInputFields(UserInterface ui)
 		{
 			if (getTextLength(text) > 0)
 			{
-				bakeUiInputFieldText(text, handle->mask);
+				bakeUiInputFieldText(text,
+					handle->mask,
+					getFontAtlasLogger(ui->fontAtlas));
 				setTransformActive(getGraphicsRenderTransform(
 					handle->textRender), true);
 				setTransformActive(getGraphicsRenderTransform(
@@ -776,6 +790,7 @@ inline static MpgxResult internalCreateUiLabel(
 	bool isItalic,
 	bool useTags,
 	bool isConstant,
+	bool isUniversal,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* _handle,
@@ -819,10 +834,23 @@ inline static MpgxResult internalCreateUiLabel(
 	Text text;
 	MpgxResult mpgxResult;
 
-	if (isUTF8)
+	if (isUniversal)
 	{
-		mpgxResult = createAtlasText8(
-			ui->fontAtlas,
+		uint32_t fontSize = (uint32_t)(scale * getPlatformScale(
+			getWindowFramebuffer(ui->window)));
+		FontAtlas fontAtlas = ui->fontAtlas;
+
+		if (fontSize % 2 != 0)
+			fontSize += 1;
+
+		mpgxResult = createFontText(
+			getFontAtlasPipeline(fontAtlas),
+			getFontAtlasRegularFonts(fontAtlas),
+			getFontAtlasBoldFonts(fontAtlas),
+			getFontAtlasItalicFonts(fontAtlas),
+			getFontAtlasBoldItalicFonts(fontAtlas),
+			getFontAtlasFontCount(fontAtlas),
+			fontSize,
 			string,
 			stringLength,
 			alignment,
@@ -831,21 +859,41 @@ inline static MpgxResult internalCreateUiLabel(
 			isItalic,
 			useTags,
 			isConstant,
+			getFontAtlasLogger(fontAtlas),
 			&text);
+
+		// TODO: UTF8 support
 	}
 	else
 	{
-		mpgxResult = createAtlasText(
-			ui->fontAtlas,
-			string,
-			stringLength,
-			alignment,
-			color,
-			isBold,
-			isItalic,
-			useTags,
-			isConstant,
-			&text);
+		if (isUTF8)
+		{
+			mpgxResult = createAtlasText8(
+				ui->fontAtlas,
+				string,
+				stringLength,
+				alignment,
+				color,
+				isBold,
+				isItalic,
+				useTags,
+				isConstant,
+				&text);
+		}
+		else
+		{
+			mpgxResult = createAtlasText(
+				ui->fontAtlas,
+				string,
+				stringLength,
+				alignment,
+				color,
+				isBold,
+				isItalic,
+				useTags,
+				isConstant,
+				&text);
+		}
 	}
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
@@ -914,6 +962,7 @@ MpgxResult createUiLabel(
 	bool isItalic,
 	bool useTags,
 	bool isConstant,
+	bool isUniversal,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
@@ -942,6 +991,7 @@ MpgxResult createUiLabel(
 		isItalic,
 		useTags,
 		isConstant,
+		isUniversal,
 		parent,
 		events,
 		handle,
@@ -961,6 +1011,7 @@ MpgxResult createUiLabel8(
 	bool isItalic,
 	bool useTags,
 	bool isConstant,
+	bool isUniversal,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
@@ -989,6 +1040,7 @@ MpgxResult createUiLabel8(
 		isItalic,
 		useTags,
 		isConstant,
+		isUniversal,
 		parent,
 		events,
 		handle,
@@ -2001,19 +2053,18 @@ static void onUiInputFieldUpdate(InterfaceElement element)
 	assert(element);
 	UiInputFieldHandle handle = (UiInputFieldHandle)
 		getInterfaceElementHandle(element);
-	Framebuffer framebuffer = handle->framebuffer;
+	UserInterface ui = handle->ui;
+	Framebuffer framebuffer = getWindowFramebuffer(ui->window);
 	cmmt_float_t platformScale = getPlatformScale(framebuffer);
-	Transform panelTransform = getGraphicsRenderTransform(
-		handle->panelRender);
-	cmmt_float_t interfaceScale = getInterfaceScale(
-		getUserInterface(handle->ui));
+	Transform panelTransform = getGraphicsRenderTransform(handle->panelRender);
+	cmmt_float_t interfaceScale = getInterfaceScale(getUserInterface(ui));
 	Vec3F panelPosition = mulValVec3F(getTranslationMat4F(
 		getTransformModel(panelTransform)),
 		platformScale * interfaceScale);
 	Vec3F panelScale = mulValVec3F(
 		getTransformScale(panelTransform),
 		platformScale * interfaceScale);
-	Vec2I framebufferSize = getFramebufferSize(handle->framebuffer);
+	Vec2I framebufferSize = getFramebufferSize(framebuffer);
 
 	Vec4I scissor = vec4I(
 		(cmmt_int_t)((cmmt_float_t)framebufferSize.x * (cmmt_float_t)0.5 +
@@ -2216,8 +2267,6 @@ inline static MpgxResult internalCreateUiInputField(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
 	handle->ui = ui;
-	handle->framebuffer = getGraphicsPipelineFramebuffer(
-		getGraphicsRendererPipeline(ui->textRenderer));
 	handle->handle = _handle;
 	handle->onChange = onChange;
 	handle->onDefocus = onDefocus;
@@ -2324,18 +2373,27 @@ inline static MpgxResult internalCreateUiInputField(
 
 	Text textInstance;
 
+	uint32_t fontSize = DEFAULT_UI_TEXT_HEIGHT * getPlatformScale(
+		getWindowFramebuffer(ui->window));
 	const uint32_t text[] = { '-', };
 
-	MpgxResult mpgxResult = createAtlasText(
-		fontAtlas,
+	MpgxResult mpgxResult = createFontText(
+		getFontAtlasPipeline(fontAtlas),
+		getFontAtlasRegularFonts(fontAtlas),
+		getFontAtlasBoldFonts(fontAtlas),
+		getFontAtlasItalicFonts(fontAtlas),
+		getFontAtlasBoldItalicFonts(fontAtlas),
+		getFontAtlasFontCount(fontAtlas),
+		fontSize,
 		text,
-		sizeof(text) / sizeof(uint32_t),
+		1,
 		LEFT_ALIGNMENT_TYPE,
 		DEFAULT_UI_TEXT_COLOR,
 		false,
 		false,
 		false,
 		false,
+		getFontAtlasLogger(fontAtlas),
 		&textInstance);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
@@ -2798,7 +2856,10 @@ void setUiInputFieldMask(
 	Text text = getTextRenderText(handle->textRender);
 
 	if (getTextLength(text) > 0)
-		bakeUiInputFieldText(text, mask);
+	{
+		bakeUiInputFieldText(text, mask, getFontAtlasLogger(
+			handle->ui->fontAtlas));
+	}
 
 	handle->mask = mask;
 }
@@ -2841,6 +2902,7 @@ bool setUiInputFieldText(
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
 	Text text = getTextRenderText(handle->textRender);
+	UserInterface ui = handle->ui;
 
 	if (length > 0)
 	{
@@ -2849,7 +2911,9 @@ bool setUiInputFieldText(
 		if (!result)
 			return false;
 
-		bakeUiInputFieldText(text, handle->mask);
+		bakeUiInputFieldText(text,
+			handle->mask,
+			getFontAtlasLogger(ui->fontAtlas));
 		setTransformActive(getGraphicsRenderTransform(
 			handle->textRender), true);
 		setTransformActive(getGraphicsRenderTransform(
@@ -2862,8 +2926,6 @@ bool setUiInputFieldText(
 		setTransformActive(getGraphicsRenderTransform(
 			handle->placeholderRender), true);
 	}
-
-	UserInterface ui = handle->ui;
 
 	if (ui->focusedInputField == inputField)
 	{
@@ -2889,6 +2951,7 @@ bool setUiInputFieldText8(
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
 	Text text = getTextRenderText(handle->textRender);
+	UserInterface ui = handle->ui;
 
 	if (length > 0)
 	{
@@ -2897,7 +2960,9 @@ bool setUiInputFieldText8(
 		if (!result)
 			return false;
 
-		bakeUiInputFieldText(text, handle->mask);
+		bakeUiInputFieldText(text,
+			handle->mask,
+			getFontAtlasLogger(ui->fontAtlas));
 		setTransformActive(getGraphicsRenderTransform(
 			handle->textRender), true);
 		setTransformActive(getGraphicsRenderTransform(
@@ -2910,8 +2975,6 @@ bool setUiInputFieldText8(
 		setTransformActive(getGraphicsRenderTransform(
 			handle->placeholderRender), true);
 	}
-
-	UserInterface ui = handle->ui;
 
 	if (ui->focusedInputField == inputField)
 	{

@@ -50,6 +50,7 @@ typedef struct Glyph
 } Glyph;
 struct FontAtlas_T
 {
+	Logger logger;
 	GraphicsPipeline pipeline;
 	Font* fonts;
 	size_t fontCount;
@@ -155,6 +156,8 @@ typedef struct BaseHandle
 	size_t textCount;
 	TextVertex* vertexBuffer;
 	size_t vertexCapacity;
+	uint8_t* pixelBuffer;
+	size_t pixelCapacity;
 	Buffer indexBuffer;
 } BaseHandle;
 #if MPGX_SUPPORT_VULKAN
@@ -168,6 +171,8 @@ typedef struct VkHandle
 	size_t textCount;
 	TextVertex* vertexBuffer;
 	size_t vertexCapacity;
+	uint8_t* pixelBuffer;
+	size_t pixelCapacity;
 	Buffer indexBuffer;
 	VkDescriptorSetLayout descriptorSetLayout;
 } VkHandle;
@@ -183,6 +188,8 @@ typedef struct GlHandle
 	size_t textCount;
 	TextVertex* vertexBuffer;
 	size_t vertexCapacity;
+	uint8_t* pixelBuffer;
+	size_t pixelCapacity;
 	Buffer indexBuffer;
 	GLint mvpLocation;
 	GLint atlasLocation;
@@ -796,7 +803,7 @@ inline static bool fillPixels(
 	uint32_t glyphLength,
 	uint32_t pixelLength,
 	uint8_t fontIndex,
-	uint8_t* pixels,
+	uint8_t* pixelBuffer,
 	Logger logger)
 {
 	assert(fonts);
@@ -805,7 +812,7 @@ inline static bool fillPixels(
 	assert(glyphs);
 	assert(glyphCount > 0);
 	assert(glyphLength > 0);
-	assert(pixels);
+	assert(pixelBuffer);
 
 	for (size_t i = 0; i < fontCount; i++)
 	{
@@ -887,17 +894,17 @@ inline static bool fillPixels(
 			glyph.positionY = ((float)glyphSlot->bitmap_top - (float)glyphHeight) / (float)fontSize;
 			glyph.positionZ = glyph.positionX + (float)glyphWidth / (float)fontSize;
 			glyph.positionW = glyph.positionY + (float)glyphHeight /(float)fontSize;
-			glyph.texCoordsX = (float)pixelPosX / (float)pixelLength; //tpl
-			glyph.texCoordsY = (float)pixelPosY / (float)pixelLength; //tpl
-			glyph.texCoordsZ = glyph.texCoordsX + (float)glyphWidth / (float)pixelLength; //tpl
-			glyph.texCoordsW = glyph.texCoordsY + (float)glyphHeight / (float)pixelLength; //tpl
+			glyph.texCoordsX = (float)pixelPosX / (float)pixelLength;
+			glyph.texCoordsY = (float)pixelPosY / (float)pixelLength;
+			glyph.texCoordsZ = glyph.texCoordsX + (float)glyphWidth / (float)pixelLength;
+			glyph.texCoordsW = glyph.texCoordsY + (float)glyphHeight / (float)pixelLength;
 			glyph.isVisible = true;
 
 			for (uint32_t y = 0; y < glyphHeight; y++)
 			{
 				for (uint32_t x = 0; x < glyphWidth; x++)
 				{
-					pixels[fontIndex + ((x + pixelPosX) +
+					pixelBuffer[fontIndex + ((x + pixelPosX) +
 						(y + pixelPosY) * pixelLength) * 4] =
 						bitmap[x + y * glyphWidth];
 				}
@@ -1048,6 +1055,7 @@ inline static MpgxResult internalCreateFontAtlas(
 	if (!fontAtlasInstance)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
+	fontAtlasInstance->logger = logger;
 	fontAtlasInstance->pipeline = textPipeline;
 	fontAtlasInstance->fontSize = fontSize;
 	fontAtlasInstance->isGenerated = isGenerated;
@@ -1125,18 +1133,18 @@ inline static MpgxResult internalCreateFontAtlas(
 	uint32_t glyphLength = (uint32_t)ceil(sqrt((double)glyphCount));
 	uint32_t pixelLength = glyphLength * fontSize;
 
-	uint8_t* pixels = calloc(
+	uint8_t* pixelBuffer = calloc(
 		pixelLength * pixelLength,
 		4 * sizeof(uint8_t));
 
-	if (!pixels)
+	if (!pixelBuffer)
 	{
 		destroyFontAtlas(fontAtlasInstance);
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
 	result = fillPixels(
-		regularFonts,
+		fontArray,
 		fontCount,
 		fontSize,
 		glyphArray,
@@ -1144,18 +1152,18 @@ inline static MpgxResult internalCreateFontAtlas(
 		glyphLength,
 		pixelLength,
 		0,
-		pixels,
+		pixelBuffer,
 		logger);
 
 	if (!result)
 	{
-		free(pixels);
+		free(pixelBuffer);
 		destroyFontAtlas(fontAtlasInstance);
 		return UNKNOWN_ERROR_MPGX_RESULT;
 	}
 
 	result = fillPixels(
-		boldFonts,
+		fontArray + fontCount,
 		fontCount,
 		fontSize,
 		glyphArray + charCount,
@@ -1163,18 +1171,18 @@ inline static MpgxResult internalCreateFontAtlas(
 		glyphLength,
 		pixelLength,
 		1,
-		pixels,
+		pixelBuffer,
 		logger);
 
 	if (!result)
 	{
-		free(pixels);
+		free(pixelBuffer);
 		destroyFontAtlas(fontAtlasInstance);
 		return UNKNOWN_ERROR_MPGX_RESULT;
 	}
 
 	result = fillPixels(
-		italicFonts,
+		fontArray + fontCount * 2,
 		fontCount,
 		fontSize,
 		glyphArray + charCount * 2,
@@ -1182,18 +1190,18 @@ inline static MpgxResult internalCreateFontAtlas(
 		glyphLength,
 		pixelLength,
 		2,
-		pixels,
+		pixelBuffer,
 		logger);
 
 	if (!result)
 	{
-		free(pixels);
+		free(pixelBuffer);
 		destroyFontAtlas(fontAtlasInstance);
 		return UNKNOWN_ERROR_MPGX_RESULT;
 	}
 
 	result = fillPixels(
-		boldItalicFonts,
+		fontArray + fontCount * 3,
 		fontCount,
 		fontSize,
 		glyphArray + charCount * 3,
@@ -1201,12 +1209,12 @@ inline static MpgxResult internalCreateFontAtlas(
 		glyphLength,
 		pixelLength,
 		3,
-		pixels,
+		pixelBuffer,
 		logger);
 
 	if (!result)
 	{
-		free(pixels);
+		free(pixelBuffer);
 		destroyFontAtlas(fontAtlasInstance);
 		return UNKNOWN_ERROR_MPGX_RESULT;
 	}
@@ -1220,7 +1228,7 @@ inline static MpgxResult internalCreateFontAtlas(
 		SAMPLED_IMAGE_TYPE,
 		IMAGE_2D,
 		R8G8B8A8_UNORM_IMAGE_FORMAT,
-		pixels,
+		pixelBuffer,
 		vec3I(
 			(cmmt_int_t)pixelLength,
 			(cmmt_int_t)pixelLength,
@@ -1229,7 +1237,7 @@ inline static MpgxResult internalCreateFontAtlas(
 		isConstant,
 		&image);
 
-	free(pixels);
+	free(pixelBuffer);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
@@ -1435,6 +1443,18 @@ uint32_t getFontAtlasFontSize(FontAtlas fontAtlas)
 	assert(textInitialized);
 	return fontAtlas->fontSize;
 }
+Logger getFontAtlasLogger(FontAtlas fontAtlas)
+{
+	assert(fontAtlas);
+	assert(textInitialized);
+	return fontAtlas->logger;
+}
+bool isFontAtlasGenerated(FontAtlas fontAtlas)
+{
+	assert(fontAtlas);
+	assert(textInitialized);
+	return fontAtlas->isGenerated;
+}
 
 inline static MpgxResult bakeFontAtlas(
 	FontAtlas fontAtlas,
@@ -1444,7 +1464,7 @@ inline static MpgxResult bakeFontAtlas(
 	assert(fontAtlas);
 
 	assert(length == 0 ||
-		(length > 0 && string));
+		   (length > 0 && string));
 
 	if (length == 0)
 		return SUCCESS_MPGX_RESULT;
@@ -1483,21 +1503,253 @@ inline static MpgxResult bakeFontAtlas(
 	memcpy(glyphs + glyphCapacity * 3, glyphs,
 		glyphCount * sizeof(Glyph));
 
+	uint32_t fontSize = fontAtlas->fontSize;
 	uint32_t glyphLength = (uint32_t)ceil(sqrt((double)glyphCount));
-	uint32_t pixelLength = glyphLength * fontAtlas->fontSize;
-	Image image = fontAtlas->image;
-	uint32_t oldPixelLength = (uint32_t)image->base.size.x;
+	uint32_t newPixelLength = glyphLength * fontSize;
+	GraphicsPipeline textPipeline = fontAtlas->pipeline;
+	Handle pipelineHandle = textPipeline->base.handle;
+	uint8_t* pixelBuffer = pipelineHandle->base.pixelBuffer;
+	size_t pixelCapacity = pipelineHandle->base.pixelCapacity;
 
-	if (pixelLength > oldPixelLength)
+	if (pixelCapacity < newPixelLength * newPixelLength * 4)
 	{
-		// TODO: resize image
+		pixelCapacity = newPixelLength * newPixelLength * 4;
+
+		uint8_t* newPixelBuffer;
+
+		if (pixelBuffer)
+		{
+			newPixelBuffer = realloc(
+				pixelBuffer,
+				pixelCapacity * sizeof(uint8_t));
+		}
+		else
+		{
+			newPixelBuffer = malloc(
+				pixelCapacity * sizeof(uint8_t));
+		}
+
+		if (!newPixelBuffer)
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+		pipelineHandle->base.pixelBuffer = pixelBuffer = newPixelBuffer;
+		pipelineHandle->base.pixelCapacity = pixelCapacity;
 	}
 
+	Font* fonts = fontAtlas->fonts;
+	size_t fontCount = fontAtlas->fontCount;
+	Logger logger = fontAtlas->logger;
+	Image image = fontAtlas->image;
+	uint32_t pixelLength = (uint32_t)image->base.size.x;
+	// TODO: check if this way will work, or we should change glyphLength
 
+	uint32_t targetPixelLength =
+		newPixelLength > pixelLength ?
+		newPixelLength : pixelLength;
+	/*memset(pixelBuffer, 0,
+		targetPixelLength * targetPixelLength * 4);*/
 
+	bool result = fillPixels(
+		fonts,
+		fontCount,
+		fontSize,
+		glyphs,
+		glyphCount,
+		glyphLength,
+		targetPixelLength,
+		0,
+		pixelBuffer,
+		logger);
 
-	// TODO:
+	if (!result)
+		return UNKNOWN_ERROR_MPGX_RESULT;
 
+	result = fillPixels(
+		fonts + fontCount,
+		fontCount,
+		fontSize,
+		glyphs + glyphCapacity,
+		glyphCount,
+		glyphLength,
+		targetPixelLength,
+		1,
+		pixelBuffer,
+		logger);
+
+	if (!result)
+		return UNKNOWN_ERROR_MPGX_RESULT;
+
+	result = fillPixels(
+		fonts + fontCount * 2,
+		fontCount,
+		fontSize,
+		glyphs + glyphCapacity * 2,
+		glyphCount,
+		glyphLength,
+		targetPixelLength,
+		2,
+		pixelBuffer,
+		logger);
+
+	if (!result)
+		return UNKNOWN_ERROR_MPGX_RESULT;
+
+	result = fillPixels(
+		fonts + fontCount * 3,
+		fontCount,
+		fontSize,
+		glyphs + glyphCapacity * 3,
+		glyphCount,
+		glyphLength,
+		targetPixelLength,
+		3,
+		pixelBuffer,
+		logger);
+
+	if (!result)
+		return UNKNOWN_ERROR_MPGX_RESULT;
+
+	Window window = textPipeline->base.window;
+	GraphicsAPI api = getGraphicsAPI();
+
+	if (newPixelLength > pixelLength)
+	{
+		Image newImage;
+
+		MpgxResult mpgxResult = createImage(
+			window,
+			SAMPLED_IMAGE_TYPE,
+			IMAGE_2D,
+			R8G8B8A8_UNORM_IMAGE_FORMAT,
+			pixelBuffer,
+			vec3I(
+				(cmmt_int_t)newPixelLength,
+				(cmmt_int_t)newPixelLength,
+				1),
+			1,
+			false,
+			&newImage);
+
+		if (mpgxResult != SUCCESS_MPGX_RESULT)
+			return mpgxResult;
+
+#if MPGX_SUPPORT_VULKAN
+		if (api == VULKAN_GRAPHICS_API)
+		{
+			VkWindow vkWindow = getVkWindow(window);
+			VkDevice device = vkWindow->device;
+
+			VkDescriptorPool descriptorPool;
+
+			mpgxResult = createVkDescriptorPool(
+				vkWindow->device,
+				&descriptorPool);
+
+			if (mpgxResult != SUCCESS_MPGX_RESULT)
+			{
+				destroyImage(newImage);
+				return mpgxResult;
+			}
+
+			VkDescriptorSet descriptorSet;
+
+			mpgxResult = createVkDescriptorSet(
+				device,
+				pipelineHandle->vk.descriptorSetLayout,
+				descriptorPool,
+				pipelineHandle->vk.sampler->vk.handle,
+				newImage->vk.imageView,
+				&descriptorSet);
+
+			if (mpgxResult != SUCCESS_MPGX_RESULT)
+			{
+				vkDestroyDescriptorPool(
+					device,
+					descriptorPool,
+					NULL);
+				destroyImage(newImage);
+				return mpgxResult;
+			}
+
+			VkResult vkResult = vkQueueWaitIdle(
+				vkWindow->graphicsQueue);
+
+			if (vkResult != VK_SUCCESS)
+			{
+				vkDestroyDescriptorPool(
+					device,
+					descriptorPool,
+					NULL);
+				destroyImage(newImage);
+				return vkToMpgxResult(vkResult);
+			}
+
+			vkDestroyDescriptorPool(
+				device,
+				fontAtlas->descriptorPool,
+				NULL);
+
+			fontAtlas->descriptorPool = descriptorPool;
+			fontAtlas->descriptorSet = descriptorSet;
+		}
+
+		destroyImage(image);
+		fontAtlas->image = newImage;
+#endif
+	}
+	else
+	{
+		MpgxResult mpgxResult;
+
+		if (api == VULKAN_GRAPHICS_API)
+		{
+#if MPGX_SUPPORT_VULKAN
+			VkWindow vkWindow = getVkWindow(window);
+
+			VkResult vkResult = vkQueueWaitIdle(
+				vkWindow->graphicsQueue);
+
+			if (vkResult != VK_SUCCESS)
+				return vkToMpgxResult(vkResult);
+
+			mpgxResult = setVkImageData(
+				vkWindow->device,
+				vkWindow->allocator,
+				vkWindow->transferQueue,
+				vkWindow->transferCommandBuffer,
+				vkWindow->transferFence,
+				image,
+				pixelBuffer,
+				vec3I(
+					(cmmt_int_t)pixelLength,
+					(cmmt_int_t)pixelLength,
+					1),
+				zeroVec3I,
+				0);
+#else
+			abort();
+#endif
+		}
+		else
+		{
+#if MPGX_SUPPORT_OPENGL
+			mpgxResult = setGlImageData(
+				image,
+				pixelBuffer,
+				vec3I(
+					(cmmt_int_t)pixelLength,
+					(cmmt_int_t)pixelLength,
+					1),
+				zeroVec3I,
+				0);
+#else
+			abort();
+#endif
+		}
+
+		if (mpgxResult != SUCCESS_MPGX_RESULT)
+			return mpgxResult;
+	}
 
 	return SUCCESS_MPGX_RESULT;
 }
@@ -2439,10 +2691,35 @@ MpgxResult createFontText(
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 		return mpgxResult;
 
-	mpgxResult = createAtlasText(
+	uint32_t* stringArray;
+	size_t capacity;
+
+	if (length > 0)
+	{
+		stringArray = malloc(length * sizeof(uint32_t));
+
+		if (!stringArray)
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+		memcpy(stringArray, string,
+			sizeof(uint32_t) * length);
+		capacity = length;
+	}
+	else
+	{
+		stringArray = malloc(sizeof(uint32_t));
+
+		if (!stringArray)
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+		capacity = 1;
+	}
+
+	mpgxResult = internalCreateText(
 		fontAtlas,
-		string,
+		stringArray,
 		length,
+		capacity,
 		alignment,
 		color,
 		isBold,
@@ -2733,6 +3010,23 @@ void setTextUseTags(
 	assert(textInitialized);
 	assert(!text->base.isConstant);
 	text->base.useTags = useTags;
+}
+
+uint32_t getTextFontSize(Text text)
+{
+	assert(text);
+	assert(text->base.fontAtlas->isGenerated);
+	assert(textInitialized);
+	return text->base.fontAtlas->fontSize;
+}
+void setTextFontSize(
+	Text text,
+	uint32_t fontSize)
+{
+	assert(text);
+	assert(text->base.fontAtlas->isGenerated);
+	assert(textInitialized);
+	text->base.fontAtlas->fontSize = fontSize;
 }
 
 bool getTextCursorAdvance(
@@ -3477,6 +3771,7 @@ static void onVkDestroy(
 		device,
 		handle->vk.descriptorSetLayout,
 		NULL);
+	free(handle->vk.pixelBuffer);
 	free(handle->vk.vertexBuffer);
 	free(handle->vk.texts);
 	free(handle);
@@ -3652,6 +3947,7 @@ static void onGlDestroy(
 	assert(handle->gl.textCount == 0);
 
 	destroyBuffer(handle->gl.indexBuffer);
+	free(handle->gl.pixelBuffer);
 	free(handle->gl.vertexBuffer);
 	free(handle->gl.texts);
 	free(handle);
@@ -3774,6 +4070,8 @@ MpgxResult createTextPipeline(
 	handle->base.textCount = 0;
 	handle->base.vertexBuffer = NULL;
 	handle->base.vertexCapacity = 0;
+	handle->base.pixelBuffer = NULL;
+	handle->base.pixelCapacity = 0;
 	handle->base.indexBuffer = NULL;
 
 #ifndef NDEBUG

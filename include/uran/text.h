@@ -311,6 +311,16 @@ size_t getFontAtlasFontCount(FontAtlas fontAtlas);
  * fontAtlas - font atlas instance.
  */
 uint32_t getFontAtlasFontSize(FontAtlas fontAtlas);
+/*
+ * Returns font atlas logger.
+ * fontAtlas - font atlas instance.
+ */
+Logger getFontAtlasLogger(FontAtlas fontAtlas);
+/*
+ * Returns true if font atlas is auto generated.
+ * fontAtlas - font atlas instance.
+ */
+bool isFontAtlasGenerated(FontAtlas fontAtlas);
 
 // TODO: shrinkAtlasIndexBuffer
 
@@ -583,6 +593,21 @@ bool isTextUseTags(Text text);
 void setTextUseTags(
 	Text text,
 	bool useTags);
+
+/*
+ * Returns text atlas font size.
+ * text - text instance.
+ */
+uint32_t getTextFontSize(Text text);
+/*
+ * Sets text atlas font size.
+ *
+ * text - text instance.
+ * fontSize - font size value.
+ */
+void setTextFontSize(
+	Text text,
+	uint32_t fontSize);
 
 /*
  * Get text cursor advance.

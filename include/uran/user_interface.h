@@ -56,7 +56,6 @@ typedef UserInterface_T* UserInterface;
  * fontAtlas - font atlas instance.
  * scale - interface scale.
  * capacity - initial element array capacity or 0.
- * threadPool - thread pool instance or NULL.
  * ui - pointer to the UI instance.
  */
 MpgxResult createUserInterface(
@@ -66,7 +65,6 @@ MpgxResult createUserInterface(
 	FontAtlas fontAtlas,
 	cmmt_float_t scale,
 	size_t capacity,
-	ThreadPool threadPool,
 	UserInterface* ui);
 /*
  * Destroys user interface instance.
@@ -172,6 +170,7 @@ GraphicsRender getUiPanelRender(InterfaceElement panel);
  * isItalic - is label italic initially.
  * useTags - use HTML tags.
  * isConstant - is label constant.
+ * isUniversal - support any UTF character (Heavy).
  * parent - parent instance or NUL.
  * events - interface events or NULL.
  * handle - label handle or NULL.
@@ -190,6 +189,7 @@ MpgxResult createUiLabel(
 	bool isItalic,
 	bool useTags,
 	bool isConstant,
+	bool isUniversal,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
@@ -209,7 +209,8 @@ MpgxResult createUiLabel(
  * isBold - is label bold initially.
  * isItalic - is label italic initially.
  * useTags - use HTML tags.
- * isConstant - is label constant
+ * isConstant - is label constant.
+ * isUniversal - support any UTF character (Heavy).
  * parent - parent instance or NULL.
  * events - interface events or NULL.
  * handle - label handle or NULL.
@@ -228,6 +229,7 @@ MpgxResult createUiLabel8(
 	bool isItalic,
 	bool useTags,
 	bool isConstant,
+	bool isUniversal,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
