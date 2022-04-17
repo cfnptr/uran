@@ -654,8 +654,7 @@ MpgxResult createBloomPipeline(
 		abort();
 #endif
 	}
-	else if (api == OPENGL_GRAPHICS_API ||
-		api == OPENGL_ES_GRAPHICS_API)
+	else if (api == OPENGL_GRAPHICS_API)
 	{
 #if MPGX_SUPPORT_OPENGL
 		return createGlPipeline(

@@ -1994,8 +1994,7 @@ inline static void internalDestroyText(Text text)
 		abort();
 #endif
 	}
-	else if (api == OPENGL_GRAPHICS_API ||
-		api == OPENGL_ES_GRAPHICS_API)
+	else if (api == OPENGL_GRAPHICS_API)
 	{
 #if MPGX_SUPPORT_OPENGL
 		GraphicsMesh mesh = text->gl.mesh;
@@ -2182,8 +2181,7 @@ inline static MpgxResult internalCreateText(
 			return mpgxResult;
 		}
 
-		if (api == OPENGL_GRAPHICS_API ||
-			api == OPENGL_ES_GRAPHICS_API)
+		if (api == OPENGL_GRAPHICS_API)
 		{
 #if MPGX_SUPPORT_OPENGL
 			for (size_t i = 0; i < textCount; i++)
@@ -2209,8 +2207,7 @@ inline static MpgxResult internalCreateText(
 		abort();
 #endif
 	}
-	else if (api == OPENGL_GRAPHICS_API ||
-		api == OPENGL_ES_GRAPHICS_API)
+	else if (api == OPENGL_GRAPHICS_API)
 	{
 #if MPGX_SUPPORT_OPENGL
 		GraphicsMesh mesh;
@@ -3080,8 +3077,7 @@ MpgxResult bakeText(Text text)
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
 			return mpgxResult;
 
-		if (api == OPENGL_GRAPHICS_API ||
-			api == OPENGL_ES_GRAPHICS_API)
+		if (api == OPENGL_GRAPHICS_API)
 		{
 #if MPGX_SUPPORT_OPENGL
 			for (size_t i = 0; i < textCount; i++)
@@ -3108,8 +3104,7 @@ MpgxResult bakeText(Text text)
 		abort();
 #endif
 	}
-	else if (api == OPENGL_GRAPHICS_API ||
-		api == OPENGL_ES_GRAPHICS_API)
+	else if (api == OPENGL_GRAPHICS_API)
 	{
 #if MPGX_SUPPORT_OPENGL
 		vertexBufferInstance = text->gl.mesh->gl.vertexBuffer;
@@ -3314,8 +3309,7 @@ size_t drawText(
 		abort();
 #endif
 	}
-	else if (api == OPENGL_GRAPHICS_API ||
-		api == OPENGL_ES_GRAPHICS_API)
+	else if (api == OPENGL_GRAPHICS_API)
 	{
 #if MPGX_SUPPORT_OPENGL
 		if (dynamicScissor)
@@ -3353,8 +3347,8 @@ MpgxResult createTextSampler(
 	assert(textSampler);
 
 	return createSampler(window,
-		NEAREST_IMAGE_FILTER,
-		NEAREST_IMAGE_FILTER,
+		LINEAR_IMAGE_FILTER,
+		LINEAR_IMAGE_FILTER,
 		NEAREST_IMAGE_FILTER,
 		false,
 		REPEAT_IMAGE_WRAP,
@@ -3847,8 +3841,7 @@ MpgxResult createTextPipeline(
 		abort();
 #endif
 	}
-	else if (api == OPENGL_GRAPHICS_API ||
-		api == OPENGL_ES_GRAPHICS_API)
+	else if (api == OPENGL_GRAPHICS_API)
 	{
 #if MPGX_SUPPORT_OPENGL
 		return createGlPipeline(

@@ -127,11 +127,6 @@ inline static void loadSettings(
 			settings.graphicsAPI = OPENGL_GRAPHICS_API;
 			settings.isAutoGraphicsAPI = false;
 		}
-		else if (strcmp(stringValue, "opengles") == 0)
-		{
-			settings.graphicsAPI = OPENGL_ES_GRAPHICS_API;
-			settings.isAutoGraphicsAPI = false;
-		}
 		else
 		{
 			logMessage(logger, WARN_LOG_LEVEL,
@@ -210,15 +205,13 @@ inline static void storeSettings(
 		stringValue = "vulkan";
 	else if (settings.graphicsAPI == OPENGL_GRAPHICS_API)
 		stringValue = "opengl";
-	else if (settings.graphicsAPI == OPENGL_ES_GRAPHICS_API)
-		stringValue = "opengles";
 	else
 		abort();
 
 	result &= writeConfComment(confWriter,
 		"Graphics rendering backend.");
 	result &= writeConfComment(confWriter,
-		"(auto, vulkan, opengl, opengles)");
+		"(auto, vulkan, opengl)");
 	result &= writeConfString(confWriter,
 		"graphicsAPI", stringValue);
 	result &= writeConfNewLine(confWriter);
@@ -260,8 +253,7 @@ inline static GraphicsPipeline createPanelPipelineInstance(
 		vertexPath = "shaders/vulkan/panel.vert.spv";
 		fragmentPath = "shaders/vulkan/panel.frag.spv";
 	}
-	else if (api == OPENGL_GRAPHICS_API ||
-			 api == OPENGL_ES_GRAPHICS_API)
+	else if (api == OPENGL_GRAPHICS_API)
 	{
 		vertexPath = "shaders/opengl/panel.vert";
 		fragmentPath = "shaders/opengl/panel.frag";
@@ -424,8 +416,7 @@ inline static GraphicsPipeline createTextPipelineInstance(
 		vertexPath = "shaders/vulkan/text.vert.spv";
 		fragmentPath = "shaders/vulkan/text.frag.spv";
 	}
-	else if (api == OPENGL_GRAPHICS_API ||
-			 api == OPENGL_ES_GRAPHICS_API)
+	else if (api == OPENGL_GRAPHICS_API)
 	{
 		vertexPath = "shaders/opengl/text.vert";
 		fragmentPath = "shaders/opengl/text.frag";
@@ -841,31 +832,12 @@ inline static Program createProgram(
 
 			if (mpgxResult != SUCCESS_MPGX_RESULT)
 			{
-				logMessage(logger, WARN_LOG_LEVEL,
-					"Failed to initialize OpenGL graphics subsystems, "
-					"trying OpenGLES... (error: %s)",
-					mpgxResultToString(mpgxResult));
-
-				mpgxResult = initializeGraphics(
-					OPENGL_ES_GRAPHICS_API,
-					ENGINE_NAME,
-					URAN_VERSION_MAJOR,
-					URAN_VERSION_MINOR,
-					URAN_VERSION_PATCH,
-					APPLICATION_NAME,
-					URAN_VERSION_MAJOR,
-					URAN_VERSION_MINOR,
-					URAN_VERSION_PATCH);
-
-				if (mpgxResult != SUCCESS_MPGX_RESULT)
-				{
-					logMessage(logger, ERROR_LOG_LEVEL,
-						"Failed to initialize graphics subsystems. "
-						"(error: %s)", mpgxResultToString(mpgxResult));
-					destroyPackReader(packReader);
-					destroyProgram(program);
-					return NULL;
-				}
+				logMessage(logger, ERROR_LOG_LEVEL,
+					"Failed to initialize graphics subsystems. "
+					"(error: %s)", mpgxResultToString(mpgxResult));
+				destroyPackReader(packReader);
+				destroyProgram(program);
+				return NULL;
 			}
 		}
 		else

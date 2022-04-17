@@ -336,8 +336,7 @@ inline static GraphicsRendererData createGraphicsRenderData(
 				data.frontPlane = plane3F(zeroVec3F, 0.0f);
 			}
 		}
-		else if (api == OPENGL_GRAPHICS_API ||
-			api == OPENGL_ES_GRAPHICS_API)
+		else if (api == OPENGL_GRAPHICS_API)
 		{
 			proj = perspNegOneMat4F(
 				camera.persp.fieldOfView,
@@ -408,8 +407,7 @@ inline static GraphicsRendererData createGraphicsRenderData(
 				data.frontPlane = plane3F(zeroVec3F, 0.0f);
 			}
 		}
-		else if (api == OPENGL_GRAPHICS_API ||
-			api == OPENGL_ES_GRAPHICS_API)
+		else if (api == OPENGL_GRAPHICS_API)
 		{
 			proj = orthoNegOneMat4F(
 				camera.ortho.leftFrustum,

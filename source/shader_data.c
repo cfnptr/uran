@@ -108,8 +108,7 @@ inline static bool getShaderDataFromFile(
 			fileSize,
 			file);
 	}
-	else if (api == OPENGL_GRAPHICS_API ||
-		api == OPENGL_ES_GRAPHICS_API)
+	else if (api == OPENGL_GRAPHICS_API)
 	{
 		shaderCode = malloc((fileSize + 1) * sizeof(uint8_t));
 
@@ -229,8 +228,7 @@ ShaderData createShaderDataFromPack(
 
 		memcpy(code, data, size * sizeof(uint8_t));
 	}
-	else if (api == OPENGL_GRAPHICS_API ||
-		api == OPENGL_ES_GRAPHICS_API)
+	else if (api == OPENGL_GRAPHICS_API)
 	{
 		code = malloc((size + 1) * sizeof(uint8_t));
 
