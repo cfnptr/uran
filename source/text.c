@@ -3641,7 +3641,7 @@ MpgxResult createTextSampler(
 
 	return createSampler(window,
 		LINEAR_IMAGE_FILTER,
-		LINEAR_IMAGE_FILTER,
+		NEAREST_IMAGE_FILTER,
 		NEAREST_IMAGE_FILTER,
 		false,
 		REPEAT_IMAGE_WRAP,

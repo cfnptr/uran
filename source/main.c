@@ -962,7 +962,6 @@ inline static Program createProgram(
 		fontAtlas,
 		settings->uiScale,
 		1,
-		threadPool,
 		&ui);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
