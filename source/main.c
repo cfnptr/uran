@@ -741,6 +741,8 @@ static void onProgramUpdate(void* argument)
 		2);
 	drawUserInterface(ui);
 	endFramebufferRender(framebuffer);
+
+	postUpdateEditor(program->editor);
 	endWindowRecord(window);
 }
 

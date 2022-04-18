@@ -21,12 +21,6 @@
 #undef interface
 #endif
 
-#define UI_PANEL_NAME "Panel"
-#define UI_LABEL_NAME "Label"
-#define UI_WINDOW_NAME "Window"
-#define UI_BUTTON_NAME "Button"
-#define UI_INPUT_FIELD_NAME "InputField"
-
 // TODO: custom delays and cursor color
 #define ACTION_START_DELAY 0.24
 #define ACTION_PRESS_DELAY 0.08
@@ -48,18 +42,25 @@ struct UserInterface_T
 	bool isButtonPressed;
 };
 
+typedef struct UiBaseHandle_T
+{
+	UiType type;
+} UiBaseHandle_T;
 typedef struct UiPanelHandle_T
 {
+	UiType type;
 	void* handle;
 	GraphicsRender render;
 } UiPanelHandle_T;
 typedef struct UiLabelHandle_T
 {
+	UiType type;
 	void* handle;
 	GraphicsRender render;
 } UiLabelHandle_T;
 typedef struct UiWindowHandle_T
 {
+	UiType type;
 	UserInterface ui;
 	void* handle;
 	OnInterfaceElementEvent onUpdate;
@@ -72,6 +73,7 @@ typedef struct UiWindowHandle_T
 } UiWindowHandle_T;
 typedef struct UiButtonHandle_T
 {
+	UiType type;
 	UserInterface ui;
 	void* handle;
 	OnInterfaceElementEvent onEnable;
@@ -90,6 +92,7 @@ typedef struct UiButtonHandle_T
 } UiButtonHandle_T;
 typedef struct UiInputFieldHandle_T
 {
+	UiType type;
 	UserInterface ui;
 	void* handle;
 	OnInterfaceElementEvent onUpdate;
@@ -111,6 +114,7 @@ typedef struct UiInputFieldHandle_T
 	uint32_t mask;
 } UiInputFieldHandle_T;
 
+typedef UiBaseHandle_T* UiBaseHandle;
 typedef UiPanelHandle_T* UiPanelHandle;
 typedef UiLabelHandle_T* UiLabelHandle;
 typedef UiWindowHandle_T* UiWindowHandle;
@@ -599,9 +603,27 @@ void updateUserInterface(UserInterface ui)
 	updateUiInputFields(ui);
 	updateInterface(ui->interface);
 }
+
+static void onUiElementScissor(
+	InterfaceElement element,
+	void* handle)
+{
+	assert(element);
+	assert(handle);
+
+	UserInterface ui = (UserInterface)handle;
+
+	// TODO: add enumerateInterfaceAsync
+}
 GraphicsRendererResult drawUserInterface(UserInterface ui)
 {
 	assert(ui);
+
+	enumerateInterfaceElements(
+		ui->interface,
+		onUiElementScissor,
+		ui);
+
 	GraphicsRendererResult result =
 		createGraphicsRendererResult();
 	GraphicsRendererResult tmpResult;
@@ -639,11 +661,19 @@ void defocusUserInterface(UserInterface ui)
 	}
 }
 
+UiType getUiType(InterfaceElement element)
+{
+	assert(element);
+	UiBaseHandle handle = getInterfaceElementHandle(element);
+	return handle->type;
+}
+
 static void onUiPanelDestroy(void* _handle)
 {
 	assert(_handle);
-
 	UiPanelHandle handle = (UiPanelHandle)_handle;
+	assert(handle->type == PANEL_UI_TYPE);
+
 	GraphicsRender render = handle->render;
 
 	if (render)
@@ -681,6 +711,7 @@ MpgxResult createUiPanel(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
+	handle->type = PANEL_UI_TYPE;
 	handle->handle = _handle;
 
 	Transform transform = createTransform(
@@ -713,15 +744,8 @@ MpgxResult createUiPanel(
 
 	handle->render = render;
 
-#ifndef NDEBUG
-	const char* name = UI_PANEL_NAME;
-#else
-	const char* name = NULL;
-#endif
-
 	InterfaceElement element = createInterfaceElement(
 		ui->interface,
-		name,
 		transform,
 		alignment,
 		position,
@@ -744,27 +768,26 @@ MpgxResult createUiPanel(
 void* getUiPanelHandle(InterfaceElement panel)
 {
 	assert(panel);
-	assert(strcmp(getInterfaceElementName(
-		panel), UI_PANEL_NAME) == 0);
 	UiPanelHandle handle =
 		getInterfaceElementHandle(panel);
+	assert(handle->type == PANEL_UI_TYPE);
 	return handle->handle;
 }
 GraphicsRender getUiPanelRender(InterfaceElement panel)
 {
 	assert(panel);
-	assert(strcmp(getInterfaceElementName(
-		panel), UI_PANEL_NAME) == 0);
 	UiPanelHandle handle =
 		getInterfaceElementHandle(panel);
+	assert(handle->type == PANEL_UI_TYPE);
 	return handle->render;
 }
 
 static void onUiLabelDestroy(void* _handle)
 {
 	assert(_handle);
-
 	UiLabelHandle handle = (UiLabelHandle)_handle;
+	assert(handle->type == LABEL_UI_TYPE);
+
 	GraphicsRender render = handle->render;
 
 	if (render)
@@ -814,6 +837,7 @@ inline static MpgxResult internalCreateUiLabel(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
+	handle->type = LABEL_UI_TYPE;
 	handle->handle = _handle;
 
 	Transform transform = createTransform(
@@ -836,33 +860,55 @@ inline static MpgxResult internalCreateUiLabel(
 
 	if (isUniversal)
 	{
-		uint32_t fontSize = (uint32_t)(scale * getPlatformScale(
+		uint32_t fontSize = (uint32_t)(scale * 2 * getPlatformScale(
 			getWindowFramebuffer(ui->window)));
 		FontAtlas fontAtlas = ui->fontAtlas;
 
 		if (fontSize % 2 != 0)
 			fontSize += 1;
 
-		mpgxResult = createFontText(
-			getFontAtlasPipeline(fontAtlas),
-			getFontAtlasRegularFonts(fontAtlas),
-			getFontAtlasBoldFonts(fontAtlas),
-			getFontAtlasItalicFonts(fontAtlas),
-			getFontAtlasBoldItalicFonts(fontAtlas),
-			getFontAtlasFontCount(fontAtlas),
-			fontSize,
-			string,
-			stringLength,
-			alignment,
-			color,
-			isBold,
-			isItalic,
-			useTags,
-			isConstant,
-			getFontAtlasLogger(fontAtlas),
-			&text);
-
-		// TODO: UTF8 support
+		if (isUTF8)
+		{
+			mpgxResult = createFontText8(
+				getFontAtlasPipeline(fontAtlas),
+				getFontAtlasRegularFonts(fontAtlas),
+				getFontAtlasBoldFonts(fontAtlas),
+				getFontAtlasItalicFonts(fontAtlas),
+				getFontAtlasBoldItalicFonts(fontAtlas),
+				getFontAtlasFontCount(fontAtlas),
+				fontSize,
+				string,
+				stringLength,
+				alignment,
+				color,
+				isBold,
+				isItalic,
+				useTags,
+				isConstant,
+				getFontAtlasLogger(fontAtlas),
+				&text);
+		}
+		else
+		{
+			mpgxResult = createFontText(
+				getFontAtlasPipeline(fontAtlas),
+				getFontAtlasRegularFonts(fontAtlas),
+				getFontAtlasBoldFonts(fontAtlas),
+				getFontAtlasItalicFonts(fontAtlas),
+				getFontAtlasBoldItalicFonts(fontAtlas),
+				getFontAtlasFontCount(fontAtlas),
+				fontSize,
+				string,
+				stringLength,
+				alignment,
+				color,
+				isBold,
+				isItalic,
+				useTags,
+				isConstant,
+				getFontAtlasLogger(fontAtlas),
+				&text);
+		}
 	}
 	else
 	{
@@ -923,15 +969,8 @@ inline static MpgxResult internalCreateUiLabel(
 
 	handle->render = render;
 
-#ifndef NDEBUG
-	const char* name = UI_LABEL_NAME;
-#else
-	const char* name = NULL;
-#endif
-
 	InterfaceElement element = createInterfaceElement(
 		ui->interface,
-		name,
 		transform,
 		alignment,
 		position,
@@ -1052,28 +1091,26 @@ MpgxResult createUiLabel8(
 void* getUiLabelHandle(InterfaceElement label)
 {
 	assert(label);
-	assert(strcmp(getInterfaceElementName(
-		label), UI_LABEL_NAME) == 0);
 	UiLabelHandle handle =
 		getInterfaceElementHandle(label);
+	assert(handle->type == LABEL_UI_TYPE);
 	return handle->handle;
 }
 GraphicsRender getUiLabelRender(InterfaceElement label)
 {
 	assert(label);
-	assert(strcmp(getInterfaceElementName(
-		label), UI_LABEL_NAME) == 0);
 	UiLabelHandle handle =
 		getInterfaceElementHandle(label);
+	assert(handle->type == LABEL_UI_TYPE);
 	return handle->render;
 }
 
 static void onUiWindowPress(InterfaceElement element)
 {
 	assert(element);
-
 	UiWindowHandle handle = (UiWindowHandle)
 		getInterfaceElementHandle(element);
+	assert(handle->type == WINDOW_UI_TYPE);
 
 	if (!handle->isDragging)
 	{
@@ -1088,9 +1125,9 @@ static void onUiWindowPress(InterfaceElement element)
 static void onUiWindowUpdate(InterfaceElement element)
 {
 	assert(element);
-
 	UiWindowHandle handle = (UiWindowHandle)
 		getInterfaceElementHandle(element);
+	assert(handle->type == WINDOW_UI_TYPE);
 
 	if (handle->isDragging)
 	{
@@ -1121,6 +1158,7 @@ static void onUiWindowDestroy(void* _handle)
 {
 	assert(_handle);
 	UiWindowHandle handle = (UiWindowHandle)_handle;
+	assert(handle->type == WINDOW_UI_TYPE);
 
 	Transform transform;
 	GraphicsRender render = handle->titleRender;
@@ -1185,6 +1223,7 @@ inline static MpgxResult internalCreateUiWindow(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
+	handle->type = WINDOW_UI_TYPE;
 	handle->ui = ui;
 	handle->handle = _handle;
 	handle->lastCursorPosition = zeroVec2F;
@@ -1343,12 +1382,6 @@ inline static MpgxResult internalCreateUiWindow(
 
 	handle->titleRender = titleRender;
 
-#ifndef NDEBUG
-	const char* name = UI_WINDOW_NAME;
-#else
-	const char* name = NULL;
-#endif
-
 	InterfaceElementEvents elementEvents = events ?
 		*events : emptyInterfaceElementEvents;
 	handle->onUpdate = elementEvents.onUpdate;
@@ -1358,7 +1391,6 @@ inline static MpgxResult internalCreateUiWindow(
 
 	InterfaceElement element = createInterfaceElement(
 		ui->interface,
-		name,
 		barTransform,
 		alignment,
 		position,
@@ -1457,55 +1489,49 @@ MpgxResult createUiWindow8(
 void* getUiWindowHandle(InterfaceElement window)
 {
 	assert(window);
-	assert(strcmp(getInterfaceElementName(
-		window), UI_WINDOW_NAME) == 0);
 	UiWindowHandle handle =
 		getInterfaceElementHandle(window);
+	assert(handle->type == WINDOW_UI_TYPE);
 	return handle->handle;
 }
 GraphicsRender getUiWindowPanelRender(InterfaceElement window)
 {
 	assert(window);
-	assert(strcmp(getInterfaceElementName(
-		window), UI_WINDOW_NAME) == 0);
 	UiWindowHandle handle =
 		getInterfaceElementHandle(window);
+	assert(handle->type == WINDOW_UI_TYPE);
 	return handle->panelRender;
 }
 GraphicsRender getUiWindowBarRender(InterfaceElement window)
 {
 	assert(window);
-	assert(strcmp(getInterfaceElementName(
-		window), UI_WINDOW_NAME) == 0);
 	UiWindowHandle handle =
 		getInterfaceElementHandle(window);
+	assert(handle->type == WINDOW_UI_TYPE);
 	return handle->barRender;
 }
 GraphicsRender getUiWindowTitleRender(InterfaceElement window)
 {
 	assert(window);
-	assert(strcmp(getInterfaceElementName(
-		window), UI_WINDOW_NAME) == 0);
 	UiWindowHandle handle =
 		getInterfaceElementHandle(window);
+	assert(handle->type == WINDOW_UI_TYPE);
 	return handle->titleRender;
 }
 OnInterfaceElementEvent getUiWindowOnUpdateEvent(InterfaceElement window)
 {
 	assert(window);
-	assert(strcmp(getInterfaceElementName(
-		window), UI_WINDOW_NAME) == 0);
 	UiWindowHandle handle =
 		getInterfaceElementHandle(window);
+	assert(handle->type == WINDOW_UI_TYPE);
 	return handle->onUpdate;
 }
 OnInterfaceElementEvent getUiWindowOnPressEvent(InterfaceElement window)
 {
 	assert(window);
-	assert(strcmp(getInterfaceElementName(
-		window), UI_WINDOW_NAME) == 0);
 	UiWindowHandle handle =
 		getInterfaceElementHandle(window);
+	assert(handle->type == WINDOW_UI_TYPE);
 	return handle->onPress;
 }
 
@@ -1514,6 +1540,7 @@ static void onUiButtonEnable(InterfaceElement element)
 	assert(element);
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
+	assert(handle->type == BUTTON_UI_TYPE);
 	setPanelRenderColor(
 		handle->panelRender,
 		handle->enabledColor);
@@ -1525,6 +1552,7 @@ static void onUiButtonDisable(InterfaceElement element)
 	assert(element);
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
+	assert(handle->type == BUTTON_UI_TYPE);
 	setPanelRenderColor(
 		handle->panelRender,
 		handle->disabledColor);
@@ -1536,6 +1564,7 @@ static void onUiButtonEnter(InterfaceElement element)
 	assert(element);
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
+	assert(handle->type == BUTTON_UI_TYPE);
 	setPanelRenderColor(
 		handle->panelRender,
 		handle->hoveredColor);
@@ -1547,6 +1576,7 @@ static void onUiButtonExit(InterfaceElement element)
 	assert(element);
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
+	assert(handle->type == BUTTON_UI_TYPE);
 	setPanelRenderColor(
 		handle->panelRender,
 		handle->enabledColor);
@@ -1559,6 +1589,7 @@ static void onUiButtonPress(InterfaceElement element)
 	assert(element);
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
+	assert(handle->type == BUTTON_UI_TYPE);
 	setPanelRenderColor(
 		handle->panelRender,
 		handle->pressedColor);
@@ -1571,6 +1602,7 @@ static void onUiButtonRelease(InterfaceElement element)
 	assert(element);
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
+	assert(handle->type == BUTTON_UI_TYPE);
 	setPanelRenderColor(
 		handle->panelRender,
 		handle->hoveredColor);
@@ -1586,6 +1618,7 @@ static void onUiButtonDestroy(void* _handle)
 {
 	assert(_handle);
 	UiButtonHandle handle = (UiButtonHandle)_handle;
+	assert(handle->type == BUTTON_UI_TYPE);
 
 	Transform transform;
 	GraphicsRender render = handle->textRender;
@@ -1641,6 +1674,7 @@ inline static MpgxResult internalCreateUiButton(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
+	handle->type = BUTTON_UI_TYPE;
 	handle->ui = ui;
 	handle->handle = _handle;
 	handle->disabledColor = srgbToLinearColor(DEFAULT_UI_DISABLED_BUTTON_COLOR);
@@ -1760,12 +1794,6 @@ inline static MpgxResult internalCreateUiButton(
 
 	handle->textRender = textRender;
 
-#ifndef NDEBUG
-	const char* name = UI_BUTTON_NAME;
-#else
-	const char* name = NULL;
-#endif
-
 	InterfaceElementEvents elementEvents = events ?
 		*events : emptyInterfaceElementEvents;
 	handle->onEnable = elementEvents.onEnable;
@@ -1783,7 +1811,6 @@ inline static MpgxResult internalCreateUiButton(
 
 	InterfaceElement element = createInterfaceElement(
 		ui->interface,
-		name,
 		panelTransform,
 		alignment,
 		position,
@@ -1881,82 +1908,73 @@ MpgxResult createUiButton8(
 void* getUiButtonHandle(InterfaceElement button)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	return handle->handle;
 }
 GraphicsRender getUiButtonPanelRender(InterfaceElement button)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	return handle->panelRender;
 }
 GraphicsRender getUiButtonTextRender(InterfaceElement button)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	return handle->textRender;
 }
 OnInterfaceElementEvent getUiButtonOnEnableEvent(InterfaceElement button)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	return handle->onEnable;
 }
 OnInterfaceElementEvent getUiButtonOnDisableEvent(InterfaceElement button)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	return handle->onDisable;
 }
 OnInterfaceElementEvent getUiButtonOnEnterEvent(InterfaceElement button)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	return handle->onEnter;
 }
 OnInterfaceElementEvent getUiButtonOnExitEvent(InterfaceElement button)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	return handle->onExit;
 }
 OnInterfaceElementEvent getUiButtonOnPressEvent(InterfaceElement button)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	return handle->onPress;
 }
 OnInterfaceElementEvent getUiButtonOnReleaseEvent(InterfaceElement button)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	return handle->onRelease;
 }
 
@@ -1964,10 +1982,9 @@ LinearColor getUiButtonDisabledColor(
 	InterfaceElement button)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	return handle->disabledColor;
 }
 void setUiButtonDisabledColor(
@@ -1975,10 +1992,9 @@ void setUiButtonDisabledColor(
 	LinearColor color)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	handle->disabledColor = color;
 }
 
@@ -1986,10 +2002,9 @@ LinearColor getUiButtonEnabledColor(
 	InterfaceElement button)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	return handle->enabledColor;
 }
 void setUiButtonEnabledColor(
@@ -1997,10 +2012,9 @@ void setUiButtonEnabledColor(
 	LinearColor color)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	handle->enabledColor = color;
 }
 
@@ -2008,10 +2022,9 @@ LinearColor getUiButtonHoveredColor(
 	InterfaceElement button)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	return handle->hoveredColor;
 }
 void setUiButtonHoveredColor(
@@ -2019,10 +2032,9 @@ void setUiButtonHoveredColor(
 	LinearColor color)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	handle->hoveredColor = color;
 }
 
@@ -2030,10 +2042,9 @@ LinearColor getUiButtonPressedColor(
 	InterfaceElement button)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	return handle->pressedColor;
 }
 void setUiButtonPressedColor(
@@ -2041,10 +2052,9 @@ void setUiButtonPressedColor(
 	LinearColor color)
 {
 	assert(button);
-	assert(strcmp(getInterfaceElementName(
-		button), UI_BUTTON_NAME) == 0);
 	UiButtonHandle handle =
 		getInterfaceElementHandle(button);
+	assert(handle->type == BUTTON_UI_TYPE);
 	handle->pressedColor = color;
 }
 
@@ -2053,6 +2063,7 @@ static void onUiInputFieldUpdate(InterfaceElement element)
 	assert(element);
 	UiInputFieldHandle handle = (UiInputFieldHandle)
 		getInterfaceElementHandle(element);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	UserInterface ui = handle->ui;
 	Framebuffer framebuffer = getWindowFramebuffer(ui->window);
 	cmmt_float_t platformScale = getPlatformScale(framebuffer);
@@ -2098,6 +2109,7 @@ static void onUiInputFieldEnable(InterfaceElement element)
 	assert(element);
 	UiInputFieldHandle handle = (UiInputFieldHandle)
 		getInterfaceElementHandle(element);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	setPanelRenderColor(
 		handle->panelRender,
 		handle->enabledColor);
@@ -2109,6 +2121,7 @@ static void onUiInputFieldDisable(InterfaceElement element)
 	assert(element);
 	UiInputFieldHandle handle = (UiInputFieldHandle)
 		getInterfaceElementHandle(element);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	setPanelRenderColor(
 		handle->panelRender,
 		handle->disabledColor);
@@ -2120,6 +2133,7 @@ static void onUiInputFieldEnter(InterfaceElement element)
 	assert(element);
 	UiInputFieldHandle handle = (UiInputFieldHandle)
 		getInterfaceElementHandle(element);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	setWindowCursorType(
 		handle->ui->window,
 		IBEAM_CURSOR_TYPE);
@@ -2131,6 +2145,7 @@ static void onUiInputFieldExit(InterfaceElement element)
 	assert(element);
 	UiInputFieldHandle handle = (UiInputFieldHandle)
 		getInterfaceElementHandle(element);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	setWindowCursorType(
 		handle->ui->window,
 		DEFAULT_CURSOR_TYPE);
@@ -2142,6 +2157,8 @@ static void onUiInputFieldPress(InterfaceElement element)
 	assert(element);
 	UiInputFieldHandle handle = (UiInputFieldHandle)
 		getInterfaceElementHandle(element);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
+
 	setPanelRenderColor(
 		handle->focusRender,
 		handle->focusedColor);
@@ -2186,6 +2203,7 @@ static void onUiInputFieldDestroy(void* _handle)
 {
 	assert(_handle);
 	UiInputFieldHandle handle = (UiInputFieldHandle)_handle;
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 
 	Transform transform;
 	GraphicsRender render = handle->placeholderRender;
@@ -2266,6 +2284,7 @@ inline static MpgxResult internalCreateUiInputField(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
+	handle->type = INPUT_FIELD_UI_TYPE;
 	handle->ui = ui;
 	handle->handle = _handle;
 	handle->onChange = onChange;
@@ -2373,8 +2392,8 @@ inline static MpgxResult internalCreateUiInputField(
 
 	Text textInstance;
 
-	uint32_t fontSize = DEFAULT_UI_TEXT_HEIGHT * getPlatformScale(
-		getWindowFramebuffer(ui->window));
+	uint32_t fontSize = (uint32_t)(DEFAULT_UI_TEXT_HEIGHT * 2 *
+		getPlatformScale(getWindowFramebuffer(ui->window)));
 	const uint32_t text[] = { '-', };
 
 	MpgxResult mpgxResult = createFontText(
@@ -2504,12 +2523,6 @@ inline static MpgxResult internalCreateUiInputField(
 
 	handle->placeholderRender = placeholderRender;
 
-#ifndef NDEBUG
-	const char* name = UI_INPUT_FIELD_NAME;
-#else
-	const char* name = NULL;
-#endif
-
 	InterfaceElementEvents elementEvents = events ?
 		*events : emptyInterfaceElementEvents;
 	handle->onUpdate = elementEvents.onUpdate;
@@ -2527,7 +2540,6 @@ inline static MpgxResult internalCreateUiInputField(
 
 	InterfaceElement element = createInterfaceElement(
 		ui->interface,
-		name,
 		panelTransform,
 		alignment,
 		position,
@@ -2644,127 +2656,113 @@ MpgxResult createUiInputField8(
 void* getUiInputFieldHandle(InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->handle;
 }
 GraphicsRender getUiInputFieldPanelRender(InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->panelRender;
 }
 GraphicsRender getUiInputFieldFocusRender(InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->focusRender;
 }
 GraphicsRender getUiInputFieldTextRender(InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->textRender;
 }
 GraphicsRender getUiInputFieldPlaceholderRender(InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->placeholderRender;
 }
 OnInterfaceElementEvent getUiInputFieldOnUpdateEvent(InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->onUpdate;
 }
 OnInterfaceElementEvent getUiInputFieldOnEnableEvent(InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->onEnable;
 }
 OnInterfaceElementEvent getUiInputFieldOnDisableEvent(InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->onDisable;
 }
 OnInterfaceElementEvent getUiInputFieldOnEnterEvent(InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->onEnter;
 }
 OnInterfaceElementEvent getUiInputFieldOnExitEvent(InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->onExit;
 }
 OnInterfaceElementEvent getUiInputFieldOnPressEvent(InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->onPress;
 }
 OnInterfaceElementEvent getUiInputFieldOnChangeEvent(InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->onChange;
 }
 OnInterfaceElementEvent getUiInputFieldOnDefocusEvent(InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->onDefocus;
 }
 size_t getUiInputFieldMaxLength(InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->maxLength;
 }
 
@@ -2772,10 +2770,9 @@ LinearColor getUiInputFieldDisabledColor(
 	InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->disabledColor;
 }
 void setUiInputFieldDisabledColor(
@@ -2783,10 +2780,9 @@ void setUiInputFieldDisabledColor(
 	LinearColor color)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	handle->disabledColor = color;
 }
 
@@ -2794,10 +2790,9 @@ LinearColor getUiInputFieldEnabledColor(
 	InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->enabledColor;
 }
 void setUiInputFieldEnabledColor(
@@ -2805,10 +2800,9 @@ void setUiInputFieldEnabledColor(
 	LinearColor color)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	handle->enabledColor = color;
 }
 
@@ -2816,10 +2810,9 @@ LinearColor getUiInputFieldFocusedColor(
 	InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->focusedColor;
 }
 void setUiInputFieldFocusedColor(
@@ -2827,10 +2820,9 @@ void setUiInputFieldFocusedColor(
 	LinearColor color)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	handle->focusedColor = color;
 }
 
@@ -2838,10 +2830,9 @@ uint32_t getUiInputFieldMask(
 	InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->mask;
 }
 void setUiInputFieldMask(
@@ -2849,10 +2840,9 @@ void setUiInputFieldMask(
 	uint32_t mask)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	Text text = getTextRenderText(handle->textRender);
 
 	if (getTextLength(text) > 0)
@@ -2868,10 +2858,9 @@ const uint32_t* getUiInputFieldText(
 	InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	Text text = getTextRenderText(
 		handle->textRender);
 	return getTextString(text);
@@ -2880,10 +2869,9 @@ size_t getUiInputFieldTextLength(
 	InterfaceElement inputField)
 {
 	assert(inputField);
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	Text text = getTextRenderText(
 		handle->textRender);
 	return getTextLength(text);
@@ -2897,10 +2885,9 @@ bool setUiInputFieldText(
 	assert(inputField);
 	assert(length == 0 ||
 		(length > 0 && string));
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	Text text = getTextRenderText(handle->textRender);
 	UserInterface ui = handle->ui;
 
@@ -2946,10 +2933,9 @@ bool setUiInputFieldText8(
 	assert(inputField);
 	assert(length == 0 ||
 		(length > 0 && string));
-	assert(strcmp(getInterfaceElementName(
-		inputField), UI_INPUT_FIELD_NAME) == 0);
 	UiInputFieldHandle handle =
 		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	Text text = getTextRenderText(handle->textRender);
 	UserInterface ui = handle->ui;
 

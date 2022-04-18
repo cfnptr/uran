@@ -52,7 +52,7 @@ typedef void(*OnInterfaceElementEvent)(
 	InterfaceElement element);
 
 /*
- * Interface element enumeration function.
+ * Interface enumeration function.
  *
  * element - interface element instance.
  * handle - handle instance or NULL.
@@ -139,12 +139,12 @@ void setInterfaceScale(
  *
  * interface - interface instance.
  * onElement - on interface element function.
- * functionArgument - function argument or NULL.
+ * handle - function argument or NULL.
  */
-void enumerateInterface(
+void enumerateInterfaceElements(
 	Interface interface,
 	OnInterfaceElement onElement,
-	void* functionArgument);
+	void* handle);
 /*
  * Destroys all interface elements.
  *
@@ -172,7 +172,6 @@ void updateInterface(Interface interface);
  * Returns interface element instance on success, otherwise NUL.
  *
  * interface - interface instance.
- * name - name string or NULL. (for debugging)
  * transform - transform instance.
  * alignment - interface element alignment type.
  * position - interface element position.
@@ -184,7 +183,6 @@ void updateInterface(Interface interface);
  */
 InterfaceElement createInterfaceElement(
 	Interface interface,
-	const char* name,
 	Transform transform,
 	AlignmentType alignment,
 	Vec3F position,
@@ -206,11 +204,6 @@ void destroyInterfaceElement(InterfaceElement element);
  * element - interface element instance.
  */
 Interface getInterfaceElementInterface(InterfaceElement element);
-/*
- * Returns interface element name string. (for debugging)
- * element - interface element instance.
- */
-const char* getInterfaceElementName(InterfaceElement element);
 /*
  * Returns interface element transform.
  * element - interface element instance.

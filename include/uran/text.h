@@ -72,6 +72,12 @@ typedef enum AlignmentType_T
 typedef uint8_t AlignmentType;
 
 /*
+ * Text pipeline enumeration function.
+ */
+typedef void(*OnPipelineText)(
+	Text text, void* handle);
+
+/*
  * String containing all printable ASCII UTF-8 characters.
  */
 static const char printableAscii[] = {
@@ -417,6 +423,28 @@ MpgxResult createFontText(
 	bool isConstant,
 	Logger logger,
 	Text* text);
+/*
+ * Create a new UTF-8 font text instance.
+ * Returns operation MPGX result.
+ *
+ * textPipeline - text pipeline instance.
+ * regularFonts - regular font array.
+ * boldFonts - bold font array.
+ * italicFonts - italic font array.
+ * boldItalicFonts - bold italic font array.
+ * fontCount - font array size.
+ * fontSize - font pixel size.
+ * string - text string or NULL.
+ * length - string length or 0.
+ * alignment - text alignment.
+ * color - initial text color.
+ * isBold - is text bold initially.
+ * isItalic - is text italic initially.
+ * useTags - use HTML tags.
+ * isConstant - is text constant.
+ * logger - logger instance or NULL.
+ * text - pointer to the text instance.
+ */
 MpgxResult createFontText8(
 	GraphicsPipeline textPipeline,
 	Font* regularFonts,
@@ -690,8 +718,12 @@ MpgxResult createTextPipeline(
  * Returns text pipeline image sampler.
  * textPipeline - text pipeline instance.
  */
-Sampler getTextPipelineSampler(
-	GraphicsPipeline textPipeline);
+Sampler getTextPipelineSampler(GraphicsPipeline textPipeline);
+/*
+ * Returns text pipeline text count.
+ * textPipeline - text pipeline instance.
+ */
+size_t getTextPipelineCount(GraphicsPipeline textPipeline);
 
 /*
  * Returns text pipeline MVP matrix.
@@ -724,6 +756,18 @@ LinearColor getTextPipelineColor(
 void setTextPipelineColor(
 	GraphicsPipeline textPipeline,
 	LinearColor color);
+
+/*
+ * Enumerates pipeline texts.
+ *
+ * textPipeline - text pipeline instance.
+ * onText - on pipeline text function.
+ * handle - function argument or NULL.
+ */
+void enumeratePipelineTexts(
+	GraphicsPipeline textPipeline,
+	OnPipelineText onText,
+	void* handle);
 
 /*
  * Returns running platform scale.
@@ -824,5 +868,4 @@ inline static Box3F createTextBox3F(
 		vec3F(box.maximum.x, box.maximum.y, (cmmt_float_t)0.5));
 }
 
-// TODO: add enumerator and count getter
 // TODO: create inside texture square for the underline sampling first full symbol.

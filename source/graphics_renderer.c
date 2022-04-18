@@ -40,10 +40,7 @@ struct GraphicsRenderer_T
 	GraphicsRenderElement* renderElements;
 	size_t renderCapacity;
 	size_t renderCount;
-	const GraphicsRendererData* data;
 	ThreadPool threadPool;
-	atomic_int64 threadIndex;
-	atomic_int64 elementIndex;
 	GraphicsRenderSorting sorting;
 	bool useCulling;
 #ifndef NDEBUG
@@ -75,10 +72,7 @@ GraphicsRenderer createGraphicsRenderer(
 	graphicsRenderer->pipeline = pipeline;
 	graphicsRenderer->onDestroy = onDestroy;
 	graphicsRenderer->onDraw = onDraw;
-	graphicsRenderer->data = NULL;
 	graphicsRenderer->threadPool = threadPool;
-	graphicsRenderer->threadIndex = 0;
-	graphicsRenderer->elementIndex = 0;
 	graphicsRenderer->sorting = sorting;
 	graphicsRenderer->useCulling = useCulling;
 #ifndef NDEBUG
@@ -199,10 +193,10 @@ void setGraphicsRendererUseCulling(
 	renderer->useCulling = useCulling;
 }
 
-void enumerateGraphicsRenderer(
+void enumerateGraphicsRendererItems(
 	GraphicsRenderer renderer,
 	OnGraphicsRendererItem onItem,
-	void* functionArgument)
+	void* handle)
 {
 	assert(renderer);
 	assert(onItem);
@@ -215,13 +209,13 @@ void enumerateGraphicsRenderer(
 	size_t renderCount = renderer->renderCount;
 
 	for (size_t i = 0; i < renderCount; i++)
-		onItem(renders[i], functionArgument);
+		onItem(renders[i], handle);
 
 #ifndef NDEBUG
 	renderer->isEnumerating = false;
 #endif
 }
-void destroyAllGraphicsRendererRenders(
+void destroyAllGraphicsRendererItems(
 	GraphicsRenderer renderer,
 	bool destroyTransforms)
 {
@@ -369,14 +363,25 @@ inline static bool isShouldDraw(
 	*element = renderElement;
 	return true;
 }
+
+typedef struct UpdateData
+{
+	GraphicsRenderer renderer;
+	const GraphicsRendererData* data;
+	atomic_int64 threadIndex;
+	atomic_int64 elementIndex;
+} UpdateData;
 static void onRendererDraw(void* argument)
 {
-	GraphicsRenderer renderer = (GraphicsRenderer)argument;
+	assert(argument);
+
+	UpdateData* updateData = (UpdateData*)argument;
+	GraphicsRenderer renderer = updateData->renderer;
 	GraphicsRender* renders = renderer->renders;
 	GraphicsRenderElement* renderElements =  renderer->renderElements;
 	bool useCulling = renderer->useCulling;
 	size_t renderCount = renderer->renderCount;
-	const GraphicsRendererData* data = renderer->data;
+	const GraphicsRendererData* data = updateData->data;
 
 	Vec3F rendererPosition = negVec3F(
 		getTranslationMat4F(data->view));
@@ -390,8 +395,8 @@ static void onRendererDraw(void* argument)
 	size_t threadCount = getThreadPoolThreadCount(
 		renderer->threadPool);
 	atomic_int64 threadIndex = atomicFetchAdd64(
-		&renderer->threadIndex, 1);
-	atomic_int64* elementIndex = &renderer->elementIndex;
+		&updateData->threadIndex, 1);
+	atomic_int64* elementIndex = &updateData->elementIndex;
 
 	for (size_t i = threadIndex; i < renderCount; i += threadCount)
 	{
@@ -447,20 +452,22 @@ GraphicsRendererResult drawGraphicsRenderer(
 	{
 		size_t threadCount = getThreadPoolThreadCount(threadPool);
 
-		renderer->data = data;
-		renderer->threadIndex = 0;
-		renderer->elementIndex = 0;
-
+		UpdateData updateData = {
+			renderer,
+			data,
+			0,
+			0,
+		};
 		ThreadPoolTask task = {
 			onRendererDraw,
-			renderer
+			&updateData,
 		};
 		addThreadPoolTaskNumber(
 			threadPool,
 			task,
 			threadCount);
 		waitThreadPool(threadPool);
-		elementCount = renderer->elementIndex;
+		elementCount = updateData.elementIndex;
 	}
 	else
 	{

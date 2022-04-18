@@ -54,3 +54,9 @@ void destroyEditor(Editor editor);
 void setEditorRendererResult(
 	Editor editor,
 	GraphicsRendererResult result);
+
+/*
+ * Update Editor after all another code.
+ * editor - editor instance.
+ */
+void postUpdateEditor(Editor editor);

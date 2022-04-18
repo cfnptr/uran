@@ -209,17 +209,17 @@ void setGraphicsRendererUseCulling(
  *
  * renderer - graphics renderer instance.
  * onItem - on graphics renderer item function.
- * functionArgument - function argument or NULL.
+ * handle - function argument or NULL.
  */
-void enumerateGraphicsRenderer(
+void enumerateGraphicsRendererItems(
 	GraphicsRenderer renderer,
 	OnGraphicsRendererItem onItem,
-	void* functionArgument);
+	void* handle);
 /*
  * Destroys all graphics renderer renders.
  * renderer - graphics renderer instance.
  */
-void destroyAllGraphicsRendererRenders(
+void destroyAllGraphicsRendererItems(
 	GraphicsRenderer renderer,
 	bool destroyTransforms);
 

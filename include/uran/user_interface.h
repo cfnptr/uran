@@ -32,10 +32,25 @@
 #define DEFAULT_UI_ENABLED_INPUT_COLOR srgbColor(80, 80, 80, 255)
 #define DEFAULT_UI_DISABLED_INPUT_COLOR srgbColor(64, 64, 64, 255)
 #define DEFAULT_UI_FOCUSED_INPUT_COLOR srgbColor(128, 128, 128, 255)
-#define DEFAULT_UI_INCORRECT_INPUT_COLOR srgbColor(192, 32, 32, 255)
 #define DEFAULT_UI_PLACEHOLDER_COLOR srgbColor(144, 144, 144, 255)
-
 // #define CHECKBOX_CHECK_COLOR srgbToLinearColor(srgbColor(128, 128, 128, 255))
+
+/*
+ * Use interface element types.
+ */
+typedef enum UiType_T
+{
+	PANEL_UI_TYPE = 0,
+	LABEL_UI_TYPE = 1,
+	WINDOW_UI_TYPE = 2,
+	BUTTON_UI_TYPE = 3,
+	INPUT_FIELD_UI_TYPE = 4,
+	// Note: your custom UI types...
+} UiType_T;
+/*
+ * Use interface element type.
+ */
+typedef size_t UiType;
 
 /*
  * User interface structure.
@@ -118,6 +133,12 @@ GraphicsRendererResult drawUserInterface(UserInterface ui);
  * ui - user interface instance.
  */
 void defocusUserInterface(UserInterface ui);
+
+/*
+ * Returns user interface element type.
+ * element - user interface element instance.
+ */
+UiType getUiType(InterfaceElement element);
 
 /*
  * Create a new UI panel instance.

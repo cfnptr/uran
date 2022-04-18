@@ -28,7 +28,6 @@ struct Transformer_T
 	size_t transformCapacity;
 	size_t transformCount;
 	Transform camera;
-	atomic_int64 threadIndex;
 #ifndef NDEBUG
 	bool isEnumerating;
 #endif
@@ -122,7 +121,6 @@ Transformer createTransformer(
 
 	transformer->threadPool = threadPool;
 	transformer->camera = NULL;
-	transformer->threadIndex = 0;
 #ifndef NDEBUG
 	transformer->isEnumerating = false;
 #endif
@@ -158,7 +156,7 @@ ThreadPool getTransformerThreadPool(Transformer transformer)
 	assert(transformer);
 	return transformer->threadPool;
 }
-size_t getTransformerTransformCount(Transformer transformer)
+size_t getTransformCount(Transformer transformer)
 {
 	assert(transformer);
 	return transformer->transformCount;
@@ -178,10 +176,10 @@ void setTransformerCamera(
 	transformer->camera = camera;
 }
 
-void enumerateTransformer(
+void enumerateTransformerItems(
 	Transformer transformer,
-	OnTransformItem onItem,
-	void* functionArgument)
+	OnTransformerItem onItem,
+	void* handle)
 {
 	assert(transformer);
 	assert(onItem);
@@ -194,13 +192,88 @@ void enumerateTransformer(
 	size_t transformCount = transformer->transformCount;
 
 	for (size_t i = 0; i < transformCount; i++)
-		onItem(transforms[i], functionArgument);
+		onItem(transforms[i], handle);
 
 #ifndef NDEBUG
 	transformer->isEnumerating = false;
 #endif
 }
-void destroyAllTransformerTransforms(Transformer transformer)
+
+typedef struct EnumerateData
+{
+	Transformer transformer;
+	OnTransformerItem onItem;
+	void* handle;
+	atomic_int64 threadIndex;
+} EnumerateData;
+static void onTransformEnumerate(void* argument)
+{
+	assert(argument);
+	EnumerateData* data = (EnumerateData*)argument;
+	Transformer transformer = data->transformer;
+	OnTransformerItem onItem = data->onItem;
+	void* handle = data->handle;
+	Transform* transforms = transformer->transforms;
+	size_t transformCount = transformer->transformCount;
+
+	size_t threadCount = getThreadPoolThreadCount(
+		transformer->threadPool);
+	atomic_int64 threadIndex = atomicFetchAdd64(
+		&data->threadIndex, 1);
+
+	for (size_t i = threadIndex; i < transformCount; i += threadCount)
+		onItem(transforms[i], handle);
+}
+void threadedEnumerateTransformerItems(
+	Transformer transformer,
+	OnTransformerItem onItem,
+	void* handle)
+{
+	size_t transformCount = transformer->transformCount;
+
+	if (!transformCount)
+		return;
+
+#ifndef NDEBUG
+	transformer->isEnumerating = true;
+#endif
+
+	ThreadPool threadPool = transformer->threadPool;
+
+	if (threadPool && transformCount >= getThreadPoolThreadCount(threadPool))
+	{
+		size_t threadCount = getThreadPoolThreadCount(threadPool);
+
+		EnumerateData data = {
+			transformer,
+			onItem,
+			handle,
+			0,
+		};
+		ThreadPoolTask task = {
+			onTransformEnumerate,
+			&data
+		};
+		addThreadPoolTaskNumber(
+			threadPool,
+			task,
+			threadCount);
+		waitThreadPool(threadPool);
+	}
+	else
+	{
+		enumerateTransformerItems(
+			transformer,
+			onItem,
+			handle);
+	}
+
+#ifndef NDEBUG
+	transformer->isEnumerating = false;
+#endif
+}
+
+void destroyAllTransformerItems(Transformer transformer)
 {
 	assert(transformer);
 	assert(!transformer->isEnumerating);
@@ -217,11 +290,17 @@ void destroyAllTransformerTransforms(Transformer transformer)
 	transformer->transformCount = 0;
 }
 
+typedef struct UpdateData
+{
+	Transformer transformer;
+	atomic_int64 threadIndex;
+} UpdateData;
 static void onTransformUpdate(void* argument)
 {
 	assert(argument);
 
-	Transformer transformer = (Transformer)argument;
+	UpdateData* data = (UpdateData*)argument;
+	Transformer transformer = data->transformer;
 	Transform* transforms = transformer->transforms;
 	size_t transformCount = transformer->transformCount;
 	Transform cameraTransform = transformer->camera;
@@ -232,7 +311,7 @@ static void onTransformUpdate(void* argument)
 	size_t threadCount = getThreadPoolThreadCount(
 		transformer->threadPool);
 	atomic_int64 threadIndex = atomicFetchAdd64(
-		&transformer->threadIndex, 1);
+		&data->threadIndex, 1);
 
 	for (size_t i = threadIndex; i < transformCount; i += threadCount)
 	{
@@ -270,11 +349,14 @@ void updateTransformer(Transformer transformer)
 	if (threadPool && transformCount >= getThreadPoolThreadCount(threadPool))
 	{
 		size_t threadCount = getThreadPoolThreadCount(threadPool);
-		transformer->threadIndex = 0;
 
+		UpdateData data = {
+			transformer,
+			0,
+		};
 		ThreadPoolTask task = {
 			onTransformUpdate,
-			transformer
+			&data,
 		};
 		addThreadPoolTaskNumber(
 			threadPool,

@@ -14,6 +14,7 @@
 
 #include "uran/editor.h"
 #include "cmmt/angle.h"
+#include "mpmt/common.h"
 
 #include <stdio.h>
 
@@ -37,6 +38,7 @@ typedef struct StatsWindow_T
 	InterfaceElement label;
 	double lastUpdateTime;
 	GraphicsRendererResult rendererResult;
+	float cpuTime;
 } StatsWindow_T;
 
 typedef StatsWindow_T* StatsWindow;
@@ -235,15 +237,19 @@ static void onStatsLabelUpdate(InterfaceElement element)
 
 	char buffer[256];
 
+	// TODO: GPU time
+
 	size_t count = snprintf(
 		buffer,
 		256,
 		"<b>FPS</b>: %d (<i>%dms</i>)\n"
+		"<b>CPU time</b>: %.3fms\n"
 		"<b>Draw count</b>: %zu\n"
 		"<b>Polygon count</b>: %zu\n"
 		"<b>Pass count</b>: %zu",
 		(int)(1.0 / deltaTime),
 		(int)(deltaTime * 1000.0),
+		(float)(statsWindow->cpuTime),
 		rendererResult.drawCount,
 		rendererResult.indexCount / 3,
 		rendererResult.passCount);
@@ -293,6 +299,10 @@ inline static StatsWindow createStatsWindow(
 
 	if (!statsWindow)
 		return NULL;
+
+	statsWindow->lastUpdateTime = 0.0;
+	statsWindow->rendererResult = createGraphicsRendererResult();
+	statsWindow->cpuTime = 0.0f;
 
 	const uint32_t windowTitle[] = {
 		'S', 't', 'a', 't', 's',
@@ -561,4 +571,18 @@ void setEditorRendererResult(
 {
 	assert(editor);
 	editor->statsWindow->rendererResult = result;
+}
+
+void postUpdateEditor(Editor editor)
+{
+	assert(editor);
+
+	Transform statsTransform = getInterfaceElementTransform(
+		editor->statsWindow->base->window);
+
+	if (isTransformActive(statsTransform))
+	{
+		editor->statsWindow->cpuTime = (float)((getCurrentClock() -
+			getWindowUpdateTime(editor->statsWindow->window)) * 1000.0);
+	}
 }

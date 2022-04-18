@@ -19,7 +19,6 @@
 #include "mpgx/_source/graphics_mesh.h"
 #include "mpgx/_source/graphics_pipeline.h"
 
-
 #define FT_CONFIG_OPTION_ERROR_STRINGS
 #include "ft2build.h"
 #include FT_FREETYPE_H
@@ -159,6 +158,9 @@ typedef struct BaseHandle
 	uint8_t* pixelBuffer;
 	size_t pixelCapacity;
 	Buffer indexBuffer;
+#ifndef NDEBUG
+	bool isEnumerating;
+#endif
 } BaseHandle;
 #if MPGX_SUPPORT_VULKAN
 typedef struct VkHandle
@@ -174,6 +176,9 @@ typedef struct VkHandle
 	uint8_t* pixelBuffer;
 	size_t pixelCapacity;
 	Buffer indexBuffer;
+#ifndef NDEBUG
+	bool isEnumerating;
+#endif
 	VkDescriptorSetLayout descriptorSetLayout;
 } VkHandle;
 #endif
@@ -191,6 +196,9 @@ typedef struct GlHandle
 	uint8_t* pixelBuffer;
 	size_t pixelCapacity;
 	Buffer indexBuffer;
+#ifndef NDEBUG
+	bool isEnumerating;
+#endif
 	GLint mvpLocation;
 	GLint atlasLocation;
 	GLint colorLocation;
@@ -2314,6 +2322,7 @@ inline static MpgxResult internalCreateText(
 
 	GraphicsPipeline pipeline = fontAtlas->pipeline;
 	Handle handle = pipeline->base.handle;
+	assert(!handle->base.isEnumerating);
 	TextVertex* vertexBuffer = handle->base.vertexBuffer;
 	size_t vertexCapacity = handle->base.vertexCapacity;
 
@@ -2735,6 +2744,111 @@ MpgxResult createFontText(
 
 	return SUCCESS_MPGX_RESULT;
 }
+MpgxResult createFontText8(
+	GraphicsPipeline textPipeline,
+	Font* regularFonts,
+	Font* boldFonts,
+	Font* italicFonts,
+	Font* boldItalicFonts,
+	size_t fontCount,
+	uint32_t fontSize,
+	const char* string,
+	size_t length,
+	AlignmentType alignment,
+	SrgbColor color,
+	bool isBold,
+	bool isItalic,
+	bool useTags,
+	bool isConstant,
+	Logger logger,
+	Text* text)
+{
+	assert(textPipeline);
+	assert(regularFonts);
+	assert(boldFonts);
+	assert(italicFonts);
+	assert(boldItalicFonts);
+	assert(fontCount > 0);
+	assert(fontSize > 0);
+	assert(fontSize % 2 == 0);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(text);
+	assert(textInitialized);
+
+	assert(length == 0 ||
+		(length > 0 && string));
+
+	uint32_t* string32;
+	size_t length32;
+	size_t capacity;
+
+	if (length > 0)
+	{
+		MpgxResult mpgxResult = allocateStringUTF32(
+			string,
+			length,
+			&string32,
+			&length32);
+
+		if (mpgxResult != SUCCESS_MPGX_RESULT)
+			return mpgxResult;
+
+		capacity = length32;
+	}
+	else
+	{
+		string32 = malloc(sizeof(uint32_t));
+
+		if (!string32)
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+		length32 = 0;
+		capacity = 1;
+	}
+
+	const uint32_t chars[] = { '\0' };
+
+	FontAtlas fontAtlas;
+
+	MpgxResult mpgxResult = internalCreateFontAtlas(
+		textPipeline,
+		regularFonts,
+		boldFonts,
+		italicFonts,
+		boldItalicFonts,
+		fontCount,
+		fontSize,
+		length > 0 ? string32 : chars,
+		length > 0 ? length : 1,
+		logger,
+		&fontAtlas,
+		true,
+		isConstant);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+		return mpgxResult;
+
+	mpgxResult = internalCreateText(
+		fontAtlas,
+		string32,
+		length,
+		capacity,
+		alignment,
+		color,
+		isBold,
+		isItalic,
+		useTags,
+		isConstant,
+		text);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		destroyFontAtlas(fontAtlas);
+		return mpgxResult;
+	}
+
+	return SUCCESS_MPGX_RESULT;
+}
 
 void destroyText(Text text)
 {
@@ -2745,6 +2859,7 @@ void destroyText(Text text)
 
 	FontAtlas fontAtlas = text->base.fontAtlas;
 	Handle handle = fontAtlas->pipeline->base.handle;
+	assert(!handle->base.isEnumerating);
 	Text* texts = handle->base.texts;
 	size_t textCount = handle->base.textCount;
 
@@ -3641,7 +3756,7 @@ MpgxResult createTextSampler(
 
 	return createSampler(window,
 		LINEAR_IMAGE_FILTER,
-		NEAREST_IMAGE_FILTER,
+		LINEAR_IMAGE_FILTER,
 		NEAREST_IMAGE_FILTER,
 		false,
 		REPEAT_IMAGE_WRAP,
@@ -4072,6 +4187,9 @@ MpgxResult createTextPipeline(
 	handle->base.pixelBuffer = NULL;
 	handle->base.pixelCapacity = 0;
 	handle->base.indexBuffer = NULL;
+#ifndef NDEBUG
+	handle->base.isEnumerating = false;
+#endif
 
 #ifndef NDEBUG
 	const char* name = TEXT_PIPELINE_NAME;
@@ -4169,6 +4287,14 @@ Sampler getTextPipelineSampler(
 	Handle handle = textPipeline->base.handle;
 	return handle->base.sampler;
 }
+size_t getTextPipelineCount(GraphicsPipeline textPipeline)
+{
+	assert(textPipeline);
+	assert(strcmp(textPipeline->base.name,
+		TEXT_PIPELINE_NAME) == 0);
+	Handle handle = textPipeline->base.handle;
+	return handle->base.textCount;
+}
 
 Mat4F getTextPipelineMVP(
 	GraphicsPipeline textPipeline)
@@ -4208,4 +4334,29 @@ void setTextPipelineColor(
 		TEXT_PIPELINE_NAME) == 0);
 	Handle handle = textPipeline->base.handle;
 	handle->base.fpc.color = color;
+}
+
+void enumeratePipelineTexts(
+	GraphicsPipeline textPipeline,
+	OnPipelineText onText,
+	void* _handle)
+{
+	assert(textPipeline);
+	assert(strcmp(textPipeline->base.name,
+		TEXT_PIPELINE_NAME) == 0);
+	Handle handle = textPipeline->base.handle;
+
+#ifndef NDEBUG
+	handle->base.isEnumerating = true;
+#endif
+
+	Text* texts = handle->base.texts;
+	size_t textCount = handle->base.textCount;
+
+	for (size_t i = 0; i < textCount; i++)
+		onText(texts[i], handle);
+
+#ifndef NDEBUG
+	handle->base.isEnumerating = false;
+#endif
 }

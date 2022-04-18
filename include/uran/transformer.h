@@ -50,9 +50,9 @@ typedef enum RotationType_T
 typedef uint8_t RotationType;
 
 /*
- * Transform item enumeration function.
+ * Transformer enumeration function.
  */
-typedef void(*OnTransformItem)(
+typedef void(*OnTransformerItem)(
 	Transform transform, void* handle);
 
 /*
@@ -80,7 +80,7 @@ ThreadPool getTransformerThreadPool(Transformer transformer);
  * Returns transformer transform count.
  * transformer - transformer instance.
  */
-size_t getTransformerTransformCount(Transformer transformer);
+size_t getTransformCount(Transformer transformer);
 
 /*
  * Returns transformer camera transform.
@@ -104,17 +104,28 @@ void setTransformerCamera(
  *
  * transformer - transformer instance.
  * onItem - on transformer item function.
- * functionArgument - function argument or NULL.
+ * handle - function argument or NULL.
  */
-void enumerateTransformer(
+void enumerateTransformerItems(
 	Transformer transformer,
-	OnTransformItem onItem,
-	void* functionArgument);
+	OnTransformerItem onItem,
+	void* handle);
+/*
+ * Enumerates transformer transforms using thread pool.
+ *
+ * transformer - transformer instance.
+ * onItem - on transformer item function.
+ * handle - function argument or NULL.
+ */
+void threadedEnumerateTransformerItems(
+	Transformer transformer,
+	OnTransformerItem onItem,
+	void* handle);
 /*
  * Destroys all transformer transforms.
  * transformer - transformer instance.
  */
-void destroyAllTransformerTransforms(Transformer transformer);
+void destroyAllTransformerItems(Transformer transformer);
 
 /*
  * Bakes transformer transforms.

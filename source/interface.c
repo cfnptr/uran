@@ -33,10 +33,6 @@ struct InterfaceElement_T
 	Box2F bounds;
 	AlignmentType alignment;
 	bool isEnabled;
-#ifndef NDEBUG
-	uint8_t _alignment[1];
-	const char* name;
-#endif
 };
 struct Interface_T
 {
@@ -46,7 +42,6 @@ struct Interface_T
 	size_t elementCapacity;
 	size_t elementCount;
 	InterfaceElement lastElement;
-	atomic_int64 threadIndex;
 	cmmt_float_t scale;
 	bool isPressed;
 	bool isMoved;
@@ -75,7 +70,6 @@ Interface createInterface(
 	interface->threadPool = threadPool;
 	interface->scale = scale;
 	interface->lastElement = NULL;
-	interface->threadIndex = 0;
 	interface->isPressed = false;
 	interface->isMoved = false;
 #ifndef NDEBUG
@@ -139,10 +133,10 @@ void setInterfaceScale(
 	interface->scale = scale;
 }
 
-void enumerateInterface(
+void enumerateInterfaceElements(
 	Interface interface,
 	OnInterfaceElement onElement,
-	void* functionArgument)
+	void* handle)
 {
 	assert(interface);
 	assert(onElement);
@@ -155,7 +149,7 @@ void enumerateInterface(
 	size_t elementCount = interface->elementCount;
 
 	for (size_t i = 0; i < elementCount; i++)
-		onElement(elements[i], functionArgument);
+		onElement(elements[i], handle);
 
 #ifndef NDEBUG
 	interface->isEnumerating = false;
@@ -303,11 +297,18 @@ inline static void updateInterfaceElementPosition(
 
 	setTransformPosition(transform, position);
 }
+
+typedef struct UpdateData
+{
+	Interface interface;
+	atomic_int64 threadIndex;
+} UpdateData;
 static void onInterfacePositionsUpdate(void* argument)
 {
 	assert(argument);
 
-	Interface interface = (Interface)argument;
+	UpdateData* data = (UpdateData*)argument;
+	Interface interface = data->interface;
 	InterfaceElement* elements = interface->elements;
 	size_t elementCount = interface->elementCount;
 
@@ -322,7 +323,7 @@ static void onInterfacePositionsUpdate(void* argument)
 	size_t threadCount = getThreadPoolThreadCount(
 		interface->threadPool);
 	atomic_int64 threadIndex = atomicFetchAdd64(
-		&interface->threadIndex, 1);
+		&data->threadIndex, 1);
 
 	for (size_t i = threadIndex; i < elementCount; i += threadCount)
 	{
@@ -516,11 +517,14 @@ void updateInterface(Interface interface)
 	if (threadPool && elementCount >= getThreadPoolThreadCount(threadPool))
 	{
 		size_t threadCount = getThreadPoolThreadCount(threadPool);
-		interface->threadIndex = 0;
 
+		UpdateData data = {
+			interface,
+			0,
+		};
 		ThreadPoolTask task = {
 			onInterfacePositionsUpdate,
-			interface
+			&data,
 		};
 		addThreadPoolTaskNumber(
 			threadPool,
@@ -549,7 +553,6 @@ void updateInterface(Interface interface)
 
 InterfaceElement createInterfaceElement(
 	Interface interface,
-	const char* name,
 	Transform transform,
 	AlignmentType alignment,
 	Vec3F position,
@@ -581,9 +584,6 @@ InterfaceElement createInterfaceElement(
 	element->bounds = bounds;
 	element->alignment = alignment;
 	element->isEnabled = isEnabled;
-#ifndef NDEBUG
-	element->name = name;
-#endif
 
 	cmmt_float_t interfaceScale = interface->scale;
 	Vec2I windowSize = getWindowSize(interface->window);
@@ -657,15 +657,6 @@ Interface getInterfaceElementInterface(InterfaceElement element)
 {
 	assert(element);
 	return element->interface;
-}
-const char* getInterfaceElementName(InterfaceElement element)
-{
-	assert(element);
-#ifndef NDEBUG
-	return element->name;
-#else
-	abort();
-#endif
 }
 Transform getInterfaceElementTransform(InterfaceElement element)
 {
