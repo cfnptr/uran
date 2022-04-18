@@ -155,6 +155,84 @@ void enumerateInterfaceElements(
 	interface->isEnumerating = false;
 #endif
 }
+
+typedef struct EnumerateData
+{
+	Interface interface;
+	OnInterfaceElement onElement;
+	void* handle;
+	atomic_int64 threadIndex;
+} EnumerateData;
+static void onInterfaceEnumerate(void* argument)
+{
+	assert(argument);
+	EnumerateData* data = (EnumerateData*)argument;
+	Interface interface = data->interface;
+	OnInterfaceElement onElement = data->onElement;
+	void* handle = data->handle;
+	InterfaceElement* elements = interface->elements;
+	size_t elementCount = interface->elementCount;
+
+	size_t threadCount = getThreadPoolThreadCount(
+		interface->threadPool);
+	atomic_int64 threadIndex = atomicFetchAdd64(
+		&data->threadIndex, 1);
+
+	for (size_t i = threadIndex; i < elementCount; i += threadCount)
+		onElement(elements[i], handle);
+}
+void threadedEnumerateInterfaceElements(
+	Interface interface,
+	OnInterfaceElement onElement,
+	void* handle)
+{
+	assert(interface);
+	assert(onElement);
+	assert(interface->threadPool);
+
+	size_t elementCount = interface->elementCount;
+
+	if (!elementCount)
+		return;
+
+#ifndef NDEBUG
+	interface->isEnumerating = true;
+#endif
+
+	if (elementCount >= getThreadPoolThreadCount(interface->threadPool))
+	{
+		ThreadPool threadPool = interface->threadPool;
+		size_t threadCount = getThreadPoolThreadCount(threadPool);
+
+		EnumerateData data = {
+			interface,
+			onElement,
+			handle,
+			0,
+		};
+		ThreadPoolTask task = {
+			onInterfaceEnumerate,
+			&data
+		};
+		addThreadPoolTaskNumber(
+			threadPool,
+			task,
+			threadCount);
+		waitThreadPool(threadPool);
+	}
+	else
+	{
+		enumerateInterfaceElements(
+			interface,
+			onElement,
+			handle);
+	}
+
+#ifndef NDEBUG
+	interface->isEnumerating = false;
+#endif
+}
+
 void destroyAllInterfaceElements(
 	Interface interface,
 	bool destroyTransforms)

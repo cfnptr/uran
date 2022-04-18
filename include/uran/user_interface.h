@@ -45,6 +45,7 @@ typedef enum UiType_T
 	WINDOW_UI_TYPE = 2,
 	BUTTON_UI_TYPE = 3,
 	INPUT_FIELD_UI_TYPE = 4,
+	CUSTOM_UI_TYPES = 5,
 	// Note: your custom UI types...
 } UiType_T;
 /*
@@ -191,7 +192,7 @@ GraphicsRender getUiPanelRender(InterfaceElement panel);
  * isItalic - is label italic initially.
  * useTags - use HTML tags.
  * isConstant - is label constant.
- * isUniversal - support any UTF character (Heavy).
+ * isUniversal - support any UTF character. (Heavy)
  * parent - parent instance or NUL.
  * events - interface events or NULL.
  * handle - label handle or NULL.
@@ -621,11 +622,6 @@ GraphicsRender getUiInputFieldTextRender(InterfaceElement inputField);
  */
 GraphicsRender getUiInputFieldPlaceholderRender(InterfaceElement inputField);
 /*
- * Returns UI input field on update event function.
- * inputField - UI input field instance.
- */
-OnInterfaceElementEvent getUiInputFieldOnUpdateEvent(InterfaceElement inputField);
-/*
  * Returns UI input field on enable event function.
  * inputField - UI input field instance.
  */
@@ -766,4 +762,5 @@ bool setUiInputFieldText8(
 	const char* string,
 	size_t length);
 
+// TODO: mask (only transform with masking)
 // TODO: InputBox, ScrollBox, Checkbox

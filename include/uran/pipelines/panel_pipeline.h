@@ -29,6 +29,7 @@
  * fragmentShader - panel fragment shader.
  * mesh - panel mesh.
  * state - pipeline state or NULL.
+ * useScissors - use scissors for text rendering.
  * panelPipeline - pointer to the panel pipeline.
  */
 MpgxResult createPanelPipeline(
@@ -37,6 +38,7 @@ MpgxResult createPanelPipeline(
 	Shader fragmentShader,
 	GraphicsMesh mesh,
 	const GraphicsPipelineState* state,
+	bool useScissors,
 	GraphicsPipeline* panelPipeline);
 
 /*

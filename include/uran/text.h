@@ -672,11 +672,8 @@ MpgxResult bakeText(Text text);
  * Returns drawn index count.
  *
  * text - text instance.
- * scissor - text scissor.
  */
-size_t drawText(
-	Text text,
-	Vec4I scissor);
+size_t drawText(Text text);
 
 // TODO: shrink text buffers
 

@@ -391,6 +391,7 @@ MpgxResult createPanelPipeline(
 	Shader fragmentShader,
 	GraphicsMesh mesh,
 	const GraphicsPipelineState* state,
+	bool useScissors,
 	GraphicsPipeline* panelPipeline)
 {
 	assert(framebuffer);
@@ -449,7 +450,7 @@ MpgxResult createPanelPipeline(
 		false,
 		DEFAULT_LINE_WIDTH,
 		size,
-		size,
+		useScissors ? zeroVec4I : size,
 		defaultDepthRange,
 		defaultDepthBias,
 		defaultBlendColor,

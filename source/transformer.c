@@ -35,6 +35,7 @@ struct Transformer_T
 struct Transform_T
 {
 	Transformer transformer;
+	void* handle;
 	Transform parent;
 	Mat4F model;
 	Quat rotation;
@@ -206,7 +207,7 @@ typedef struct EnumerateData
 	void* handle;
 	atomic_int64 threadIndex;
 } EnumerateData;
-static void onTransformEnumerate(void* argument)
+static void onTransformerEnumerate(void* argument)
 {
 	assert(argument);
 	EnumerateData* data = (EnumerateData*)argument;
@@ -229,6 +230,10 @@ void threadedEnumerateTransformerItems(
 	OnTransformerItem onItem,
 	void* handle)
 {
+	assert(transformer);
+	assert(onItem);
+	assert(transformer->threadPool);
+
 	size_t transformCount = transformer->transformCount;
 
 	if (!transformCount)
@@ -238,10 +243,9 @@ void threadedEnumerateTransformerItems(
 	transformer->isEnumerating = true;
 #endif
 
-	ThreadPool threadPool = transformer->threadPool;
-
-	if (threadPool && transformCount >= getThreadPoolThreadCount(threadPool))
+	if (transformCount >= getThreadPoolThreadCount(transformer->threadPool))
 	{
+		ThreadPool threadPool = transformer->threadPool;
 		size_t threadCount = getThreadPoolThreadCount(threadPool);
 
 		EnumerateData data = {
@@ -251,7 +255,7 @@ void threadedEnumerateTransformerItems(
 			0,
 		};
 		ThreadPoolTask task = {
-			onTransformEnumerate,
+			onTransformerEnumerate,
 			&data
 		};
 		addThreadPoolTaskNumber(
@@ -402,6 +406,7 @@ Transform createTransform(
 	Quat rotation,
 	RotationType rotationType,
 	Transform parent,
+	void* handle,
 	bool isActive)
 {
 	assert(transformer);
@@ -416,6 +421,7 @@ Transform createTransform(
 		return NULL;
 
 	transform->transformer = transformer;
+	transform->handle = handle;
 	transform->parent = parent;
 	transform->rotation = rotation;
 	transform->scale = scale;
@@ -569,6 +575,20 @@ void setTransformParent(
 		parent->transformer));
 	assert(!parent || (parent != transform));
 	transform->parent = parent;
+}
+
+void* getTransformHandle(
+	Transform transform)
+{
+	assert(transform);
+	return transform->handle;
+}
+void setTransformHandle(
+	Transform transform,
+	void* handle)
+{
+	assert(transform);
+	transform->handle = handle;
 }
 
 bool isTransformActive(

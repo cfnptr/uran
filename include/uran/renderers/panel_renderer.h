@@ -41,12 +41,14 @@ GraphicsRenderer createPanelRenderer(
  * bounds - render bounds.
  * color - render color.
  * mesh - render mesh.
+ * scissor - scissor or zero vector.
  */
 GraphicsRender createPanelRender(
 	GraphicsRenderer panelRenderer,
 	Transform transform,
 	Box3F bounds,
-	LinearColor color);
+	LinearColor color,
+	Vec4I scissor);
 
 /*
  * Returns panel render color.
@@ -63,3 +65,19 @@ LinearColor getPanelRenderColor(
 void setPanelRenderColor(
 	GraphicsRender panelRender,
 	LinearColor color);
+
+/*
+ * Returns panel render scissor.
+ * panelRender - panel render instance.
+ */
+Vec4I getPanelRenderScissor(
+	GraphicsRender panelRender);
+/*
+ * Sets panel render scissor.
+ *
+ * panelRender - panel render instance.
+ * scissor - scissor value.
+ */
+void setPanelRenderScissor(
+	GraphicsRender panelRender,
+	Vec4I scissor);

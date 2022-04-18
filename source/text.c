@@ -3620,30 +3620,14 @@ MpgxResult bakeText(Text text)
 	text->base.size = textSize;
 	return SUCCESS_MPGX_RESULT;
 }
-size_t drawText(
-	Text text,
-	Vec4I scissor)
+size_t drawText(Text text)
 {
 	assert(text);
-	assert(scissor.x >= 0);
-	assert(scissor.y >= 0);
-	assert(scissor.z >= 0);
-	assert(scissor.w >= 0);
 	assert(textInitialized);
 
 	FontAtlas fontAtlas = text->base.fontAtlas;
 	GraphicsPipeline pipeline = fontAtlas->pipeline;
-	Vec2I framebufferSize = pipeline->base.framebuffer->base.size;
 
-	assert(scissor.x + scissor.z <= framebufferSize.x);
-	assert(scissor.y + scissor.w <= framebufferSize.y);
-
-	if (scissor.z + scissor.w == 0)
-		scissor = vec4I(0, 0, framebufferSize.x, framebufferSize.y);
-
-	Vec4I stateScissor = pipeline->base.state.scissor;
-	Window window = pipeline->base.window;
-	bool dynamicScissor = stateScissor.z + stateScissor.w == 0;
 	GraphicsAPI api = getGraphicsAPI();
 
 	if (api == VULKAN_GRAPHICS_API)
@@ -3654,25 +3638,9 @@ size_t drawText(
 		if (indexCount == 0)
 			return 0;
 
-		VkWindow vkWindow = getVkWindow(window);
+		VkWindow vkWindow = getVkWindow(pipeline->base.window);
 		VkCommandBuffer commandBuffer = vkWindow->currenCommandBuffer;
 		VkPipelineLayout pipelineLayout = pipeline->vk.layout;
-
-		if (dynamicScissor)
-		{
-			VkRect2D vkScissor = {
-				(int32_t)scissor.x,
-				(int32_t)((framebufferSize.y - scissor.y) - scissor.w),
-				(uint32_t)scissor.z,
-				(uint32_t)scissor.w,
-			};
-			vkCmdSetScissor(
-				commandBuffer,
-				0,
-				1,
-				&vkScissor);
-		}
-
 		Handle handle = pipeline->vk.handle;
 		const VkDeviceSize offset = 0;
 
@@ -3720,15 +3688,6 @@ size_t drawText(
 	else if (api == OPENGL_GRAPHICS_API)
 	{
 #if MPGX_SUPPORT_OPENGL
-		if (dynamicScissor)
-		{
-			glScissor(
-				(GLint)scissor.x,
-				(GLint)scissor.y,
-				(GLsizei)scissor.z,
-				(GLsizei)scissor.w);
-		}
-
 		glBindTexture(
 			GL_TEXTURE_2D,
 			fontAtlas->image->gl.handle);

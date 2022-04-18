@@ -69,6 +69,7 @@ FreeCamera createFreeCamera(
 		oneQuat,
 		ORBIT_ROTATION_TYPE,
 		NULL,
+		freeCamera,
 		true);
 
 	if (!transform)

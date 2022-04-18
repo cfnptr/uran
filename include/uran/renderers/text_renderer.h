@@ -41,7 +41,7 @@ GraphicsRenderer createTextRenderer(
  * bounds - render bounds.
  * color - render color.
  * text - render text.
- * scissor - text scissor or zero vector.
+ * scissor - scissor or zero vector.
  */
 GraphicsRender createTextRender(
 	GraphicsRenderer textRenderer,

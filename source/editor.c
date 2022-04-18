@@ -179,7 +179,7 @@ inline static BaseWindow createBaseWindow(
 		LEFT_ALIGNMENT_TYPE,
 		vec3F(
 			(cmmt_float_t)14.0,
-			(cmmt_float_t)0.0,
+			scale.y * (cmmt_float_t)0.5,
 			(cmmt_float_t)-0.01),
 		valVec2F((cmmt_float_t)18.0),
 		windowTransform,
@@ -273,6 +273,12 @@ static void onStatsLabelUpdate(InterfaceElement element)
 			mpgxResultToString(mpgxResult));
 		abort();
 	}
+
+	Vec2F textSize = getTextSize(text);
+	AlignmentType alignment = getTextAlignment(text);
+
+	setInterfaceElementBounds(element,
+		createTextBox2F(alignment, textSize));
 
 	statsWindow->lastUpdateTime = updateTime + 0.1;
 }

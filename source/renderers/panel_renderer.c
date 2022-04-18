@@ -23,6 +23,7 @@
 typedef struct Handle_T
 {
 	LinearColor color;
+	Vec4I scissor;
 } Handle_T;
 
 typedef Handle_T* Handle;
@@ -55,6 +56,22 @@ static size_t onDraw(
 	setPanelPipelineColor(
 		graphicsPipeline,
 		handle->color);
+
+	Vec4I stateScissor = graphicsPipeline->base.state.scissor;
+	bool dynamicScissor = stateScissor.z + stateScissor.w == 0;
+
+	if (dynamicScissor)
+	{
+		Vec4I panelScissor = handle->scissor;
+		Vec2I framebufferSize = graphicsPipeline->base.framebuffer->base.size;
+
+		assert(panelScissor.x + panelScissor.z <= framebufferSize.x);
+		assert(panelScissor.y + panelScissor.w <= framebufferSize.y);
+
+		setWindowScissor(
+			graphicsPipeline->base.window,
+			panelScissor);
+	}
 
 	GraphicsAPI api = getGraphicsAPI();
 
@@ -128,7 +145,8 @@ GraphicsRender createPanelRender(
 	GraphicsRenderer panelRenderer,
 	Transform transform,
 	Box3F bounds,
-	LinearColor color)
+	LinearColor color,
+	Vec4I scissor)
 {
 	assert(panelRenderer);
 	assert(transform);
@@ -144,6 +162,7 @@ GraphicsRender createPanelRender(
 		return NULL;
 
 	handle->color = color;
+	handle->scissor = scissor;
 
 	GraphicsRender render = createGraphicsRender(
 		panelRenderer,
@@ -186,4 +205,32 @@ void setPanelRenderColor(
 	Handle handle = getGraphicsRenderHandle(
 		panelRender);
 	handle->color = color;
+}
+
+Vec4I getPanelRenderScissor(
+	GraphicsRender panelRender)
+{
+	assert(panelRender);
+	assert(strcmp(getGraphicsPipelineName(
+		getGraphicsRendererPipeline(
+		getGraphicsRenderRenderer(
+		panelRender))),
+		PANEL_PIPELINE_NAME) == 0);
+	Handle handle = getGraphicsRenderHandle(
+		panelRender);
+	return handle->scissor;
+}
+void setPanelRenderScissor(
+	GraphicsRender panelRender,
+	Vec4I scissor)
+{
+	assert(panelRender);
+	assert(strcmp(getGraphicsPipelineName(
+		getGraphicsRendererPipeline(
+		getGraphicsRenderRenderer(
+		panelRender))),
+		PANEL_PIPELINE_NAME) == 0);
+	Handle handle = getGraphicsRenderHandle(
+		panelRender);
+	handle->scissor = scissor;
 }

@@ -95,7 +95,6 @@ typedef struct UiInputFieldHandle_T
 	UiType type;
 	UserInterface ui;
 	void* handle;
-	OnInterfaceElementEvent onUpdate;
 	OnInterfaceElementEvent onEnable;
 	OnInterfaceElementEvent onDisable;
 	OnInterfaceElementEvent onEnter;
@@ -135,6 +134,7 @@ inline static GraphicsRender createCursorRenderInstance(
 		zeroQuat,
 		NO_ROTATION_TYPE,
 		NULL,
+		NULL,
 		false);
 
 	if (!transform)
@@ -144,7 +144,8 @@ inline static GraphicsRender createCursorRenderInstance(
 		panelRenderer,
 		transform,
 		oneSizeBox3F,
-		srgbToLinearColor(DEFAULT_UI_TEXT_COLOR));
+		srgbToLinearColor(DEFAULT_UI_TEXT_COLOR),
+		zeroVec4I);
 
 	if (!render)
 	{
@@ -152,6 +153,7 @@ inline static GraphicsRender createCursorRenderInstance(
 		return NULL;
 	}
 
+	setTransformHandle(transform, render);
 	return render;
 }
 inline static void destroyCursorRenderInstance(
@@ -303,7 +305,7 @@ GraphicsRender getUserInterfaceCursor(UserInterface ui)
 	return ui->cursorRender;
 }
 
-inline static void bakeUiInputFieldText(
+inline static void bakeInputFieldText(
 	Text text,
 	uint32_t mask,
 	Logger logger)
@@ -353,7 +355,7 @@ inline static void bakeUiInputFieldText(
 			mpgxResultToString(mpgxResult));
 	}
 }
-inline static void updateUiCursor(
+inline static void updateCursor(
 	UserInterface ui,
 	Transform textTransform,
 	Text text)
@@ -401,7 +403,7 @@ inline static void updateUiCursor(
 	setTransformActive(cursorTransform, true);
 	ui->blinkDelay = getWindowUpdateTime(ui->window) + 0.5;
 }
-inline static void updateUiInputFields(UserInterface ui)
+inline static void updateInputFields(UserInterface ui)
 {
 	assert(ui);
 	Window window = ui->window;
@@ -559,7 +561,7 @@ inline static void updateUiInputFields(UserInterface ui)
 		{
 			if (getTextLength(text) > 0)
 			{
-				bakeUiInputFieldText(text,
+				bakeInputFieldText(text,
 					handle->mask,
 					getFontAtlasLogger(ui->fontAtlas));
 				setTransformActive(getGraphicsRenderTransform(
@@ -583,7 +585,7 @@ inline static void updateUiInputFields(UserInterface ui)
 			Transform textTransform = getGraphicsRenderTransform(
 				getTextLength(text) > 0 ?
 				handle->textRender : handle->placeholderRender);
-			updateUiCursor(ui, textTransform, text);
+			updateCursor(ui, textTransform, text);
 		}
 
 		if (updateTime > ui->blinkDelay)
@@ -600,29 +602,206 @@ inline static void updateUiInputFields(UserInterface ui)
 void updateUserInterface(UserInterface ui)
 {
 	assert(ui);
-	updateUiInputFields(ui);
+	updateInputFields(ui);
 	updateInterface(ui->interface);
 }
 
-static void onUiElementScissor(
-	InterfaceElement element,
-	void* handle)
+inline static Transform getUiElementTransform(InterfaceElement element)
 {
 	assert(element);
-	assert(handle);
+	UiBaseHandle base = getInterfaceElementHandle(element);
+	UiType type = base->type;
 
-	UserInterface ui = (UserInterface)handle;
+	switch (type)
+	{
+	case PANEL_UI_TYPE:
+		return getGraphicsRenderTransform(
+			((UiPanelHandle)base)->render);
+	case LABEL_UI_TYPE:
+		return getGraphicsRenderTransform(
+			((UiLabelHandle)base)->render);
+	case WINDOW_UI_TYPE:
+		return getGraphicsRenderTransform(
+			((UiWindowHandle)base)->barRender);
+	case BUTTON_UI_TYPE:
+		return getGraphicsRenderTransform(
+			((UiButtonHandle)base)->panelRender);
+	case INPUT_FIELD_UI_TYPE:
+		return getGraphicsRenderTransform(
+			((UiInputFieldHandle)base)->panelRender);
+	default:
+		return NULL;
+	}
+}
+inline static Vec4I calculateUiElementScissor(
+	Transform transform,
+	Vec2I framebufferSize,
+	cmmt_float_t scale)
+{
+	assert(transform);
+	assert(framebufferSize.x > 0);
+	assert(framebufferSize.y > 0);
+	assert(scale > 0);
 
-	// TODO: add enumerateInterfaceAsync
+	Vec4I scissor = vec4I(
+		(cmmt_int_t)0,
+		(cmmt_int_t)0,
+		framebufferSize.x,
+		framebufferSize.y);
+
+	Transform parent = getTransformParent(transform);
+
+	while (parent)
+	{
+		transform = getUiElementTransform(
+			getTransformHandle(parent));
+
+		if (!transform || !isTransformActive(transform))
+			break;
+
+		Vec3F panelPosition = mulValVec3F(
+			getTranslationMat4F(getTransformModel(transform)), scale);
+		Vec3F panelScale = mulValVec3F(
+			getTransformScale(transform), scale);
+		Vec4I parentScissor = vec4I(
+			(cmmt_int_t)((cmmt_float_t)framebufferSize.x * (cmmt_float_t)0.5 +
+				panelPosition.x - panelScale.x * (cmmt_float_t)0.5),
+			(cmmt_int_t)((cmmt_float_t)framebufferSize.y * (cmmt_float_t)0.5 +
+				panelPosition.y - panelScale.y * (cmmt_float_t)0.5),
+			(cmmt_int_t)panelScale.x,
+			(cmmt_int_t)panelScale.y);
+
+		if (parentScissor.x >= framebufferSize.x ||
+			parentScissor.y >= framebufferSize.y ||
+			parentScissor.z <= 0 || parentScissor.w <= 0)
+		{
+			scissor = zeroVec4I;
+			break;
+		}
+
+		if (parentScissor.x < 0)
+		{
+			parentScissor.z += parentScissor.x;
+			parentScissor.x = 0;
+		}
+		if (parentScissor.y < 0)
+		{
+			parentScissor.w += parentScissor.y;
+			parentScissor.y = 0;
+		}
+
+		if (parentScissor.z < 0 || parentScissor.w < 0)
+		{
+			scissor = zeroVec4I;
+			break;
+		}
+
+		if (parentScissor.x + parentScissor.z > framebufferSize.x)
+			parentScissor.z += framebufferSize.x - (parentScissor.x + parentScissor.z);
+		if (parentScissor.y + parentScissor.w > framebufferSize.y)
+			parentScissor.w += framebufferSize.y - (parentScissor.y + parentScissor.w);
+
+		if (scissor.x < parentScissor.x)
+			scissor.x = parentScissor.x;
+		if (scissor.y < parentScissor.y)
+			scissor.y = parentScissor.y;
+		if (scissor.z > parentScissor.z)
+			scissor.z = parentScissor.z;
+		if (scissor.w > parentScissor.w)
+			scissor.w = parentScissor.w;
+
+		parent = getTransformParent(parent);
+	}
+
+	return scissor;
+}
+static void onElementScissor(
+	InterfaceElement element,
+	void* _handle)
+{
+	assert(element);
+	assert(_handle);
+
+	UiBaseHandle base = getInterfaceElementHandle(element);
+
+	if (base->type >= CUSTOM_UI_TYPES)
+		return;
+
+	UserInterface ui = (UserInterface)_handle;
+	Transform transform = getUiElementTransform(element);
+
+	if (!transform || !isTransformActive(transform))
+		return;
+
+	Framebuffer framebuffer = getWindowFramebuffer(ui->window);
+	cmmt_float_t scale = getPlatformScale(framebuffer) *
+		getInterfaceScale(getUserInterface(ui));
+	Vec2I framebufferSize = getFramebufferSize(framebuffer);
+
+	Vec4I scissor = calculateUiElementScissor(
+		transform, framebufferSize, scale);
+
+	UiType type = base->type;
+
+	if (type == PANEL_UI_TYPE)
+	{
+		UiPanelHandle handle = (UiPanelHandle)base;
+		setPanelRenderScissor(handle->render, scissor);
+	}
+	else if (type == LABEL_UI_TYPE)
+	{
+		UiLabelHandle handle = (UiLabelHandle)base;
+		setTextRenderScissor(handle->render, scissor);
+	}
+	else if (type == WINDOW_UI_TYPE)
+	{
+		UiWindowHandle handle = (UiWindowHandle)base;
+		setPanelRenderScissor(handle->barRender, scissor);
+		setPanelRenderScissor(handle->panelRender, scissor);
+		setTextRenderScissor(handle->titleRender, scissor);
+	}
+	else if (type == BUTTON_UI_TYPE)
+	{
+		UiButtonHandle handle = (UiButtonHandle)base;
+		setPanelRenderScissor(handle->panelRender, scissor);
+		setTextRenderScissor(handle->textRender, scissor);
+	}
+	else if (type == INPUT_FIELD_UI_TYPE)
+	{
+		UiInputFieldHandle handle = (UiInputFieldHandle)base;
+		setPanelRenderScissor(handle->panelRender, scissor);
+		setPanelRenderScissor(handle->focusRender, scissor);
+		scissor = calculateUiElementScissor(
+			getGraphicsRenderTransform(handle->textRender),
+			framebufferSize, scale);
+		setTextRenderScissor(handle->textRender, scissor);
+		scissor = calculateUiElementScissor(
+			getGraphicsRenderTransform(handle->placeholderRender),
+			framebufferSize, scale);
+		setTextRenderScissor(handle->placeholderRender, scissor);
+	}
+	else
+	{
+		abort();
+	}
 }
 GraphicsRendererResult drawUserInterface(UserInterface ui)
 {
 	assert(ui);
-
-	enumerateInterfaceElements(
+	
+	threadedEnumerateInterfaceElements(
 		ui->interface,
-		onUiElementScissor,
+		onElementScissor,
 		ui);
+
+	Framebuffer framebuffer = getWindowFramebuffer(ui->window);
+	cmmt_float_t scale = getPlatformScale(framebuffer) *
+		getInterfaceScale(getUserInterface(ui));
+	Vec2I framebufferSize = getFramebufferSize(framebuffer);
+	Vec4I scissor = calculateUiElementScissor(
+		getGraphicsRenderTransform(ui->cursorRender),
+		framebufferSize, scale);
+	setPanelRenderScissor(ui->cursorRender, scissor);
 
 	GraphicsRendererResult result =
 		createGraphicsRendererResult();
@@ -721,6 +900,7 @@ MpgxResult createUiPanel(
 		oneQuat,
 		NO_ROTATION_TYPE,
 		parent,
+		NULL,
 		isActive);
 
 	if (!transform)
@@ -733,7 +913,8 @@ MpgxResult createUiPanel(
 		ui->panelRenderer,
 		transform,
 		oneSizeBox3F,
-		srgbToLinearColor(DEFAULT_UI_PANEL_COLOR));
+		srgbToLinearColor(DEFAULT_UI_PANEL_COLOR),
+		zeroVec4I);
 
 	if (!render)
 	{
@@ -760,6 +941,8 @@ MpgxResult createUiPanel(
 		onUiPanelDestroy(handle);
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
+
+	setTransformHandle(transform, element);
 
 	*uiPanel = element;
 	return SUCCESS_MPGX_RESULT;
@@ -847,6 +1030,7 @@ inline static MpgxResult internalCreateUiLabel(
 		oneQuat,
 		NO_ROTATION_TYPE,
 		parent,
+		NULL,
 		isActive);
 
 	if (!transform)
@@ -985,6 +1169,8 @@ inline static MpgxResult internalCreateUiLabel(
 		onUiLabelDestroy(handle);
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
+
+	setTransformHandle(transform, element);
 
 	*uiLabel = element;
 	return SUCCESS_MPGX_RESULT;
@@ -1234,14 +1420,18 @@ inline static MpgxResult internalCreateUiWindow(
 
 	Transform barTransform = createTransform(
 		transformer,
-		zeroVec3F,
+		vec3F(
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)0.001),
 		vec3F(
 			scale.x,
-			DEFAULT_UI_BAR_HEIGHT,
+			scale.y + DEFAULT_UI_BAR_HEIGHT,
 			(cmmt_float_t)1.0),
 		oneQuat,
 		NO_ROTATION_TYPE,
 		parent,
+		NULL,
 		isActive);
 
 	if (!barTransform)
@@ -1254,7 +1444,8 @@ inline static MpgxResult internalCreateUiWindow(
 		panelRenderer,
 		barTransform,
 		oneSizeBox3F,
-		srgbToLinearColor(DEFAULT_UI_BAR_COLOR));
+		srgbToLinearColor(DEFAULT_UI_BAR_COLOR),
+		zeroVec4I);
 
 	if (!barRender)
 	{
@@ -1269,9 +1460,8 @@ inline static MpgxResult internalCreateUiWindow(
 		transformer,
 		vec3F(
 			(cmmt_float_t)0.0,
-			-(scale.y * (cmmt_float_t)0.5 +
-			  DEFAULT_UI_BAR_HEIGHT * (cmmt_float_t)0.5),
-			(cmmt_float_t)0.0),
+			-DEFAULT_UI_BAR_HEIGHT * (cmmt_float_t)0.5,
+			(cmmt_float_t)-0.0001),
 		vec3F(
 			scale.x,
 			scale.y,
@@ -1279,6 +1469,7 @@ inline static MpgxResult internalCreateUiWindow(
 		oneQuat,
 		NO_ROTATION_TYPE,
 		barTransform,
+		NULL,
 		true);
 
 	if (!panelTransform)
@@ -1291,7 +1482,8 @@ inline static MpgxResult internalCreateUiWindow(
 		panelRenderer,
 		panelTransform,
 		oneSizeBox3F,
-		srgbToLinearColor(DEFAULT_UI_PANEL_COLOR));
+		srgbToLinearColor(DEFAULT_UI_PANEL_COLOR),
+		zeroVec4I);
 
 	if (!panelRender)
 	{
@@ -1306,7 +1498,7 @@ inline static MpgxResult internalCreateUiWindow(
 		transformer,
 		vec3F(
 			(cmmt_float_t)0.0,
-			(cmmt_float_t)0.0,
+			(cmmt_float_t)scale.y * (cmmt_float_t)0.5,
 			(cmmt_float_t)-0.001),
 		vec3F(
 			DEFAULT_UI_TEXT_HEIGHT,
@@ -1315,6 +1507,7 @@ inline static MpgxResult internalCreateUiWindow(
 		oneQuat,
 		NO_ROTATION_TYPE,
 		barTransform,
+		NULL,
 		true);
 
 	if (!titleTransform)
@@ -1405,6 +1598,10 @@ inline static MpgxResult internalCreateUiWindow(
 		onUiWindowDestroy(handle);
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
+
+	setTransformHandle(barTransform, element);
+	setTransformHandle(panelTransform, element);
+	setTransformHandle(titleTransform, element);
 
 	*uiWindow = element;
 	return SUCCESS_MPGX_RESULT;
@@ -1692,6 +1889,7 @@ inline static MpgxResult internalCreateUiButton(
 		oneQuat,
 		NO_ROTATION_TYPE,
 		parent,
+		NULL,
 		isActive);
 
 	if (!panelTransform)
@@ -1704,7 +1902,8 @@ inline static MpgxResult internalCreateUiButton(
 		ui->panelRenderer,
 		panelTransform,
 		oneSizeBox3F,
-		srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR));
+		srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR),
+		zeroVec4I);
 
 	if (!panelRender)
 	{
@@ -1728,6 +1927,7 @@ inline static MpgxResult internalCreateUiButton(
 		oneQuat,
 		NO_ROTATION_TYPE,
 		panelTransform,
+		NULL,
 		true);
 
 	if (!textTransform)
@@ -1825,6 +2025,9 @@ inline static MpgxResult internalCreateUiButton(
 		onUiButtonDestroy(handle);
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
+
+	setTransformHandle(panelTransform, element);
+	setTransformHandle(textTransform, element);
 
 	*uiButton = element;
 	return SUCCESS_MPGX_RESULT;
@@ -2058,52 +2261,6 @@ void setUiButtonPressedColor(
 	handle->pressedColor = color;
 }
 
-static void onUiInputFieldUpdate(InterfaceElement element)
-{
-	assert(element);
-	UiInputFieldHandle handle = (UiInputFieldHandle)
-		getInterfaceElementHandle(element);
-	assert(handle->type == INPUT_FIELD_UI_TYPE);
-	UserInterface ui = handle->ui;
-	Framebuffer framebuffer = getWindowFramebuffer(ui->window);
-	cmmt_float_t platformScale = getPlatformScale(framebuffer);
-	Transform panelTransform = getGraphicsRenderTransform(handle->panelRender);
-	cmmt_float_t interfaceScale = getInterfaceScale(getUserInterface(ui));
-	Vec3F panelPosition = mulValVec3F(getTranslationMat4F(
-		getTransformModel(panelTransform)),
-		platformScale * interfaceScale);
-	Vec3F panelScale = mulValVec3F(
-		getTransformScale(panelTransform),
-		platformScale * interfaceScale);
-	Vec2I framebufferSize = getFramebufferSize(framebuffer);
-
-	Vec4I scissor = vec4I(
-		(cmmt_int_t)((cmmt_float_t)framebufferSize.x * (cmmt_float_t)0.5 +
-			panelPosition.x - panelScale.x * (cmmt_float_t)0.5),
-		(cmmt_int_t)((cmmt_float_t)framebufferSize.y * (cmmt_float_t)0.5 +
-			panelPosition.y - panelScale.y * (cmmt_float_t)0.5),
-		(cmmt_int_t)panelScale.x,
-		(cmmt_int_t)panelScale.y);
-
-	if (scissor.x < 0) scissor.x = 0;
-	if (scissor.y < 0) scissor.y = 0;
-	if (scissor.z <= 0) scissor.z = 1;
-	if (scissor.w <= 0) scissor.w = 1;
-
-	if (scissor.x + scissor.z > framebufferSize.x)
-	{
-		scissor.x = 0;
-		scissor.z = framebufferSize.x;
-	}
-	if (scissor.y + scissor.w > framebufferSize.y)
-	{
-		scissor.y = 0;
-		scissor.w = framebufferSize.y;
-	}
-
-	setTextRenderScissor(handle->textRender, scissor);
-	setTextRenderScissor(handle->placeholderRender, scissor);
-}
 static void onUiInputFieldEnable(InterfaceElement element)
 {
 	assert(element);
@@ -2191,7 +2348,7 @@ static void onUiInputFieldPress(InterfaceElement element)
 	size_t index = 0;
 	getTextCursorIndex(text, cursorPosition, &index);
 	ui->cursorIndex = index;
-	updateUiCursor(ui, textTransform, text);
+	updateCursor(ui, textTransform, text);
 
 	ui->blinkDelay = getWindowUpdateTime(window) + 0.5f;
 	ui->focusedInputField = element;
@@ -2306,6 +2463,7 @@ inline static MpgxResult internalCreateUiInputField(
 		oneQuat,
 		NO_ROTATION_TYPE,
 		parent,
+		NULL,
 		isActive);
 
 	if (!panelTransform)
@@ -2318,7 +2476,8 @@ inline static MpgxResult internalCreateUiInputField(
 		panelRenderer,
 		panelTransform,
 		oneSizeBox3F,
-		srgbToLinearColor(DEFAULT_UI_INPUT_PANEL_COLOR));
+		srgbToLinearColor(DEFAULT_UI_INPUT_PANEL_COLOR),
+		zeroVec4I);
 
 	if (!panelRender)
 	{
@@ -2342,6 +2501,7 @@ inline static MpgxResult internalCreateUiInputField(
 		oneQuat,
 		NO_ROTATION_TYPE,
 		panelTransform,
+		NULL,
 		true);
 
 	if (!focusTransform)
@@ -2354,7 +2514,8 @@ inline static MpgxResult internalCreateUiInputField(
 		panelRenderer,
 		focusTransform,
 		oneSizeBox3F,
-		srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR));
+		srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR),
+		zeroVec4I);
 
 	if (!focusRender)
 	{
@@ -2382,6 +2543,7 @@ inline static MpgxResult internalCreateUiInputField(
 		oneQuat,
 		NO_ROTATION_TYPE,
 		panelTransform,
+		NULL,
 		false);
 
 	if (!textTransform)
@@ -2457,6 +2619,7 @@ inline static MpgxResult internalCreateUiInputField(
 		oneQuat,
 		NO_ROTATION_TYPE,
 		panelTransform,
+		NULL,
 		true);
 
 	if (!placeholderTransform)
@@ -2525,13 +2688,11 @@ inline static MpgxResult internalCreateUiInputField(
 
 	InterfaceElementEvents elementEvents = events ?
 		*events : emptyInterfaceElementEvents;
-	handle->onUpdate = elementEvents.onUpdate;
 	handle->onEnable = elementEvents.onEnable;
 	handle->onDisable = elementEvents.onDisable;
 	handle->onEnter = elementEvents.onEnter;
 	handle->onExit = elementEvents.onExit;
 	handle->onPress = elementEvents.onPress;
-	elementEvents.onUpdate = onUiInputFieldUpdate;
 	elementEvents.onEnable = onUiInputFieldEnable;
 	elementEvents.onDisable = onUiInputFieldDisable;
 	elementEvents.onEnter = onUiInputFieldEnter;
@@ -2554,6 +2715,11 @@ inline static MpgxResult internalCreateUiInputField(
 		onUiInputFieldDestroy(handle);
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
+
+	setTransformHandle(panelTransform, element);
+	setTransformHandle(focusTransform, element);
+	setTransformHandle(textTransform, element);
+	setTransformHandle(placeholderTransform, element);
 
 	*uiInputField = element;
 	return SUCCESS_MPGX_RESULT;
@@ -2692,14 +2858,6 @@ GraphicsRender getUiInputFieldPlaceholderRender(InterfaceElement inputField)
 		getInterfaceElementHandle(inputField);
 	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->placeholderRender;
-}
-OnInterfaceElementEvent getUiInputFieldOnUpdateEvent(InterfaceElement inputField)
-{
-	assert(inputField);
-	UiInputFieldHandle handle =
-		getInterfaceElementHandle(inputField);
-	assert(handle->type == INPUT_FIELD_UI_TYPE);
-	return handle->onUpdate;
 }
 OnInterfaceElementEvent getUiInputFieldOnEnableEvent(InterfaceElement inputField)
 {
@@ -2847,7 +3005,7 @@ void setUiInputFieldMask(
 
 	if (getTextLength(text) > 0)
 	{
-		bakeUiInputFieldText(text, mask, getFontAtlasLogger(
+		bakeInputFieldText(text, mask, getFontAtlasLogger(
 			handle->ui->fontAtlas));
 	}
 
@@ -2898,7 +3056,7 @@ bool setUiInputFieldText(
 		if (!result)
 			return false;
 
-		bakeUiInputFieldText(text,
+		bakeInputFieldText(text,
 			handle->mask,
 			getFontAtlasLogger(ui->fontAtlas));
 		setTransformActive(getGraphicsRenderTransform(
@@ -2920,7 +3078,7 @@ bool setUiInputFieldText(
 		Transform textTransform = getGraphicsRenderTransform(
 			getTextLength(text) > 0 ?
 			handle->textRender : handle->placeholderRender);
-		updateUiCursor(ui, textTransform, text);
+		updateCursor(ui, textTransform, text);
 	}
 
 	return true;
@@ -2946,7 +3104,7 @@ bool setUiInputFieldText8(
 		if (!result)
 			return false;
 
-		bakeUiInputFieldText(text,
+		bakeInputFieldText(text,
 			handle->mask,
 			getFontAtlasLogger(ui->fontAtlas));
 		setTransformActive(getGraphicsRenderTransform(
@@ -2968,7 +3126,7 @@ bool setUiInputFieldText8(
 		Transform textTransform = getGraphicsRenderTransform(
 			getTextLength(text) > 0 ?
 			handle->textRender : handle->placeholderRender);
-		updateUiCursor(ui, textTransform, text);
+		updateCursor(ui, textTransform, text);
 	}
 
 	return true;

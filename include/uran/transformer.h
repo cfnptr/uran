@@ -121,6 +121,7 @@ void threadedEnumerateTransformerItems(
 	Transformer transformer,
 	OnTransformerItem onItem,
 	void* handle);
+
 /*
  * Destroys all transformer transforms.
  * transformer - transformer instance.
@@ -143,6 +144,7 @@ void updateTransformer(Transformer transformer);
  * rotation - transform rotation.
  * rotationType - transform rotation type.
  * parent - transform parent or NULL.
+ * handle - custom handle or NULL.
  * isActive - is transform active.
  */
 Transform createTransform(
@@ -152,6 +154,7 @@ Transform createTransform(
 	Quat rotation,
 	RotationType rotationType,
 	Transform parent,
+	void* handle,
 	bool isActive);
 /*
  * Destroys transform instance.
@@ -253,6 +256,22 @@ Transform getTransformParent(
 void setTransformParent(
 	Transform transform,
 	Transform parent);
+
+/*
+ * Returns transform handle.
+ * transform - transform instance.
+ */
+void* getTransformHandle(
+	Transform transform);
+/*
+ * Sets transform handle.
+ *
+ * transform - transform instance.
+ * parent - transform parent.
+ */
+void setTransformHandle(
+	Transform transform,
+	void* handle);
 
 /*
  * Returns true if transform is active.

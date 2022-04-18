@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "uran/renderers/text_renderer.h"
+#include "mpgx/_source/graphics_pipeline.h"
 
 #include <string.h>
 #include <assert.h>
@@ -52,9 +53,24 @@ static size_t onDraw(
 	setTextPipelineColor(
 		graphicsPipeline,
 		handle->color);
-	return drawText(
-		handle->text,
-		handle->scissor);
+
+	Vec4I stateScissor = graphicsPipeline->base.state.scissor;
+	bool dynamicScissor = stateScissor.z + stateScissor.w == 0;
+
+	if (dynamicScissor)
+	{
+		Vec4I panelScissor = handle->scissor;
+		Vec2I framebufferSize = graphicsPipeline->base.framebuffer->base.size;
+
+		assert(panelScissor.x + panelScissor.z <= framebufferSize.x);
+		assert(panelScissor.y + panelScissor.w <= framebufferSize.y);
+
+		setWindowScissor(
+			graphicsPipeline->base.window,
+			panelScissor);
+	}
+
+	return drawText(handle->text);
 }
 GraphicsRenderer createTextRenderer(
 	GraphicsPipeline textPipeline,

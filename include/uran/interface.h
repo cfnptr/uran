@@ -146,6 +146,18 @@ void enumerateInterfaceElements(
 	OnInterfaceElement onElement,
 	void* handle);
 /*
+ * Enumerates interface elements using thread pool.
+ *
+ * interface - interface instance.
+ * onElement - on interface element function.
+ * handle - function argument or NULL.
+ */
+void threadedEnumerateInterfaceElements(
+	Interface interface,
+	OnInterfaceElement onElement,
+	void* handle);
+
+/*
  * Destroys all interface elements.
  *
  * interface - transformer instance.
