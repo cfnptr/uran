@@ -275,6 +275,44 @@ void* getUiLabelHandle(InterfaceElement label);
 GraphicsRender getUiLabelRender(InterfaceElement label);
 
 /*
+ * Returns UI label text UTF-32 string.
+ * label - UI label instance.
+ */
+const uint32_t* getUiLabelText(
+	InterfaceElement label);
+/*
+ * Returns UI label text string length.
+ * label - UI label instance.
+ */
+size_t getUiLabelTextLength(
+	InterfaceElement label);
+
+/*
+ * Set UI label text UTF-32 string.
+ * Returns operation MPGX result.
+ *
+ * label - UI label instance.
+ * string - text string or NULL.
+ * length - string length or 0.
+ */
+MpgxResult setUiLabelText(
+	InterfaceElement label,
+	const uint32_t* string,
+	size_t length);
+/*
+ * Set UI label text UTF-8 string.
+ * Returns operation MPGX result.
+ *
+ * label - UI label instance.
+ * string - text string or NULL.
+ * length - string length or 0.
+ */
+MpgxResult setUiLabelText8(
+	InterfaceElement label,
+	const char* string,
+	size_t length);
+
+/*
  * Create a new UTF-32 UI window instance.
  * Returns operation MPGX result.
  *
@@ -594,7 +632,7 @@ MpgxResult createUiInputField(
  */
 MpgxResult createUiInputField8(
 	UserInterface ui,
-	const uint32_t* placeholder,
+	const char* placeholder,
 	size_t placeholderLength,
 	AlignmentType alignment,
 	Vec3F position,
@@ -731,12 +769,13 @@ void setUiInputFieldFocusedColor(
 uint32_t getUiInputFieldMask(
 	InterfaceElement inputField);
 /*
- * Sets UI input field mask.
+ * Set UI input field mask.
+ * Returns operation MPGX result.
  *
  * inputField - UI input field instance.
  * mask - character mask.
  */
-void setUiInputFieldMask(
+MpgxResult setUiInputFieldMask(
 	InterfaceElement inputField,
 	uint32_t mask);
 
@@ -754,24 +793,26 @@ size_t getUiInputFieldTextLength(
 	InterfaceElement inputField);
 
 /*
- * Sets UI input field text UTF-32 string.
+ * Set UI input field text UTF-32 string.
+ * Returns operation MPGX result.
  *
  * inputField - UI input field instance.
  * string - text string or NULL.
  * length - string length or 0.
  */
-bool setUiInputFieldText(
+MpgxResult setUiInputFieldText(
 	InterfaceElement inputField,
 	const uint32_t* string,
 	size_t length);
 /*
- * Sets UI input field text UTF-8 string.
+ * Set UI input field text UTF-8 string.
+ * Returns operation MPGX result.
  *
  * inputField - UI input field instance.
  * string - text string or NULL.
  * length - string length or 0.
  */
-bool setUiInputFieldText8(
+MpgxResult setUiInputFieldText8(
 	InterfaceElement inputField,
 	const char* string,
 	size_t length);

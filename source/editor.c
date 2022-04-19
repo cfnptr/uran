@@ -233,7 +233,6 @@ static void onStatsLabelUpdate(InterfaceElement element)
 		return;
 
 	double deltaTime = getWindowDeltaTime(statsWindow->window);
-	Text text = getTextRenderText(getUiLabelRender(element));
 	GraphicsRendererResult rendererResult = statsWindow->rendererResult;
 
 	char buffer[256];
@@ -255,17 +254,8 @@ static void onStatsLabelUpdate(InterfaceElement element)
 		rendererResult.indexCount / 3,
 		rendererResult.passCount);
 
-	bool result = setTextString8(text,
-		buffer, count);
-
-	if (!result)
-	{
-		logMessage(statsWindow->logger, FATAL_LOG_LEVEL,
-			"Failed to set stats text.");
-		abort();
-	}
-
-	MpgxResult mpgxResult = bakeText(text);
+	MpgxResult mpgxResult = setUiLabelText8(
+		element, buffer, count);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
@@ -275,6 +265,7 @@ static void onStatsLabelUpdate(InterfaceElement element)
 		abort();
 	}
 
+	Text text = getTextRenderText(getUiLabelRender(element));
 	Vec2F textSize = getTextSize(text);
 	AlignmentType alignment = getTextAlignment(text);
 

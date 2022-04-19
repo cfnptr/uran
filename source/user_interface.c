@@ -53,6 +53,7 @@ typedef struct UiPanelHandle_T
 typedef struct UiLabelHandle_T
 {
 	UiType type;
+	UserInterface ui;
 	void* handle;
 	GraphicsRender render;
 } UiLabelHandle_T;
@@ -326,10 +327,9 @@ GraphicsRender getUserInterfaceCursor(UserInterface ui)
 	return ui->cursorRender;
 }
 
-inline static void bakeInputFieldText(
+inline static MpgxResult bakeInputFieldText(
 	Text text,
-	uint32_t mask,
-	Logger logger)
+	uint32_t mask)
 {
 	assert(text);
 
@@ -367,12 +367,7 @@ inline static void bakeInputFieldText(
 		mpgxResult = bakeText(text);
 	}
 
-	if (mpgxResult != SUCCESS_MPGX_RESULT && logger)
-	{
-		logMessage(logger, ERROR_LOG_LEVEL,
-			"Failed to bake text. (error: %s)",
-			mpgxResultToString(mpgxResult));
-	}
+	return mpgxResult;
 }
 inline static void updateCursor(
 	UserInterface ui,
@@ -610,9 +605,20 @@ inline static void updateInputFields(UserInterface ui)
 		{
 			if (getTextLength(text) > 0)
 			{
-				bakeInputFieldText(text,
-					handle->mask,
-					getFontAtlasLogger(ui->fontAtlas));
+				MpgxResult mpgxResult = bakeInputFieldText(text, handle->mask);
+
+				if (mpgxResult != SUCCESS_MPGX_RESULT)
+				{
+					Logger logger = getFontAtlasLogger(ui->fontAtlas);
+
+					if (logger)
+					{
+						logMessage(logger, ERROR_LOG_LEVEL,
+							"Failed to bake input field text. (error: %s)",
+							mpgxResultToString(mpgxResult));
+					}
+				}
+
 				setTransformActive(getGraphicsRenderTransform(
 					handle->textRender), true);
 				setTransformActive(getGraphicsRenderTransform(
@@ -1091,6 +1097,7 @@ inline static MpgxResult internalCreateUiLabel(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
 	handle->type = LABEL_UI_TYPE;
+	handle->ui = ui;
 	handle->handle = _handle;
 
 	Transform transform = createTransform(
@@ -1359,6 +1366,77 @@ GraphicsRender getUiLabelRender(InterfaceElement label)
 		getInterfaceElementHandle(label);
 	assert(handle->type == LABEL_UI_TYPE);
 	return handle->render;
+}
+
+const uint32_t* getUiLabelText(
+	InterfaceElement label)
+{
+	assert(label);
+	UiLabelHandle handle =
+		getInterfaceElementHandle(label);
+	assert(handle->type == LABEL_UI_TYPE);
+	Text text = getTextRenderText(
+		handle->render);
+	return getTextString(text);
+}
+size_t getUiLabelTextLength(
+	InterfaceElement label)
+{
+	assert(label);
+	UiLabelHandle handle =
+		getInterfaceElementHandle(label);
+	assert(handle->type == LABEL_UI_TYPE);
+	Text text = getTextRenderText(
+		handle->render);
+	return getTextLength(text);
+}
+
+MpgxResult setUiLabelText(
+	InterfaceElement label,
+	const uint32_t* string,
+	size_t length)
+{
+	assert(label);
+	assert(length == 0 ||
+		(length > 0 && string));
+
+
+	UiLabelHandle handle =
+		getInterfaceElementHandle(label);
+	Text text = getTextRenderText(handle->render);
+	assert(handle->type == LABEL_UI_TYPE);
+	assert(!isTextConstant(text));
+	UserInterface ui = handle->ui;
+
+	bool result = setTextString(text, string, length);
+
+	if (!result)
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+	return bakeText(text);
+}
+MpgxResult setUiLabelText8(
+	InterfaceElement label,
+	const char* string,
+	size_t length)
+{
+	assert(label);
+	assert(length == 0 ||
+		(length > 0 && string));
+
+	UiLabelHandle handle =
+		getInterfaceElementHandle(label);
+	Text text = getTextRenderText(handle->render);
+	assert(handle->type == LABEL_UI_TYPE);
+	assert(!isTextConstant(text));
+	UserInterface ui = handle->ui;
+
+	bool result = setTextString8(text, string, length);
+
+	if (!result)
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+	return bakeText(text);
 }
 
 static void onUiWindowPress(InterfaceElement element)
@@ -2892,7 +2970,7 @@ MpgxResult createUiInputField(
 }
 MpgxResult createUiInputField8(
 	UserInterface ui,
-	const uint32_t* placeholder,
+	const char* placeholder,
 	size_t placeholderLength,
 	AlignmentType alignment,
 	Vec3F position,
@@ -3114,7 +3192,7 @@ uint32_t getUiInputFieldMask(
 	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->mask;
 }
-void setUiInputFieldMask(
+MpgxResult setUiInputFieldMask(
 	InterfaceElement inputField,
 	uint32_t mask)
 {
@@ -3127,8 +3205,11 @@ void setUiInputFieldMask(
 	if (getTextLength(text) > 0)
 	{
 		UserInterface ui = handle->ui;
-		bakeInputFieldText(text, mask,
-			getFontAtlasLogger(ui->fontAtlas));
+		MpgxResult mpgxResult = bakeInputFieldText(text, mask);
+
+		if (mpgxResult != SUCCESS_MPGX_RESULT)
+			return mpgxResult;
+
 		Transform textTransform = getGraphicsRenderTransform(
 			getTextLength(text) > 0 ?
 			handle->textRender : handle->placeholderRender);
@@ -3136,6 +3217,7 @@ void setUiInputFieldMask(
 	}
 
 	handle->mask = mask;
+	return SUCCESS_MPGX_RESULT;
 }
 
 const uint32_t* getUiInputFieldText(
@@ -3161,7 +3243,7 @@ size_t getUiInputFieldTextLength(
 	return getTextLength(text);
 }
 
-bool setUiInputFieldText(
+MpgxResult setUiInputFieldText(
 	InterfaceElement inputField,
 	const uint32_t* string,
 	size_t length)
@@ -3180,11 +3262,13 @@ bool setUiInputFieldText(
 		bool result = setTextString(text, string, length);
 
 		if (!result)
-			return false;
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
-		bakeInputFieldText(text,
-			handle->mask,
-			getFontAtlasLogger(ui->fontAtlas));
+		MpgxResult mpgxResult = bakeInputFieldText(text, handle->mask);
+
+		if (mpgxResult != SUCCESS_MPGX_RESULT)
+			return mpgxResult;
+
 		setTransformActive(getGraphicsRenderTransform(
 			handle->textRender), true);
 		setTransformActive(getGraphicsRenderTransform(
@@ -3207,9 +3291,9 @@ bool setUiInputFieldText(
 		updateCursor(ui, textTransform, text, handle->mask);
 	}
 
-	return true;
+	return SUCCESS_MPGX_RESULT;
 }
-bool setUiInputFieldText8(
+MpgxResult setUiInputFieldText8(
 	InterfaceElement inputField,
 	const char* string,
 	size_t length)
@@ -3228,11 +3312,13 @@ bool setUiInputFieldText8(
 		bool result = setTextString8(text, string, length);
 
 		if (!result)
-			return false;
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
-		bakeInputFieldText(text,
-			handle->mask,
-			getFontAtlasLogger(ui->fontAtlas));
+		MpgxResult mpgxResult = bakeInputFieldText(text, handle->mask);
+
+		if (mpgxResult != SUCCESS_MPGX_RESULT)
+			return mpgxResult;
+
 		setTransformActive(getGraphicsRenderTransform(
 			handle->textRender), true);
 		setTransformActive(getGraphicsRenderTransform(
@@ -3255,7 +3341,7 @@ bool setUiInputFieldText8(
 		updateCursor(ui, textTransform, text, handle->mask);
 	}
 
-	return true;
+	return SUCCESS_MPGX_RESULT;
 }
 
 static void onUiCheckboxEnable(InterfaceElement element)

@@ -89,7 +89,8 @@ inline static void loadSettings(
 	if (confResult != SUCCESS_CONF_RESULT)
 	{
 		logMessage(logger, WARN_LOG_LEVEL,
-			"Failed to read settings. (error: %s at line %zu)",
+			"Failed to load \"settings.txt\" file. "
+			"(error: %s at line %zu)",
 			confResultToString(confResult), errorLine);
 
 		settings.graphicsAPI = VULKAN_GRAPHICS_API;
