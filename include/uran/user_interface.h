@@ -27,13 +27,17 @@
 #define DEFAULT_UI_DISABLED_BUTTON_COLOR srgbColor(64, 64, 64, 255)
 #define DEFAULT_UI_HOVERED_BUTTON_COLOR srgbColor(96, 96, 96, 255)
 #define DEFAULT_UI_PRESSED_BUTTON_COLOR srgbColor(64, 64, 64, 255)
-#define DEFAULT_UI_PRESSED_BUTTON_COLOR srgbColor(64, 64, 64, 255)
 #define DEFAULT_UI_INPUT_PANEL_COLOR srgbColor(32, 32, 32, 255)
 #define DEFAULT_UI_ENABLED_INPUT_COLOR srgbColor(80, 80, 80, 255)
 #define DEFAULT_UI_DISABLED_INPUT_COLOR srgbColor(64, 64, 64, 255)
 #define DEFAULT_UI_FOCUSED_INPUT_COLOR srgbColor(128, 128, 128, 255)
 #define DEFAULT_UI_PLACEHOLDER_COLOR srgbColor(144, 144, 144, 255)
-// #define CHECKBOX_CHECK_COLOR srgbToLinearColor(srgbColor(128, 128, 128, 255))
+#define DEFAULT_UI_ENABLED_CHECKBOX_COLOR srgbColor(32, 32, 32, 255)
+#define DEFAULT_UI_DISABLED_CHECKBOX_COLOR srgbColor(16, 16, 16, 255)
+#define DEFAULT_UI_HOVERED_CHECKBOX_COLOR srgbColor(48, 48, 48, 255)
+#define DEFAULT_UI_PRESSED_CHECKBOX_COLOR srgbColor(24, 24, 24, 255)
+#define DEFAULT_UI_CHECKBOX_FOCUS_COLOR srgbColor(80, 80, 80, 255)
+#define DEFAULT_UI_CHECKBOX_CHECK_COLOR srgbColor(128, 128, 128, 255)
 
 /*
  * Use interface element types.
@@ -45,7 +49,8 @@ typedef enum UiType_T
 	WINDOW_UI_TYPE = 2,
 	BUTTON_UI_TYPE = 3,
 	INPUT_FIELD_UI_TYPE = 4,
-	CUSTOM_UI_TYPES = 5,
+	CHECKBOX_UI_TYPE = 5,
+	CUSTOM_UI_TYPES = 6,
 	// Note: your custom UI types...
 } UiType_T;
 /*
@@ -413,6 +418,7 @@ MpgxResult createUiButton8(
 	void* handle,
 	bool isActive,
 	InterfaceElement* uiButton);
+
 /*
  * Returns UI button handle.
  * button - UI button instance.
@@ -762,5 +768,202 @@ bool setUiInputFieldText8(
 	const char* string,
 	size_t length);
 
+/*
+ * Create a new UTF-32 UI checkbox instance.
+ * Returns operation MPGX result.
+ *
+ * ui - user interface instance.
+ * text - text string or NULL.
+ * textLength - text string length or 0.
+ * alignment - alignment type.
+ * position - checkbox position.
+ * scale - checkbox scale.
+ * isChecked - is checkbox checked.
+ * parent - parent instance or NULL.
+ * events - interface events or NULL.
+ * handle - checkbox handle or NULL.
+ * isActive - is checkbox active.
+ * uiCheckbox - pointer to the UI checkbox.
+ */
+MpgxResult createUiCheckbox(
+	UserInterface ui,
+	const uint32_t* text,
+	size_t textLength,
+	AlignmentType alignment,
+	Vec3F position,
+	cmmt_float_t scale,
+	bool isChecked,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* handle,
+	bool isActive,
+	InterfaceElement* uiCheckbox);
+/*
+ * Create a new UTF-8 UI checkbox instance.
+ * Returns operation MPGX result.
+ *
+ * ui - user interface instance.
+ * text - text string or NULL.
+ * textLength - text string length or 0.
+ * alignment - alignment type.
+ * position - checkbox position.
+ * scale - checkbox scale.
+ * isChecked - is checkbox checked.
+ * parent - parent instance or NULL.
+ * events - interface events or NULL.
+ * handle - checkbox handle or NULL.
+ * isActive - is checkbox active.
+ * uiCheckbox - pointer to the UI checkbox.
+ */
+MpgxResult createUiCheckbox8(
+	UserInterface ui,
+	const char* text,
+	size_t textLength,
+	AlignmentType alignment,
+	Vec3F position,
+	cmmt_float_t scale,
+	bool isChecked,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* handle,
+	bool isActive,
+	InterfaceElement* uiCheckbox);
+
+/*
+ * Returns UI checkbox handle.
+ * checkbox - UI checkbox instance.
+ */
+void* getUiCheckboxHandle(InterfaceElement checkbox);
+/*
+ * Returns UI checkbox panel render instance.
+ * checkbox - UI checkbox instance.
+ */
+GraphicsRender getUiCheckboxPanelRender(InterfaceElement checkbox);
+/*
+ * Returns UI checkbox focus render instance.
+ * checkbox - UI checkbox instance.
+ */
+GraphicsRender getUiCheckboxFocusRender(InterfaceElement checkbox);
+/*
+ * Returns UI checkbox check render instance.
+ * checkbox - UI checkbox instance.
+ */
+GraphicsRender getUiCheckboxCheckRender(InterfaceElement checkbox);
+/*
+ * Returns UI checkbox text render instance.
+ * checkbox - UI checkbox instance.
+ */
+GraphicsRender getUiCheckboxTextRender(InterfaceElement checkbox);
+/*
+ * Returns UI checkbox on enable event function.
+ * checkbox - UI checkbox instance.
+ */
+OnInterfaceElementEvent getUiCheckboxOnEnableEvent(InterfaceElement checkbox);
+/*
+ * Returns UI checkbox on disable event function.
+ * checkbox - UI checkbox instance.
+ */
+OnInterfaceElementEvent getUiCheckboxOnDisableEvent(InterfaceElement checkbox);
+/*
+ * Returns UI checkbox on enter event function.
+ * checkbox - UI checkbox instance.
+ */
+OnInterfaceElementEvent getUiCheckboxOnEnterEvent(InterfaceElement checkbox);
+/*
+ * Returns UI checkbox on exit event function.
+ * checkbox - UI checkbox instance.
+ */
+OnInterfaceElementEvent getUiCheckboxOnExitEvent(InterfaceElement checkbox);
+/*
+ * Returns UI checkbox on press event function.
+ * checkbox - UI checkbox instance.
+ */
+OnInterfaceElementEvent getUiCheckboxOnPressEvent(InterfaceElement checkbox);
+/*
+ * Returns UI checkbox on release event function.
+ * checkbox - UI checkbox instance.
+ */
+OnInterfaceElementEvent getUiCheckboxOnReleaseEvent(InterfaceElement checkbox);
+
+/*
+ * Returns UI checkbox disabled color.
+ * checkbox - UI checkbox instance.
+ */
+LinearColor getUiCheckboxDisabledColor(
+	InterfaceElement checkbox);
+/*
+ * Sets UI checkbox disabled color.
+ *
+ * checkbox - UI checkbox instance.
+ * color - color value.
+ */
+void setUiCheckboxDisabledColor(
+	InterfaceElement checkbox,
+	LinearColor color);
+
+/*
+ * Returns UI checkbox enabled color.
+ * checkbox - UI button instance.
+ */
+LinearColor getUiCheckboxEnabledColor(
+	InterfaceElement checkbox);
+/*
+ * Sets UI checkbox enabled color.
+ *
+ * checkbox - UI checkbox instance.
+ * color - color value.
+ */
+void setUiCheckboxEnabledColor(
+	InterfaceElement checkbox,
+	LinearColor color);
+
+/*
+ * Returns UI checkbox hovered color.
+ * checkbox - UI checkbox instance.
+ */
+LinearColor getUiCheckboxHoveredColor(
+	InterfaceElement checkbox);
+/*
+ * Sets UI checkbox hovered color.
+ *
+ * checkbox - UI checkbox instance.
+ * color - color value.
+ */
+void setUiCheckboxHoveredColor(
+	InterfaceElement checkbox,
+	LinearColor color);
+
+/*
+ * Returns UI checkbox pressed color.
+ * checkbox - UI checkbox instance.
+ */
+LinearColor getUiCheckboxPressedColor(
+	InterfaceElement checkbox);
+/*
+ * Sets UI checkbox pressed color.
+ *
+ * checkbox - UI checkbox instance.
+ * color - color value.
+ */
+void setUiCheckboxPressedColor(
+	InterfaceElement checkbox,
+	LinearColor color);
+
+/*
+ * Returns true if UI checkbox is checked.
+ * checkbox - UI checkbox instance.
+ */
+bool isCheckboxChecked(
+	InterfaceElement checkbox);
+/*
+ * Sets UI checkbox checked value.
+ *
+ * checkbox - UI checkbox instance.
+ * isChecked - is checked value.
+ */
+void setCheckboxChecked(
+	InterfaceElement checkbox,
+	bool isChecked);
+
 // TODO: mask (only transform with masking)
-// TODO: InputBox, ScrollBox, Checkbox
+// TODO: InputBox, ScrollBox

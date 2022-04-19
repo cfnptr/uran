@@ -360,6 +360,7 @@ inline static GraphicsPipeline createPanelPipelineInstance(
 		fragmentShader,
 		mesh,
 		NULL,
+		true,
 		&pipeline);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)

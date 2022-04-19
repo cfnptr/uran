@@ -13,8 +13,6 @@
 // limitations under the License.
 
 #include "uran/user_interface.h"
-#include "openssl/crypto.h"
-
 #include <string.h>
 
 #if _WIN32
@@ -112,6 +110,28 @@ typedef struct UiInputFieldHandle_T
 	GraphicsRender placeholderRender;
 	uint32_t mask;
 } UiInputFieldHandle_T;
+typedef struct UiCheckboxHandle_T
+{
+	UiType type;
+	UserInterface ui;
+	void* handle;
+	OnInterfaceElementEvent onEnable;
+	OnInterfaceElementEvent onDisable;
+	OnInterfaceElementEvent onEnter;
+	OnInterfaceElementEvent onExit;
+	OnInterfaceElementEvent onPress;
+	OnInterfaceElementEvent onRelease;
+	LinearColor disabledColor;
+	LinearColor enabledColor;
+	LinearColor hoveredColor;
+	LinearColor pressedColor;
+	GraphicsRender panelRender;
+	GraphicsRender focusRender;
+	GraphicsRender checkRender;
+	GraphicsRender textRender;
+	bool isPressed;
+	bool isChecked;
+} UiCheckboxHandle_T;
 
 typedef UiBaseHandle_T* UiBaseHandle;
 typedef UiPanelHandle_T* UiPanelHandle;
@@ -119,6 +139,7 @@ typedef UiLabelHandle_T* UiLabelHandle;
 typedef UiWindowHandle_T* UiWindowHandle;
 typedef UiButtonHandle_T* UiButtonHandle;
 typedef UiInputFieldHandle_T* UiInputFieldHandle;
+typedef UiCheckboxHandle_T* UiCheckboxHandle;
 
 inline static GraphicsRender createCursorRenderInstance(
 	Transformer transformer,
@@ -131,7 +152,7 @@ inline static GraphicsRender createCursorRenderInstance(
 		transformer,
 		zeroVec3F,
 		oneVec3F,
-		zeroQuat,
+		oneQuat,
 		NO_ROTATION_TYPE,
 		NULL,
 		NULL,
@@ -179,7 +200,7 @@ MpgxResult createUserInterface(
 	assert(panelPipeline);
 	assert(textPipeline);
 	assert(fontAtlas);
-	assert(scale > 0.0f);
+	assert(scale > 0.0);
 	assert(ui);
 
 	Window window = getGraphicsPipelineWindow(panelPipeline);
@@ -315,7 +336,7 @@ inline static void bakeInputFieldText(
 	MpgxResult mpgxResult = OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	size_t length = getTextLength(text);
 
-	if (length > 0 && mask != 0) // TODO: use better approach
+	if (length > 0 && mask != 0) // TODO: cache mask buffer
 	{
 		const uint32_t* string = getTextString(text);
 		uint32_t* textString = malloc(length * sizeof(uint32_t));
@@ -336,8 +357,6 @@ inline static void bakeInputFieldText(
 				mpgxResult = bakeText(text);
 				setTextString(text, textString, length);
 			}
-
-			OPENSSL_cleanse(textString, length * sizeof(uint32_t));
 		}
 
 		free(textString);
@@ -358,7 +377,8 @@ inline static void bakeInputFieldText(
 inline static void updateCursor(
 	UserInterface ui,
 	Transform textTransform,
-	Text text)
+	Text text,
+	uint32_t mask)
 {
 	assert(ui);
 	assert(textTransform);
@@ -370,21 +390,50 @@ inline static void updateCursor(
 
 	Vec2F cursorOffset;
 
-	if (getTextLength(text) > 0)
+	bool offsetResult = false;
+
+	if (getTextLength(text) > 0 && mask != 0) // TODO: cache mask buffer
 	{
-		bool result = getTextCursorAdvance(text,
+		const uint32_t* string = getTextString(text);
+		size_t length = getTextLength(text);
+		uint32_t* textString = malloc(length * sizeof(uint32_t));
+		uint32_t* maskString = malloc(length * sizeof(uint32_t));
+
+		if (textString && maskString)
+		{
+			memcpy(textString, string,
+				length * sizeof(uint32_t));
+
+			for (size_t i = 0; i < length; ++i)
+				maskString[i] = mask;
+
+			bool result = setTextString(text, maskString, length);
+
+			if (result)
+			{
+				offsetResult = getTextCursorAdvance(
+					text,
+					ui->cursorIndex,
+					&cursorOffset);
+				setTextString(text, textString, length);
+			}
+		}
+
+		free(textString);
+		free(maskString);
+	}
+	else
+	{
+		offsetResult = getTextCursorAdvance(
+			text,
 			ui->cursorIndex,
 			&cursorOffset);
+	}
 
-		if (result)
-		{
-			cursorOffset.x *= textScale.x;
-			cursorOffset.y *= textScale.y;
-		}
-		else
-		{
-			cursorOffset = zeroVec2F;
-		}
+	if (offsetResult)
+	{
+		cursorOffset.x *= textScale.x;
+		cursorOffset.y *= textScale.y;
 	}
 	else
 	{
@@ -585,7 +634,7 @@ inline static void updateInputFields(UserInterface ui)
 			Transform textTransform = getGraphicsRenderTransform(
 				getTextLength(text) > 0 ?
 				handle->textRender : handle->placeholderRender);
-			updateCursor(ui, textTransform, text);
+			updateCursor(ui, textTransform, text, handle->mask);
 		}
 
 		if (updateTime > ui->blinkDelay)
@@ -629,6 +678,9 @@ inline static Transform getUiElementTransform(InterfaceElement element)
 	case INPUT_FIELD_UI_TYPE:
 		return getGraphicsRenderTransform(
 			((UiInputFieldHandle)base)->panelRender);
+	case CHECKBOX_UI_TYPE:
+		return getGraphicsRenderTransform(
+			((UiCheckboxHandle)base)->panelRender);
 	default:
 		return NULL;
 	}
@@ -780,6 +832,14 @@ static void onElementScissor(
 			framebufferSize, scale);
 		setTextRenderScissor(handle->placeholderRender, scissor);
 	}
+	else if (type == CHECKBOX_UI_TYPE)
+	{
+		UiCheckboxHandle handle = (UiCheckboxHandle)base;
+		setPanelRenderScissor(handle->panelRender, scissor);
+		setPanelRenderScissor(handle->focusRender, scissor);
+		setPanelRenderScissor(handle->checkRender, scissor);
+		setTextRenderScissor(handle->textRender, scissor);
+	}
 	else
 	{
 		abort();
@@ -788,11 +848,21 @@ static void onElementScissor(
 GraphicsRendererResult drawUserInterface(UserInterface ui)
 {
 	assert(ui);
-	
-	threadedEnumerateInterfaceElements(
-		ui->interface,
-		onElementScissor,
-		ui);
+
+	if (getInterfaceThreadPool(ui->interface))
+	{
+		threadedEnumerateInterfaceElements(
+			ui->interface,
+			onElementScissor,
+			ui);
+	}
+	else
+	{
+		enumerateInterfaceElements(
+			ui->interface,
+			onElementScissor,
+			ui);
+	}
 
 	Framebuffer framebuffer = getWindowFramebuffer(ui->window);
 	cmmt_float_t scale = getPlatformScale(framebuffer) *
@@ -877,8 +947,8 @@ MpgxResult createUiPanel(
 {
 	assert(ui);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale.x > 0.0f);
-	assert(scale.y > 0.0f);
+	assert(scale.x > 0.0);
+	assert(scale.y > 0.0);
 	assert(uiPanel);
 
 	assert(!parent || (parent && ui->transformer ==
@@ -1006,7 +1076,7 @@ inline static MpgxResult internalCreateUiLabel(
 {
 	assert(ui);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale > 0.0f);
+	assert(scale > 0.0);
 	assert(uiLabel);
 
 	assert(stringLength == 0 ||
@@ -1196,7 +1266,7 @@ MpgxResult createUiLabel(
 {
 	assert(ui);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale > 0.0f);
+	assert(scale > 0.0);
 	assert(uiLabel);
 
 	assert(stringLength == 0 ||
@@ -1245,7 +1315,7 @@ MpgxResult createUiLabel8(
 {
 	assert(ui);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale > 0.0f);
+	assert(scale > 0.0);
 	assert(uiLabel);
 
 	assert(stringLength == 0 ||
@@ -1394,8 +1464,8 @@ inline static MpgxResult internalCreateUiWindow(
 {
 	assert(ui);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale.x > 0.0f);
-	assert(scale.y > 0.0f);
+	assert(scale.x > 0.0);
+	assert(scale.y > 0.0);
 	assert(uiWindow);
 
 	assert(titleLength == 0 ||
@@ -1621,8 +1691,8 @@ MpgxResult createUiWindow(
 {
 	assert(ui);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale.x > 0.0f);
-	assert(scale.y > 0.0f);
+	assert(scale.x > 0.0);
+	assert(scale.y > 0.0);
 	assert(uiWindow);
 
 	assert(titleLength == 0 ||
@@ -1659,8 +1729,8 @@ MpgxResult createUiWindow8(
 {
 	assert(ui);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale.x > 0.0f);
-	assert(scale.y > 0.0f);
+	assert(scale.x > 0.0);
+	assert(scale.y > 0.0);
 	assert(uiWindow);
 
 	assert(titleLength == 0 ||
@@ -1800,16 +1870,18 @@ static void onUiButtonRelease(InterfaceElement element)
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
 	assert(handle->type == BUTTON_UI_TYPE);
-	setPanelRenderColor(
-		handle->panelRender,
-		handle->hoveredColor);
-	if (handle->isPressed && handle->onRelease)
+
+	if (handle->isPressed)
 	{
 		handle->isPressed = false;
-		handle->onRelease(element);
-		return;
+		
+		setPanelRenderColor(
+			handle->panelRender,
+			handle->hoveredColor);
+
+		if (handle->onRelease)
+			handle->onRelease(element);
 	}
-	handle->isPressed = false;
 }
 static void onUiButtonDestroy(void* _handle)
 {
@@ -1856,8 +1928,8 @@ inline static MpgxResult internalCreateUiButton(
 {
 	assert(ui);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale.x > 0.0f);
-	assert(scale.y > 0.0f);
+	assert(scale.x > 0.0);
+	assert(scale.y > 0.0);
 	assert(uiButton);
 
 	assert(textLength == 0 ||
@@ -1932,7 +2004,7 @@ inline static MpgxResult internalCreateUiButton(
 
 	if (!textTransform)
 	{
-		onUiWindowDestroy(handle);
+		onUiButtonDestroy(handle);
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
@@ -1971,7 +2043,7 @@ inline static MpgxResult internalCreateUiButton(
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
 		destroyTransform(textTransform);
-		onUiWindowDestroy(handle);
+		onUiButtonDestroy(handle);
 		return mpgxResult;
 	}
 
@@ -1988,7 +2060,7 @@ inline static MpgxResult internalCreateUiButton(
 	{
 		destroyText(textInstance);
 		destroyTransform(textTransform);
-		onUiWindowDestroy(handle);
+		onUiButtonDestroy(handle);
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
@@ -2047,8 +2119,8 @@ MpgxResult createUiButton(
 {
 	assert(ui);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale.x > 0.0f);
-	assert(scale.y > 0.0f);
+	assert(scale.x > 0.0);
+	assert(scale.y > 0.0);
 	assert(uiButton);
 
 	assert(textLength == 0 ||
@@ -2085,8 +2157,8 @@ MpgxResult createUiButton8(
 {
 	assert(ui);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale.x > 0.0f);
-	assert(scale.y > 0.0f);
+	assert(scale.x > 0.0);
+	assert(scale.y > 0.0);
 	assert(uiButton);
 
 	assert(textLength == 0 ||
@@ -2108,6 +2180,7 @@ MpgxResult createUiButton8(
 		uiButton,
 		true);
 }
+
 void* getUiButtonHandle(InterfaceElement button)
 {
 	assert(button);
@@ -2346,9 +2419,42 @@ static void onUiInputFieldPress(InterfaceElement element)
 	cursorPosition.y = (cursorPosition.y - textPosition.y) / textScale.y;
 
 	size_t index = 0;
-	getTextCursorIndex(text, cursorPosition, &index);
+
+	if (getTextLength(text) > 0 && handle->mask != 0) // TODO: cache mask buffer
+	{
+		const uint32_t* string = getTextString(text);
+		size_t length = getTextLength(text);
+		uint32_t* textString = malloc(length * sizeof(uint32_t));
+		uint32_t* maskString = malloc(length * sizeof(uint32_t));
+
+		if (textString && maskString)
+		{
+			memcpy(textString, string,
+				length * sizeof(uint32_t));
+			uint32_t mask = handle->mask;
+
+			for (size_t i = 0; i < length; ++i)
+				maskString[i] = mask;
+
+			bool result = setTextString(text, maskString, length);
+
+			if (result)
+			{
+				getTextCursorIndex(text, cursorPosition, &index);
+				setTextString(text, textString, length);
+			}
+		}
+
+		free(textString);
+		free(maskString);
+	}
+	else
+	{
+		getTextCursorIndex(text, cursorPosition, &index);
+	}
+
 	ui->cursorIndex = index;
-	updateCursor(ui, textTransform, text);
+	updateCursor(ui, textTransform, text, handle->mask);
 
 	ui->blinkDelay = getWindowUpdateTime(window) + 0.5f;
 	ui->focusedInputField = element;
@@ -2425,8 +2531,8 @@ inline static MpgxResult internalCreateUiInputField(
 {
 	assert(ui);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale.x > 0.0f);
-	assert(scale.y > 0.0f);
+	assert(scale.x > 0.0);
+	assert(scale.y > 0.0);
 	assert(maxLength > 0);
 	assert(uiInputField);
 
@@ -2454,6 +2560,7 @@ inline static MpgxResult internalCreateUiInputField(
 
 	Transformer transformer = ui->transformer;
 	GraphicsRenderer panelRenderer = ui->panelRenderer;
+	GraphicsRenderer textRenderer = ui->textRenderer;
 	FontAtlas fontAtlas = ui->fontAtlas;
 
 	Transform panelTransform = createTransform(
@@ -2587,7 +2694,7 @@ inline static MpgxResult internalCreateUiInputField(
 	removeTextChar(textInstance, 0);
 
 	GraphicsRender textRender = createTextRender(
-		ui->textRenderer,
+		textRenderer,
 		textTransform,
 		createTextBox3F(
 			alignment,
@@ -2667,7 +2774,7 @@ inline static MpgxResult internalCreateUiInputField(
 	}
 
 	GraphicsRender placeholderRender = createTextRender(
-		ui->textRenderer,
+		textRenderer,
 		placeholderTransform,
 		createTextBox3F(
 			alignment,
@@ -2743,8 +2850,8 @@ MpgxResult createUiInputField(
 {
 	assert(ui);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale.x > 0.0f);
-	assert(scale.y > 0.0f);
+	assert(scale.x > 0.0);
+	assert(scale.y > 0.0);
 	assert(maxLength > 0);
 	assert(uiInputField);
 
@@ -2790,8 +2897,8 @@ MpgxResult createUiInputField8(
 {
 	assert(ui);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
-	assert(scale.x > 0.0f);
-	assert(scale.y > 0.0f);
+	assert(scale.x > 0.0);
+	assert(scale.y > 0.0);
 	assert(maxLength > 0);
 	assert(uiInputField);
 
@@ -3005,8 +3112,13 @@ void setUiInputFieldMask(
 
 	if (getTextLength(text) > 0)
 	{
-		bakeInputFieldText(text, mask, getFontAtlasLogger(
-			handle->ui->fontAtlas));
+		UserInterface ui = handle->ui;
+		bakeInputFieldText(text, mask,
+			getFontAtlasLogger(ui->fontAtlas));
+		Transform textTransform = getGraphicsRenderTransform(
+			getTextLength(text) > 0 ?
+			handle->textRender : handle->placeholderRender);
+		updateCursor(ui, textTransform, text, handle->mask);
 	}
 
 	handle->mask = mask;
@@ -3078,7 +3190,7 @@ bool setUiInputFieldText(
 		Transform textTransform = getGraphicsRenderTransform(
 			getTextLength(text) > 0 ?
 			handle->textRender : handle->placeholderRender);
-		updateCursor(ui, textTransform, text);
+		updateCursor(ui, textTransform, text, handle->mask);
 	}
 
 	return true;
@@ -3126,8 +3238,685 @@ bool setUiInputFieldText8(
 		Transform textTransform = getGraphicsRenderTransform(
 			getTextLength(text) > 0 ?
 			handle->textRender : handle->placeholderRender);
-		updateCursor(ui, textTransform, text);
+		updateCursor(ui, textTransform, text, handle->mask);
 	}
 
 	return true;
+}
+
+static void onUiCheckboxEnable(InterfaceElement element)
+{
+	assert(element);
+	UiCheckboxHandle handle = (UiCheckboxHandle)
+		getInterfaceElementHandle(element);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	setPanelRenderColor(
+		handle->panelRender,
+		handle->enabledColor);
+	if (handle->onEnable)
+		handle->onEnable(element);
+}
+static void onUiCheckboxDisable(InterfaceElement element)
+{
+	assert(element);
+	UiCheckboxHandle handle = (UiCheckboxHandle)
+		getInterfaceElementHandle(element);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	setPanelRenderColor(
+		handle->panelRender,
+		handle->disabledColor);
+	if (handle->onDisable)
+		handle->onDisable(element);
+}
+static void onUiCheckboxEnter(InterfaceElement element)
+{
+	assert(element);
+	UiCheckboxHandle handle = (UiCheckboxHandle)
+		getInterfaceElementHandle(element);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	setPanelRenderColor(
+		handle->panelRender,
+		handle->hoveredColor);
+	if (handle->onEnter)
+		handle->onEnter(element);
+}
+static void onUiCheckboxExit(InterfaceElement element)
+{
+	assert(element);
+	UiCheckboxHandle handle = (UiCheckboxHandle)
+		getInterfaceElementHandle(element);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	setPanelRenderColor(
+		handle->panelRender,
+		handle->enabledColor);
+	handle->isPressed = false;
+	if (handle->onExit)
+		handle->onExit(element);
+}
+static void onUiCheckboxPress(InterfaceElement element)
+{
+	assert(element);
+	UiCheckboxHandle handle = (UiCheckboxHandle)
+		getInterfaceElementHandle(element);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	setPanelRenderColor(
+		handle->panelRender,
+		handle->pressedColor);
+	handle->isPressed = true;
+	if (handle->onPress)
+		handle->onPress(element);
+}
+static void onUiCheckboxRelease(InterfaceElement element)
+{
+	assert(element);
+	UiCheckboxHandle handle = (UiCheckboxHandle)
+		getInterfaceElementHandle(element);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+
+	if (handle->isPressed)
+	{
+		handle->isPressed = false;
+		handle->isChecked = !handle->isChecked;
+
+		setPanelRenderColor(
+			handle->panelRender,
+			handle->hoveredColor);
+		setTransformActive(
+			getGraphicsRenderTransform(
+				handle->checkRender),
+			handle->isChecked);
+
+		if (handle->onRelease)
+			handle->onRelease(element);
+	}
+}
+static void onUiCheckboxDestroy(void* _handle)
+{
+	assert(_handle);
+	UiCheckboxHandle handle = (UiCheckboxHandle)_handle;
+	assert(handle->type == CHECKBOX_UI_TYPE);
+
+	Transform transform;
+	GraphicsRender render = handle->textRender;
+
+	if (render)
+	{
+		Text text = getTextRenderText(render);
+		transform = getGraphicsRenderTransform(render);
+		destroyGraphicsRender(render);
+		destroyText(text);
+		destroyTransform(transform);
+	}
+
+	render = handle->checkRender;
+
+	if (render)
+	{
+		transform = getGraphicsRenderTransform(render);
+		destroyGraphicsRender(render);
+		destroyTransform(transform);
+	}
+
+	render = handle->focusRender;
+
+	if (render)
+	{
+		transform = getGraphicsRenderTransform(render);
+		destroyGraphicsRender(render);
+		destroyTransform(transform);
+	}
+
+	render = handle->panelRender;
+
+	if (render)
+	{
+		transform = getGraphicsRenderTransform(render);
+		destroyGraphicsRender(render);
+		destroyTransform(transform);
+	}
+
+	free(handle);
+}
+inline static MpgxResult internalCreateUiCheckbox(
+	UserInterface ui,
+	const void* text,
+	size_t textLength,
+	AlignmentType alignment,
+	Vec3F position,
+	cmmt_float_t scale,
+	bool isChecked,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* _handle,
+	bool isActive,
+	InterfaceElement* uiCheckbox,
+	bool isUTF8)
+{
+	assert(ui);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale > 0.0);
+	assert(uiCheckbox);
+
+	assert(textLength == 0 ||
+		(textLength > 0 && text));
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
+
+	UiCheckboxHandle handle = calloc(1,
+		sizeof(UiCheckboxHandle_T));
+
+	if (!handle)
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+	handle->type = CHECKBOX_UI_TYPE;
+	handle->ui = ui;
+	handle->handle = _handle;
+	handle->disabledColor = srgbToLinearColor(DEFAULT_UI_DISABLED_CHECKBOX_COLOR);
+	handle->enabledColor = srgbToLinearColor(DEFAULT_UI_ENABLED_CHECKBOX_COLOR);
+	handle->hoveredColor = srgbToLinearColor(DEFAULT_UI_HOVERED_CHECKBOX_COLOR);
+	handle->pressedColor = srgbToLinearColor(DEFAULT_UI_PRESSED_CHECKBOX_COLOR);
+	handle->isPressed = false;
+	handle->isChecked = isChecked;
+
+	Transformer transformer = ui->transformer;
+	GraphicsRenderer panelRenderer = ui->panelRenderer;
+
+	Transform panelTransform = createTransform(
+		transformer,
+		zeroVec3F,
+		vec3F(scale, scale, (cmmt_float_t)1.0),
+		oneQuat,
+		NO_ROTATION_TYPE,
+		parent,
+		NULL,
+		isActive);
+
+	if (!panelTransform)
+	{
+		onUiCheckboxDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	GraphicsRender panelRender = createPanelRender(
+		panelRenderer,
+		panelTransform,
+		oneSizeBox3F,
+		srgbToLinearColor(DEFAULT_UI_ENABLED_CHECKBOX_COLOR),
+		zeroVec4I);
+
+	if (!panelRender)
+	{
+		destroyTransform(panelTransform);
+		onUiCheckboxDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	handle->panelRender = panelRender;
+
+	Transform focusTransform = createTransform(
+		transformer,
+		vec3F(
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)0.001),
+		vec3F(
+			scale + (cmmt_float_t)2.0,
+			scale + (cmmt_float_t)2.0,
+			(cmmt_float_t)1.0),
+		oneQuat,
+		NO_ROTATION_TYPE,
+		panelTransform,
+		NULL,
+		true);
+
+	if (!focusTransform)
+	{
+		onUiCheckboxDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	GraphicsRender focusRender = createPanelRender(
+		panelRenderer,
+		focusTransform,
+		oneSizeBox3F,
+		srgbToLinearColor(DEFAULT_UI_CHECKBOX_FOCUS_COLOR),
+		zeroVec4I);
+
+	if (!focusRender)
+	{
+		destroyTransform(focusTransform);
+		onUiCheckboxDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	handle->focusRender = focusRender;
+
+	Transform checkTransform = createTransform(
+		transformer,
+		vec3F(
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)-0.001),
+		vec3F(
+			scale - (cmmt_float_t)6.0,
+			scale - (cmmt_float_t)6.0,
+			(cmmt_float_t)1.0),
+		oneQuat,
+		NO_ROTATION_TYPE,
+		panelTransform,
+		NULL,
+		isChecked);
+
+	if (!checkTransform)
+	{
+		onUiCheckboxDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	GraphicsRender checkRender = createPanelRender(
+		panelRenderer,
+		checkTransform,
+		oneSizeBox3F,
+		srgbToLinearColor(DEFAULT_UI_CHECKBOX_CHECK_COLOR),
+		zeroVec4I);
+
+	if (!checkRender)
+	{
+		destroyTransform(checkTransform);
+		onUiCheckboxDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	handle->checkRender = checkRender;
+
+	Transform textTransform = createTransform(
+		transformer,
+		vec3F(
+			(cmmt_float_t)scale,
+			(cmmt_float_t)0.0,
+			(cmmt_float_t)0.0),
+		vec3F(
+			DEFAULT_UI_TEXT_HEIGHT,
+			DEFAULT_UI_TEXT_HEIGHT,
+			(cmmt_float_t)1.0),
+		oneQuat,
+		NO_ROTATION_TYPE,
+		panelTransform,
+		NULL,
+		true);
+
+	if (!textTransform)
+	{
+		onUiCheckboxDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	Text textInstance;
+	MpgxResult mpgxResult;
+
+	if (isUTF8)
+	{
+		mpgxResult = createAtlasText8(
+			ui->fontAtlas,
+			text,
+			textLength,
+			LEFT_ALIGNMENT_TYPE,
+			DEFAULT_UI_TEXT_COLOR,
+			false,
+			false,
+			true,
+			true,
+			&textInstance);
+	}
+	else
+	{
+		mpgxResult = createAtlasText(
+			ui->fontAtlas,
+			text,
+			textLength,
+			LEFT_ALIGNMENT_TYPE,
+			DEFAULT_UI_TEXT_COLOR,
+			false,
+			false,
+			true,
+			true,
+			&textInstance);
+	}
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		destroyTransform(textTransform);
+		onUiCheckboxDestroy(handle);
+		return mpgxResult;
+	}
+
+	GraphicsRender textRender = createTextRender(
+		ui->textRenderer,
+		textTransform,
+		createTextBox3F(alignment,
+			getTextSize(textInstance)),
+		whiteLinearColor,
+		textInstance,
+		zeroVec4I);
+
+	if (!textRender)
+	{
+		destroyText(textInstance);
+		destroyTransform(textTransform);
+		onUiCheckboxDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	handle->textRender = textRender;
+
+	InterfaceElementEvents elementEvents = events ?
+		*events : emptyInterfaceElementEvents;
+	handle->onEnable = elementEvents.onEnable;
+	handle->onDisable = elementEvents.onDisable;
+	handle->onEnter = elementEvents.onEnter;
+	handle->onExit = elementEvents.onExit;
+	handle->onPress = elementEvents.onPress;
+	handle->onRelease = elementEvents.onRelease;
+	elementEvents.onEnable = onUiCheckboxEnable;
+	elementEvents.onDisable = onUiCheckboxDisable;
+	elementEvents.onEnter = onUiCheckboxEnter;
+	elementEvents.onExit = onUiCheckboxExit;
+	elementEvents.onPress = onUiCheckboxPress;
+	elementEvents.onRelease = onUiCheckboxRelease;
+
+	InterfaceElement element = createInterfaceElement(
+		ui->interface,
+		panelTransform,
+		alignment,
+		position,
+		oneSizeBox2F,
+		true,
+		onUiCheckboxDestroy,
+		&elementEvents,
+		handle);
+
+	if (!element)
+	{
+		onUiCheckboxDestroy(handle);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	setTransformHandle(panelTransform, element);
+	setTransformHandle(focusTransform, element);
+	setTransformHandle(checkTransform, element);
+	setTransformHandle(textTransform, element);
+
+	*uiCheckbox = element;
+	return SUCCESS_MPGX_RESULT;
+}
+MpgxResult createUiCheckbox(
+	UserInterface ui,
+	const uint32_t* text,
+	size_t textLength,
+	AlignmentType alignment,
+	Vec3F position,
+	cmmt_float_t scale,
+	bool isChecked,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* handle,
+	bool isActive,
+	InterfaceElement* uiCheckbox)
+{
+	assert(ui);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale > 0.0);
+	assert(uiCheckbox);
+
+	assert(textLength == 0 ||
+		(textLength > 0 && text));
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
+
+	return internalCreateUiCheckbox(
+		ui,
+		text,
+		textLength,
+		alignment,
+		position,
+		scale,
+		isChecked,
+		parent,
+		events,
+		handle,
+		isActive,
+		uiCheckbox,
+		false);
+}
+MpgxResult createUiCheckbox8(
+	UserInterface ui,
+	const char* text,
+	size_t textLength,
+	AlignmentType alignment,
+	Vec3F position,
+	cmmt_float_t scale,
+	bool isChecked,
+	Transform parent,
+	const InterfaceElementEvents* events,
+	void* handle,
+	bool isActive,
+	InterfaceElement* uiCheckbox)
+{
+	assert(ui);
+	assert(alignment < ALIGNMENT_TYPE_COUNT);
+	assert(scale > 0.0);
+	assert(uiCheckbox);
+
+	assert(textLength == 0 ||
+		(textLength > 0 && text));
+	assert(!parent || (parent && ui->transformer ==
+		getTransformTransformer(parent)));
+
+	return internalCreateUiCheckbox(
+		ui,
+		text,
+		textLength,
+		alignment,
+		position,
+		scale,
+		isChecked,
+		parent,
+		events,
+		handle,
+		isActive,
+		uiCheckbox,
+		true);
+}
+
+void* getUiCheckboxHandle(InterfaceElement checkbox)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	return handle->handle;
+}
+GraphicsRender getUiCheckboxPanelRender(InterfaceElement checkbox)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	return handle->panelRender;
+}
+GraphicsRender getUiCheckboxFocusRender(InterfaceElement checkbox)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	return handle->focusRender;
+}
+GraphicsRender getUiCheckboxCheckRender(InterfaceElement checkbox)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	return handle->checkRender;
+}
+GraphicsRender getUiCheckboxTextRender(InterfaceElement checkbox)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	return handle->textRender;
+}
+OnInterfaceElementEvent getUiCheckboxOnEnableEvent(InterfaceElement checkbox)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	return handle->onEnable;
+}
+OnInterfaceElementEvent getUiCheckboxOnDisableEvent(InterfaceElement checkbox)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	return handle->onDisable;
+}
+OnInterfaceElementEvent getUiCheckboxOnEnterEvent(InterfaceElement checkbox)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	return handle->onEnter;
+}
+OnInterfaceElementEvent getUiCheckboxOnExitEvent(InterfaceElement checkbox)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	return handle->onExit;
+}
+OnInterfaceElementEvent getUiCheckboxOnPressEvent(InterfaceElement checkbox)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	return handle->onPress;
+}
+OnInterfaceElementEvent getUiCheckboxOnReleaseEvent(InterfaceElement checkbox)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	return handle->onRelease;
+}
+
+LinearColor getUiCheckboxDisabledColor(
+	InterfaceElement checkbox)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	return handle->disabledColor;
+}
+void setUiCheckboxDisabledColor(
+	InterfaceElement checkbox,
+	LinearColor color)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	handle->disabledColor = color;
+}
+
+LinearColor getUiCheckboxEnabledColor(
+	InterfaceElement checkbox)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	return handle->enabledColor;
+}
+void setUiCheckboxEnabledColor(
+	InterfaceElement checkbox,
+	LinearColor color)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	handle->enabledColor = color;
+}
+
+LinearColor getUiCheckboxHoveredColor(
+	InterfaceElement checkbox)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	return handle->hoveredColor;
+}
+void setUiCheckboxHoveredColor(
+	InterfaceElement checkbox,
+	LinearColor color)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	handle->hoveredColor = color;
+}
+
+LinearColor getUiCheckboxPressedColor(
+	InterfaceElement checkbox)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	return handle->pressedColor;
+}
+void setUiCheckboxPressedColor(
+	InterfaceElement checkbox,
+	LinearColor color)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	handle->pressedColor = color;
+}
+
+bool isCheckboxChecked(
+	InterfaceElement checkbox)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	return handle->isChecked;
+}
+void setCheckboxChecked(
+	InterfaceElement checkbox,
+	bool isChecked)
+{
+	assert(checkbox);
+	UiCheckboxHandle handle =
+		getInterfaceElementHandle(checkbox);
+	assert(handle->type == CHECKBOX_UI_TYPE);
+	setTransformActive(
+		getGraphicsRenderTransform(
+			handle->checkRender),
+		isChecked);
+	handle->isChecked = isChecked;
 }

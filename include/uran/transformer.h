@@ -258,13 +258,13 @@ void setTransformParent(
 	Transform parent);
 
 /*
- * Returns transform handle.
+ * Returns transform handle. (Use with caution!)
  * transform - transform instance.
  */
 void* getTransformHandle(
 	Transform transform);
 /*
- * Sets transform handle.
+ * Sets transform handle. (Use with caution!)
  *
  * transform - transform instance.
  * parent - transform parent.

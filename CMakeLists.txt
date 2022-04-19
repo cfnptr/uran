@@ -110,7 +110,8 @@ set(URAN_LINK_LIBRARIES
 	logy-static
 	mpgx-static
 	pack-static
-	mpnw-static)
+	mpnw-static
+	${URAN_PROGRAM_LIBRARIES})
 
 configure_file(cmake/defines.h.in uran/defines.h)
 

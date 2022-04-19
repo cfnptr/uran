@@ -44,7 +44,6 @@ struct Interface_T
 	InterfaceElement lastElement;
 	cmmt_float_t scale;
 	bool isPressed;
-	bool isMoved;
 #ifndef NDEBUG
 	bool isEnumerating;
 #endif
@@ -57,7 +56,7 @@ Interface createInterface(
 	ThreadPool threadPool)
 {
 	assert(window);
-	assert(scale > 0.0f);
+	assert(scale > 0.0);
 	assert(capacity > 0);
 
 	Interface interface = calloc(1,
@@ -71,7 +70,6 @@ Interface createInterface(
 	interface->scale = scale;
 	interface->lastElement = NULL;
 	interface->isPressed = false;
-	interface->isMoved = false;
 #ifndef NDEBUG
 	interface->isEnumerating = false;
 #endif
@@ -129,7 +127,7 @@ void setInterfaceScale(
 	cmmt_float_t scale)
 {
 	assert(interface);
-	assert(scale > 0.0f);
+	assert(scale > 0.0);
 	interface->scale = scale;
 }
 
@@ -277,8 +275,8 @@ Camera createInterfaceCamera(
 		halfSize.x,
 		-halfSize.y,
 		halfSize.y,
-		0.0f,
-		1.0f);
+		(cmmt_float_t)0.0,
+		(cmmt_float_t)1.0);
 }
 
 inline static void updateInterfaceElementPosition(
