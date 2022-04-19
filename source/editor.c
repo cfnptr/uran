@@ -182,6 +182,7 @@ inline static BaseWindow createBaseWindow(
 			scale.y * (cmmt_float_t)0.5,
 			(cmmt_float_t)-0.01),
 		valVec2F((cmmt_float_t)18.0),
+		true,
 		windowTransform,
 		&events,
 		baseWindow,
@@ -493,6 +494,7 @@ inline static MenuBar createMenuBar(
 		vec2F(
 			(cmmt_float_t)64.0,
 			(cmmt_float_t)(DEFAULT_UI_TEXT_HEIGHT * 2.0)),
+		true,
 		panelTransform,
 		&events,
 		menuBar,

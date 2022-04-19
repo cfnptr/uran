@@ -1026,17 +1026,17 @@ MAIN_FUNCTION
 		return EXIT_FAILURE;
 	}
 
-	logMessage(logger, INFO_LOG_LEVEL,
 #if __linux__
-		"OS: Linux.");
+	const char* osString = "OS: Linux.";
 #elif __APPLE__
-		"OS: macOS.");
+	const char* osString = "OS: macOS.";
 #elif _WIN32
-		"OS: Windows.");
+	const char* osString = "OS: Windows.";
 #else
-		"OS: Unknown.");
 #error Unknown operating system
 #endif
+
+	logMessage(logger, INFO_LOG_LEVEL, osString);
 
 	int cpuCount = getCpuCount();
 

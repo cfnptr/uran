@@ -260,6 +260,7 @@ void terminateText(Logger logger)
 	}
 
 	ftLibrary = NULL;
+	textInitialized = false;
 }
 bool isTextInitialized()
 {

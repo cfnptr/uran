@@ -1874,7 +1874,7 @@ static void onUiButtonRelease(InterfaceElement element)
 	if (handle->isPressed)
 	{
 		handle->isPressed = false;
-		
+
 		setPanelRenderColor(
 			handle->panelRender,
 			handle->hoveredColor);
@@ -1919,6 +1919,7 @@ inline static MpgxResult internalCreateUiButton(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
+	bool isEnabled,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* _handle,
@@ -1974,7 +1975,9 @@ inline static MpgxResult internalCreateUiButton(
 		ui->panelRenderer,
 		panelTransform,
 		oneSizeBox3F,
-		srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR),
+		srgbToLinearColor(isEnabled ?
+			DEFAULT_UI_ENABLED_BUTTON_COLOR :
+			DEFAULT_UI_DISABLED_BUTTON_COLOR),
 		zeroVec4I);
 
 	if (!panelRender)
@@ -2087,7 +2090,7 @@ inline static MpgxResult internalCreateUiButton(
 		alignment,
 		position,
 		oneSizeBox2F,
-		true,
+		isEnabled,
 		onUiButtonDestroy,
 		&elementEvents,
 		handle);
@@ -2111,6 +2114,7 @@ MpgxResult createUiButton(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
+	bool isEnabled,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
@@ -2135,6 +2139,7 @@ MpgxResult createUiButton(
 		alignment,
 		position,
 		scale,
+		isEnabled,
 		parent,
 		events,
 		handle,
@@ -2149,6 +2154,7 @@ MpgxResult createUiButton8(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
+	bool isEnabled,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
@@ -2173,6 +2179,7 @@ MpgxResult createUiButton8(
 		alignment,
 		position,
 		scale,
+		isEnabled,
 		parent,
 		events,
 		handle,
@@ -2520,6 +2527,7 @@ inline static MpgxResult internalCreateUiInputField(
 	Vec2F scale,
 	size_t maxLength,
 	uint32_t mask,
+	bool isEnabled,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	OnInterfaceElementEvent onChange,
@@ -2621,7 +2629,9 @@ inline static MpgxResult internalCreateUiInputField(
 		panelRenderer,
 		focusTransform,
 		oneSizeBox3F,
-		srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR),
+		srgbToLinearColor(isEnabled ?
+			DEFAULT_UI_ENABLED_INPUT_COLOR :
+			DEFAULT_UI_DISABLED_INPUT_COLOR),
 		zeroVec4I);
 
 	if (!focusRender)
@@ -2812,7 +2822,7 @@ inline static MpgxResult internalCreateUiInputField(
 		alignment,
 		position,
 		oneSizeBox2F,
-		true,
+		isEnabled,
 		onUiInputFieldDestroy,
 		&elementEvents,
 		handle);
@@ -2840,6 +2850,7 @@ MpgxResult createUiInputField(
 	Vec2F scale,
 	size_t maxLength,
 	uint32_t mask,
+	bool isEnabled,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	OnInterfaceElementEvent onChange,
@@ -2869,6 +2880,7 @@ MpgxResult createUiInputField(
 		scale,
 		maxLength,
 		mask,
+		isEnabled,
 		parent,
 		events,
 		onChange,
@@ -2887,6 +2899,7 @@ MpgxResult createUiInputField8(
 	Vec2F scale,
 	size_t maxLength,
 	uint32_t mask,
+	bool isEnabled,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	OnInterfaceElementEvent onChange,
@@ -2916,6 +2929,7 @@ MpgxResult createUiInputField8(
 		scale,
 		maxLength,
 		mask,
+		isEnabled,
 		parent,
 		events,
 		onChange,
@@ -3385,6 +3399,7 @@ inline static MpgxResult internalCreateUiCheckbox(
 	Vec3F position,
 	cmmt_float_t scale,
 	bool isChecked,
+	bool isEnabled,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* _handle,
@@ -3441,7 +3456,9 @@ inline static MpgxResult internalCreateUiCheckbox(
 		panelRenderer,
 		panelTransform,
 		oneSizeBox3F,
-		srgbToLinearColor(DEFAULT_UI_ENABLED_CHECKBOX_COLOR),
+		srgbToLinearColor(isEnabled ?
+			DEFAULT_UI_ENABLED_CHECKBOX_COLOR :
+			DEFAULT_UI_DISABLED_CHECKBOX_COLOR),
 		zeroVec4I);
 
 	if (!panelRender)
@@ -3630,7 +3647,7 @@ inline static MpgxResult internalCreateUiCheckbox(
 		alignment,
 		position,
 		oneSizeBox2F,
-		true,
+		isEnabled,
 		onUiCheckboxDestroy,
 		&elementEvents,
 		handle);
@@ -3657,6 +3674,7 @@ MpgxResult createUiCheckbox(
 	Vec3F position,
 	cmmt_float_t scale,
 	bool isChecked,
+	bool isEnabled,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
@@ -3681,6 +3699,7 @@ MpgxResult createUiCheckbox(
 		position,
 		scale,
 		isChecked,
+		isEnabled,
 		parent,
 		events,
 		handle,
@@ -3696,6 +3715,7 @@ MpgxResult createUiCheckbox8(
 	Vec3F position,
 	cmmt_float_t scale,
 	bool isChecked,
+	bool isEnabled,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
@@ -3720,6 +3740,7 @@ MpgxResult createUiCheckbox8(
 		position,
 		scale,
 		isChecked,
+		isEnabled,
 		parent,
 		events,
 		handle,

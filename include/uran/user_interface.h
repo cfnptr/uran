@@ -372,6 +372,7 @@ OnInterfaceElementEvent getUiWindowOnPressEvent(InterfaceElement window);
  * alignment - alignment type.
  * position - button position.
  * scale - button scale.
+ * isEnabled - is button enabled.
  * parent - parent instance or NULL.
  * events - interface events or NULL.
  * handle - button handle or NULL.
@@ -385,6 +386,7 @@ MpgxResult createUiButton(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
+	bool isEnabled,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
@@ -400,6 +402,7 @@ MpgxResult createUiButton(
  * alignment - alignment type.
  * position - button position.
  * scale - button scale.
+ * isEnabled - is button enabled.
  * parent - parent instance or NULL.
  * events - interface events or NULL.
  * handle - button handle or NULL.
@@ -413,6 +416,7 @@ MpgxResult createUiButton8(
 	AlignmentType alignment,
 	Vec3F position,
 	Vec2F scale,
+	bool isEnabled,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
@@ -541,6 +545,7 @@ void setUiButtonPressedColor(
  * scale - input field scale.
  * maxLength - max input string length.
  * mask - password mask character or 0.
+ * isEnabled - is input field enabled.
  * parent - parent instance or NULL.
  * events - interface events or NULL.
  * onChange - on change event function or NULL.
@@ -558,6 +563,7 @@ MpgxResult createUiInputField(
 	Vec2F scale,
 	size_t maxLength,
 	uint32_t mask,
+	bool isEnabled,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	OnInterfaceElementEvent onChange,
@@ -577,6 +583,7 @@ MpgxResult createUiInputField(
  * scale - input field scale.
  * maxLength - max input string length.
  * mask - password mask character or 0.
+ * isEnabled - is input field enabled.
  * parent - parent instance or NULL.
  * events - interface events or NULL.
  * onChange - on change event function or NULL.
@@ -594,6 +601,7 @@ MpgxResult createUiInputField8(
 	Vec2F scale,
 	size_t maxLength,
 	uint32_t mask,
+	bool isEnabled,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	OnInterfaceElementEvent onChange,
@@ -779,6 +787,7 @@ bool setUiInputFieldText8(
  * position - checkbox position.
  * scale - checkbox scale.
  * isChecked - is checkbox checked.
+ * isEnabled - is checkbox enabled.
  * parent - parent instance or NULL.
  * events - interface events or NULL.
  * handle - checkbox handle or NULL.
@@ -793,6 +802,7 @@ MpgxResult createUiCheckbox(
 	Vec3F position,
 	cmmt_float_t scale,
 	bool isChecked,
+	bool isEnabled,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
@@ -809,6 +819,7 @@ MpgxResult createUiCheckbox(
  * position - checkbox position.
  * scale - checkbox scale.
  * isChecked - is checkbox checked.
+ * isEnabled - is checkbox enabled.
  * parent - parent instance or NULL.
  * events - interface events or NULL.
  * handle - checkbox handle or NULL.
@@ -823,6 +834,7 @@ MpgxResult createUiCheckbox8(
 	Vec3F position,
 	cmmt_float_t scale,
 	bool isChecked,
+	bool isEnabled,
 	Transform parent,
 	const InterfaceElementEvents* events,
 	void* handle,
