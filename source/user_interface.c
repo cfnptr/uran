@@ -1400,7 +1400,6 @@ MpgxResult setUiLabelText(
 	assert(length == 0 ||
 		(length > 0 && string));
 
-
 	UiLabelHandle handle =
 		getInterfaceElementHandle(label);
 	Text text = getTextRenderText(handle->render);
@@ -1707,7 +1706,7 @@ inline static MpgxResult internalCreateUiWindow(
 		ui->textRenderer,
 		titleTransform,
 		createTextBox3F(
-			alignment,
+			CENTER_ALIGNMENT_TYPE,
 			getTextSize(text)),
 		whiteLinearColor,
 		text,
@@ -2131,7 +2130,8 @@ inline static MpgxResult internalCreateUiButton(
 	GraphicsRender textRender = createTextRender(
 		ui->textRenderer,
 		textTransform,
-		createTextBox3F(alignment,
+		createTextBox3F(
+			CENTER_ALIGNMENT_TYPE,
 			getTextSize(textInstance)),
 		whiteLinearColor,
 		textInstance,
@@ -2785,7 +2785,7 @@ inline static MpgxResult internalCreateUiInputField(
 		textRenderer,
 		textTransform,
 		createTextBox3F(
-			alignment,
+			LEFT_ALIGNMENT_TYPE,
 			getTextSize(textInstance)),
 		whiteLinearColor,
 		textInstance,
@@ -2865,7 +2865,7 @@ inline static MpgxResult internalCreateUiInputField(
 		textRenderer,
 		placeholderTransform,
 		createTextBox3F(
-			alignment,
+			LEFT_ALIGNMENT_TYPE,
 			getTextSize(textInstance)),
 		whiteLinearColor,
 		placeholderInstance,
@@ -3257,18 +3257,18 @@ MpgxResult setUiInputFieldText(
 	Text text = getTextRenderText(handle->textRender);
 	UserInterface ui = handle->ui;
 
+	bool result = setTextString(text, string, length);
+
+	if (!result)
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+	MpgxResult mpgxResult = bakeInputFieldText(text, handle->mask);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+		return mpgxResult;
+
 	if (length > 0)
 	{
-		bool result = setTextString(text, string, length);
-
-		if (!result)
-			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
-
-		MpgxResult mpgxResult = bakeInputFieldText(text, handle->mask);
-
-		if (mpgxResult != SUCCESS_MPGX_RESULT)
-			return mpgxResult;
-
 		setTransformActive(getGraphicsRenderTransform(
 			handle->textRender), true);
 		setTransformActive(getGraphicsRenderTransform(
@@ -3307,18 +3307,18 @@ MpgxResult setUiInputFieldText8(
 	Text text = getTextRenderText(handle->textRender);
 	UserInterface ui = handle->ui;
 
+	bool result = setTextString8(text, string, length);
+
+	if (!result)
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+
+	MpgxResult mpgxResult = bakeInputFieldText(text, handle->mask);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+		return mpgxResult;
+
 	if (length > 0)
 	{
-		bool result = setTextString8(text, string, length);
-
-		if (!result)
-			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
-
-		MpgxResult mpgxResult = bakeInputFieldText(text, handle->mask);
-
-		if (mpgxResult != SUCCESS_MPGX_RESULT)
-			return mpgxResult;
-
 		setTransformActive(getGraphicsRenderTransform(
 			handle->textRender), true);
 		setTransformActive(getGraphicsRenderTransform(
@@ -3696,7 +3696,8 @@ inline static MpgxResult internalCreateUiCheckbox(
 	GraphicsRender textRender = createTextRender(
 		ui->textRenderer,
 		textTransform,
-		createTextBox3F(alignment,
+		createTextBox3F(
+			LEFT_ALIGNMENT_TYPE,
 			getTextSize(textInstance)),
 		whiteLinearColor,
 		textInstance,

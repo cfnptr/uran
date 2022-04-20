@@ -193,7 +193,7 @@ inline static void storeSettings(
 	result &= writeConfComment(confWriter,
 		"Copyright (c) 2020-2022 Nikita Fediuchin. All rights reserved.");
 	result &= writeConfComment(confWriter,
-		"Licensed under the Apache License, Version 2.0 (the \"License\")");
+		"Licensed under the Apache License, Version 2.0 (\"AS IS\" BASIS)");
 	result &= writeConfComment(confWriter,
 		"==============================================================");
 	result &= writeConfNewLine(confWriter);
@@ -772,9 +772,6 @@ inline static Program createProgram(
 	assert(logger);
 	assert(threadPool);
 
-	logMessage(logger, INFO_LOG_LEVEL,
-		"Uran - Editor (v" URAN_VERSION_STRING ")");
-
 	Program program = calloc(
 		1, sizeof(Program_T));
 
@@ -1026,6 +1023,9 @@ MAIN_FUNCTION
 			logyResultToString(logyResult));
 		return EXIT_FAILURE;
 	}
+
+	logMessage(logger, INFO_LOG_LEVEL,
+		"Uran - Editor (v" URAN_VERSION_STRING ")");
 
 #if __linux__
 	const char* osString = "OS: Linux.";
