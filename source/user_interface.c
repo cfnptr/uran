@@ -23,6 +23,8 @@
 #define ACTION_START_DELAY 0.24
 #define ACTION_PRESS_DELAY 0.08
 
+// TODO: use better approach for the input field mask, cache buffers, etc.
+
 struct UserInterface_T
 {
 	Window window;
@@ -241,7 +243,7 @@ MpgxResult createUserInterface(
 
 	GraphicsRenderer panelRenderer = createPanelRenderer(
 		panelPipeline,
-		DESCENDING_GRAPHICS_RENDER_SORTING,
+		UI_DESCENDING_GRAPHICS_RENDER_SORTING,
 		false,
 		1,
 		threadPool);
@@ -256,7 +258,7 @@ MpgxResult createUserInterface(
 
 	GraphicsRenderer textRenderer = createTextRenderer(
 		textPipeline,
-		DESCENDING_GRAPHICS_RENDER_SORTING,
+		UI_DESCENDING_GRAPHICS_RENDER_SORTING,
 		false,
 		1,
 		threadPool);
@@ -336,14 +338,15 @@ inline static MpgxResult bakeInputFieldText(
 	MpgxResult mpgxResult = OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	size_t length = getTextLength(text);
 
-	if (length > 0 && mask != 0) // TODO: cache mask buffer
+	if (length > 0 && mask != 0)
 	{
 		const uint32_t* string = getTextString(text);
-		uint32_t* textString = malloc(length * sizeof(uint32_t));
-		uint32_t* maskString = malloc(length * sizeof(uint32_t));
+		uint32_t* textString = malloc(length * 2 * sizeof(uint32_t));
 
-		if (textString && maskString)
+		if (textString)
 		{
+			uint32_t* maskString = textString + length;
+
 			memcpy(textString, string,
 				length * sizeof(uint32_t));
 
@@ -360,7 +363,6 @@ inline static MpgxResult bakeInputFieldText(
 		}
 
 		free(textString);
-		free(maskString);
 	}
 	else
 	{
@@ -387,15 +389,16 @@ inline static void updateCursor(
 
 	bool offsetResult = false;
 
-	if (getTextLength(text) > 0 && mask != 0) // TODO: cache mask buffer
+	if (getTextLength(text) > 0 && mask != 0)
 	{
 		const uint32_t* string = getTextString(text);
 		size_t length = getTextLength(text);
-		uint32_t* textString = malloc(length * sizeof(uint32_t));
-		uint32_t* maskString = malloc(length * sizeof(uint32_t));
+		uint32_t* textString = malloc(length * 2 * sizeof(uint32_t));
 
-		if (textString && maskString)
+		if (textString)
 		{
+			uint32_t* maskString = textString + length;
+
 			memcpy(textString, string,
 				length * sizeof(uint32_t));
 
@@ -415,7 +418,6 @@ inline static void updateCursor(
 		}
 
 		free(textString);
-		free(maskString);
 	}
 	else
 	{
@@ -2505,15 +2507,16 @@ static void onUiInputFieldPress(InterfaceElement element)
 
 	size_t index = 0;
 
-	if (getTextLength(text) > 0 && handle->mask != 0) // TODO: cache mask buffer
+	if (getTextLength(text) > 0 && handle->mask != 0)
 	{
 		const uint32_t* string = getTextString(text);
 		size_t length = getTextLength(text);
-		uint32_t* textString = malloc(length * sizeof(uint32_t));
-		uint32_t* maskString = malloc(length * sizeof(uint32_t));
+		uint32_t* textString = malloc(length * 2 * sizeof(uint32_t));
 
-		if (textString && maskString)
+		if (textString)
 		{
+			uint32_t* maskString = textString + length;
+
 			memcpy(textString, string,
 				length * sizeof(uint32_t));
 			uint32_t mask = handle->mask;
@@ -2531,7 +2534,6 @@ static void onUiInputFieldPress(InterfaceElement element)
 		}
 
 		free(textString);
-		free(maskString);
 	}
 	else
 	{

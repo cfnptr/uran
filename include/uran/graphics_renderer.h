@@ -46,7 +46,9 @@ typedef enum GraphicsRenderSorting_T
 	NO_GRAPHICS_RENDER_SORTING = 0,
 	ASCENDING_GRAPHICS_RENDER_SORTING = 1,
 	DESCENDING_GRAPHICS_RENDER_SORTING = 2,
-	GRAPHICS_RENDER_SORTING_COUNT = 3,
+	UI_ASCENDING_GRAPHICS_RENDER_SORTING = 3,
+	UI_DESCENDING_GRAPHICS_RENDER_SORTING = 4,
+	GRAPHICS_RENDER_SORTING_COUNT = 5,
 } RenderSorting_T;
 
 /*
@@ -124,22 +126,6 @@ GraphicsRenderer createGraphicsRenderer(
 	GraphicsPipeline pipeline,
 	GraphicsRenderSorting sorting,
 	bool useCulling,
-	OnGraphicsRenderDestroy onDestroy,
-	OnGraphicsRenderDraw onDraw,
-	size_t capacity,
-	ThreadPool threadPool);
-/*
- * Create a new default graphics renderer instance.
- * Returns graphics renderer instance on success, otherwise NULL.
- *
- * pipeline - graphics pipeline instance.
- * onDestroy - on graphics render destroy function.
- * onDraw - on graphics render draw function.
- * capacity - initial render array capacity.
- * threadPool - thread pool instance or NULL.
- */
-GraphicsRenderer createDefaultGraphicsRenderer(
-	GraphicsPipeline pipeline,
 	OnGraphicsRenderDestroy onDestroy,
 	OnGraphicsRenderDraw onDraw,
 	size_t capacity,

@@ -214,7 +214,7 @@ inline static void storeSettings(
 	result &= writeConfComment(confWriter,
 		"(auto, vulkan, opengl)");
 	result &= writeConfString(confWriter,
-		"graphicsAPI", stringValue);
+		"graphicsAPI", stringValue, 0);
 	result &= writeConfNewLine(confWriter);
 
 	result &= writeConfComment(confWriter,

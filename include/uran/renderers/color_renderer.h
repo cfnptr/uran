@@ -23,7 +23,7 @@
  * colorPipeline - color pipeline instance.
  * sorting - render sorting type.
  * useCulling - use frustum culling.
- * capacity - initial render array capacity or 0.
+ * capacity - initial render array capacity.
  * threadPool - thread pool instance or NULL.
  */
 GraphicsRenderer createColorRenderer(

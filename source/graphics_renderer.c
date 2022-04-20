@@ -104,27 +104,6 @@ GraphicsRenderer createGraphicsRenderer(
 	graphicsRenderer->renderElements = renderElements;
 	return graphicsRenderer;
 }
-GraphicsRenderer createDefaultGraphicsRenderer(
-	GraphicsPipeline pipeline,
-	OnGraphicsRenderDestroy onDestroy,
-	OnGraphicsRenderDraw onDraw,
-	size_t capacity,
-	ThreadPool threadPool)
-{
-	assert(pipeline);
-	assert(onDestroy);
-	assert(onDraw);
-	assert(capacity > 0);
-
-	return createGraphicsRenderer(
-		pipeline,
-		ASCENDING_GRAPHICS_RENDER_SORTING,
-		true,
-		onDestroy,
-		onDraw,
-		capacity,
-		threadPool);
-}
 void destroyGraphicsRenderer(GraphicsRenderer renderer)
 {
 	if (!renderer)
@@ -262,13 +241,6 @@ static int ascendingRenderCompare(
 		data->rendererPosition,
 		data->renderPosition);
 
-	if (distanceA < distanceB)
-		return -1;
-	if (distanceA == distanceB)
-		return 0;
-	if (distanceA > distanceB)
-		return 1;
-
 	return distanceA > distanceB ? 1 : -1;
 }
 static int descendingRenderCompare(
@@ -290,6 +262,51 @@ static int descendingRenderCompare(
 	cmmt_float_t distanceB = distPowVec3F(
 		data->rendererPosition,
 		data->renderPosition);
+
+	return distanceA < distanceB ? 1 : -1;
+}
+
+static int uiAscendingRenderCompare(
+	const void* a,
+	const void* b)
+{
+	// NOTE: a and b should not be NULL!
+	// Skipping assertions for debug build speed.
+
+	const GraphicsRenderElement* data =
+		(GraphicsRenderElement*)a;
+
+	cmmt_float_t distanceA =
+		data->renderPosition.z -
+		data->rendererPosition.z;
+
+	data = (GraphicsRenderElement*)b;
+
+	cmmt_float_t distanceB =
+		data->renderPosition.z -
+		data->rendererPosition.z;
+
+	return distanceA > distanceB ? 1 : -1;
+}
+static int uiDescendingRenderCompare(
+	const void* a,
+	const void* b)
+{
+	// NOTE: a and b should not be NULL!
+	// Skipping assertions for debug build speed.
+
+	const GraphicsRenderElement* data =
+		(GraphicsRenderElement*)a;
+
+	cmmt_float_t distanceA =
+		data->renderPosition.z -
+		data->rendererPosition.z;
+
+	data = (GraphicsRenderElement*)b;
+
+	cmmt_float_t distanceB =
+		data->renderPosition.z -
+		data->rendererPosition.z;
 
 	return distanceA < distanceB ? 1 : -1;
 }
@@ -524,6 +541,20 @@ GraphicsRendererResult drawGraphicsRenderer(
 				elementCount,
 				sizeof(GraphicsRenderElement),
 				descendingRenderCompare);
+		}
+		else if (sorting == UI_ASCENDING_GRAPHICS_RENDER_SORTING)
+		{
+			qsort(renderElements,
+				elementCount,
+				sizeof(GraphicsRenderElement),
+				uiAscendingRenderCompare);
+		}
+		else if (sorting == UI_DESCENDING_GRAPHICS_RENDER_SORTING)
+		{
+			qsort(renderElements,
+				elementCount,
+				sizeof(GraphicsRenderElement),
+				uiDescendingRenderCompare);
 		}
 		else
 		{
