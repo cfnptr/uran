@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "uran/user_interface.h"
+#include "openssl/crypto.h"
+
 #include <string.h>
 
 #if _WIN32
@@ -177,7 +179,6 @@ inline static GraphicsRender createCursorRenderInstance(
 		return NULL;
 	}
 
-	setTransformHandle(transform, render);
 	return render;
 }
 inline static void destroyCursorRenderInstance(
@@ -362,6 +363,7 @@ inline static MpgxResult bakeInputFieldText(
 			}
 		}
 
+		OPENSSL_cleanse(textString, length * 2 * sizeof(uint32_t));
 		free(textString);
 	}
 	else
@@ -417,6 +419,7 @@ inline static void updateCursor(
 			}
 		}
 
+		OPENSSL_cleanse(textString, length * 2 * sizeof(uint32_t));
 		free(textString);
 	}
 	else
@@ -1650,8 +1653,8 @@ inline static MpgxResult internalCreateUiWindow(
 			(cmmt_float_t)scale.y * (cmmt_float_t)0.5,
 			(cmmt_float_t)-0.001),
 		vec3F(
-			DEFAULT_UI_TEXT_HEIGHT,
-			DEFAULT_UI_TEXT_HEIGHT,
+			(cmmt_float_t)DEFAULT_UI_TEXT_HEIGHT,
+			(cmmt_float_t)DEFAULT_UI_TEXT_HEIGHT,
 			(cmmt_float_t)1.0),
 		oneQuat,
 		NO_ROTATION_TYPE,
@@ -1923,9 +1926,12 @@ static void onUiButtonExit(InterfaceElement element)
 	UiButtonHandle handle = (UiButtonHandle)
 		getInterfaceElementHandle(element);
 	assert(handle->type == BUTTON_UI_TYPE);
-	setPanelRenderColor(
-		handle->panelRender,
-		handle->enabledColor);
+	if (isInterfaceElementEnabled(element))
+	{
+		setPanelRenderColor(
+			handle->panelRender,
+			handle->enabledColor);
+	}
 	handle->isPressed = false;
 	if (handle->onExit)
 		handle->onExit(element);
@@ -2075,8 +2081,8 @@ inline static MpgxResult internalCreateUiButton(
 			(cmmt_float_t)0.0,
 			(cmmt_float_t)-0.001),
 		vec3F(
-			DEFAULT_UI_TEXT_HEIGHT,
-			DEFAULT_UI_TEXT_HEIGHT,
+			(cmmt_float_t)(DEFAULT_UI_TEXT_HEIGHT + 2.0),
+			(cmmt_float_t)(DEFAULT_UI_TEXT_HEIGHT + 2.0),
 			(cmmt_float_t)1.0),
 		oneQuat,
 		NO_ROTATION_TYPE,
@@ -2533,6 +2539,7 @@ static void onUiInputFieldPress(InterfaceElement element)
 			}
 		}
 
+		OPENSSL_cleanse(textString, length * 2 * sizeof(uint32_t));
 		free(textString);
 	}
 	else
@@ -2723,9 +2730,8 @@ inline static MpgxResult internalCreateUiInputField(
 
 	handle->focusRender = focusRender;
 
-	cmmt_float_t textPosition =
-		(scale.x * (cmmt_float_t)-0.5) +
-		(DEFAULT_UI_TEXT_HEIGHT * (cmmt_float_t)0.5);
+	cmmt_float_t textPosition = scale.x * (cmmt_float_t)-0.5 +
+		(cmmt_float_t)DEFAULT_UI_TEXT_HEIGHT * (cmmt_float_t)0.5;
 
 	Transform textTransform = createTransform(
 		transformer,
@@ -2734,8 +2740,8 @@ inline static MpgxResult internalCreateUiInputField(
 			(cmmt_float_t)0.0,
 			(cmmt_float_t)-0.001),
 		vec3F(
-			DEFAULT_UI_TEXT_HEIGHT,
-			DEFAULT_UI_TEXT_HEIGHT,
+			(cmmt_float_t)DEFAULT_UI_TEXT_HEIGHT,
+			(cmmt_float_t)DEFAULT_UI_TEXT_HEIGHT,
 			(cmmt_float_t)1.0),
 		oneQuat,
 		NO_ROTATION_TYPE,
@@ -2810,8 +2816,8 @@ inline static MpgxResult internalCreateUiInputField(
 			(cmmt_float_t)0.0,
 			(cmmt_float_t)-0.001),
 		vec3F(
-			DEFAULT_UI_TEXT_HEIGHT,
-			DEFAULT_UI_TEXT_HEIGHT,
+			(cmmt_float_t)DEFAULT_UI_TEXT_HEIGHT,
+			(cmmt_float_t)DEFAULT_UI_TEXT_HEIGHT,
 			(cmmt_float_t)1.0),
 		oneQuat,
 		NO_ROTATION_TYPE,
@@ -3641,8 +3647,8 @@ inline static MpgxResult internalCreateUiCheckbox(
 			(cmmt_float_t)0.0,
 			(cmmt_float_t)0.0),
 		vec3F(
-			DEFAULT_UI_TEXT_HEIGHT,
-			DEFAULT_UI_TEXT_HEIGHT,
+			(cmmt_float_t)DEFAULT_UI_TEXT_HEIGHT,
+			(cmmt_float_t)DEFAULT_UI_TEXT_HEIGHT,
 			(cmmt_float_t)1.0),
 		oneQuat,
 		NO_ROTATION_TYPE,

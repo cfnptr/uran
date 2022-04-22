@@ -2023,13 +2023,13 @@ inline static bool fillVertices(
 				SrgbColor newColor;
 
 				bool result = hexToColor(
-					string + 2,
+					string + i + 2,
 					&newColor.r);
 				result &= hexToColor(
-					string + 4,
+					string + i + 4,
 					&newColor.g);
 				result &= hexToColor(
-					string + 6,
+					string + i + 6,
 					&newColor.b);
 
 				if (result)
@@ -2045,16 +2045,16 @@ inline static bool fillVertices(
 				SrgbColor newColor;
 
 				bool result = hexToColor(
-					string + 2,
+					string + i + 2,
 					&newColor.r);
 				result &= hexToColor(
-					string + 4,
+					string + i + 4,
 					&newColor.g);
 				result &= hexToColor(
-					string + 6,
+					string + i + 6,
 					&newColor.b);
 				result &= hexToColor(
-					string + 8,
+					string + i + 8,
 					&newColor.a);
 
 				if (result)

@@ -127,18 +127,16 @@ target_include_directories(uran-static PUBLIC
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows" AND
 	${CMAKE_BUILD_TYPE} MATCHES "Release")
-	add_executable(uran-editor WIN32
+	add_executable(${URAN_PROGRAM_NAME} WIN32
 		${URAN_PROGRAM_SOURCES})
 else ()
-	add_executable(uran-editor
+	add_executable(${URAN_PROGRAM_NAME}
 		${URAN_PROGRAM_SOURCES})
 endif ()
 
-set_target_properties(uran-editor PROPERTIES
-	OUTPUT_NAME "${URAN_PROGRAM_NAME}")
-target_link_libraries(uran-editor PRIVATE
+target_link_libraries(${URAN_PROGRAM_NAME} PRIVATE
 	uran-static)
-target_include_directories(uran-editor PRIVATE
+target_include_directories(${URAN_PROGRAM_NAME} PRIVATE
 	${PROJECT_BINARY_DIR}
 	${PROJECT_SOURCE_DIR}/include
 	${URAN_PROGRAM_INCLUDES})
@@ -146,7 +144,7 @@ target_include_directories(uran-editor PRIVATE
 if (${CMAKE_BUILD_TYPE} MATCHES "Release" AND
 	(${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR
 	${CMAKE_SYSTEM_NAME} MATCHES "Darwin"))
-	add_custom_command(TARGET uran-editor POST_BUILD
+	add_custom_command(TARGET ${URAN_PROGRAM_NAME} POST_BUILD
 		COMMAND strip "$<TARGET_FILE:uran-editor>"
 		VERBATIM)
 endif ()
