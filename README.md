@@ -14,8 +14,9 @@ Work in Progress!
 ## Build requirements
 
 * C99 and C++11 compiler
+* Objective-C compiler (macOS only)
 * [Git 2.30+](https://git-scm.com/)
-* [CMake 3.10+](https://cmake.org/)
+* [CMake 3.16+](https://cmake.org/)
 * [Vulkan SDK 1.2+](https://vulkan.lunarg.com/)
 * [X11](https://www.x.org/) (Linux only)
 * [OpenSSL 1.1.1+](https://openssl.org/)
@@ -34,10 +35,17 @@ Work in Progress!
 
 | Name                   | Description                        | Default value   |
 |------------------------|------------------------------------|-----------------|
+| URAN_MACOS_BUNDLE      | Build as macOS bundle              | `OFF`           |
+
+### CMake variables
+| Name                   | Description                        | Default value   |
+|------------------------|------------------------------------|-----------------|
 | URAN_PROGRAM_NAME      | Custom program executable name     | `uran-editor`   |
 | URAN_PROGRAM_SOURCES   | Custom program source files        | `source/main.c` |
 | URAN_PROGRAM_INCLUDES  | Custom program include directories |                 |
 | URAN_PROGRAM_LIBRARIES | Custom program link libraries      |                 |
+| URAN_MACOS_INFO_PLIST  | Custom macOS bundle Info.plist     |                 |
+| URAN_MACOS_RESOURCES   | Custom macOS bundle resources      |                 |
 
 ## Cloning
 

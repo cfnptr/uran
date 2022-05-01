@@ -577,7 +577,7 @@ Font createFont(
 	}
 
 	font->data = dataArray;
-	memcpy(dataArray, data, size);
+	memcpy(dataArray, data, size * sizeof(uint8_t));
 
 	FT_Face face;
 
@@ -1554,7 +1554,7 @@ inline static MpgxResult bakeFontAtlas(
 	uint32_t targetPixelLength =
 		newPixelLength > pixelLength ?
 		newPixelLength : pixelLength;
-	memset(pixelBuffer, 0,
+	memset(pixelBuffer, 0, sizeof(uint8_t) *
 		targetPixelLength * targetPixelLength * 4);
 
 	bool result = fillPixels(

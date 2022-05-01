@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.16)
 
 if (${CMAKE_SOURCE_DIR} MATCHES ${CMAKE_BINARY_DIR})
 	message(FATAL_ERROR "Prevented in-tree build")
@@ -22,22 +22,40 @@ if (TARGET uran-static)
 	return()
 endif ()
 
+set(URAN_LANGUAGES C CXX)
+
+if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+	list(APPEND URAN_LANGUAGES OBJC)
+endif ()
+
 project(uran
 	VERSION 0.0.1
 	DESCRIPTION "Open multi-platform game and application engine"
 	HOMEPAGE_URL "https://github.com/cfnptr/uran"
-	LANGUAGES C CXX)
+	LANGUAGES ${URAN_LANGUAGES})
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED TRUE)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
+option(URAN_MACOS_BUNDLE "Build as macOS bundle." OFF)
+
 if (NOT DEFINED URAN_PROGRAM_NAME)
 	set(URAN_PROGRAM_NAME uran-editor)
 endif ()
 if (NOT DEFINED URAN_PROGRAM_SOURCES)
 	set(URAN_PROGRAM_SOURCES source/main.c)
+endif ()
+
+if (URAN_MACOS_BUNDLE AND NOT DEFINED URAN_MACOS_INFO_PLIST)
+	message(FATAL_ERROR "macOS bundle Info.plist is not defined!")
+endif ()
+if (URAN_MACOS_BUNDLE AND NOT DEFINED URAN_MACOS_RESOURCES)
+	message(FATAL_ERROR "macOS bundle resources are not defined!")
+endif ()
+if (URAN_MACOS_BUNDLE AND NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+	message(FATAL_ERROR "Current system is not macOS!")
 endif ()
 
 set(CONF_BUILD_SHARED OFF CACHE BOOL "" FORCE)
@@ -131,7 +149,16 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows" AND
 		${URAN_PROGRAM_SOURCES})
 else ()
 	add_executable(${URAN_PROGRAM_NAME}
-		${URAN_PROGRAM_SOURCES})
+		${URAN_PROGRAM_SOURCES}
+		${URAN_MACOS_RESOURCES})
+endif ()
+
+if (${URAN_MACOS_BUNDLE} AND
+	${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+	set_target_properties(${URAN_PROGRAM_NAME} PROPERTIES
+		MACOSX_BUNDLE TRUE
+		MACOSX_BUNDLE_INFO_PLIST ${URAN_MACOS_INFO_PLIST}
+		RESOURCE "${URAN_MACOS_RESOURCES}")
 endif ()
 
 target_link_libraries(${URAN_PROGRAM_NAME} PRIVATE
@@ -145,7 +172,7 @@ if (${CMAKE_BUILD_TYPE} MATCHES "Release" AND
 	(${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR
 	${CMAKE_SYSTEM_NAME} MATCHES "Darwin"))
 	add_custom_command(TARGET ${URAN_PROGRAM_NAME} POST_BUILD
-		COMMAND strip "$<TARGET_FILE:uran-editor>"
+		COMMAND strip "$<TARGET_FILE:${URAN_PROGRAM_NAME}>"
 		VERBATIM)
 endif ()
 
