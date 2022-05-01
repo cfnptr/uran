@@ -40,7 +40,7 @@
 #define MAIN_FUNCTION int main(int argc, char *argv[])
 #endif
 
-#define LOG_FILE_PATH "log.txt"
+#define LOG_DIRECTORY_PATH "logs"
 #define SETTINGS_FILE_PATH "editor-settings.txt"
 #define RESOURCES_FILE_PATH "editor-resources.pack"
 #define ENGINE_NAME "Uran"
@@ -998,8 +998,6 @@ inline static Program createProgram(
 
 MAIN_FUNCTION
 {
-	remove(LOG_FILE_PATH);
-
 #ifndef NDEBUG
 	LogLevel logLevel = ALL_LOG_LEVEL;
 	bool logToStdout = true;
@@ -1011,9 +1009,10 @@ MAIN_FUNCTION
 	Logger logger;
 
 	LogyResult logyResult = createLogger(
-		LOG_FILE_PATH,
+		LOG_DIRECTORY_PATH,
 		logLevel,
 		logToStdout,
+		0.0,
 		&logger);
 
 	if (logyResult != SUCCESS_LOGY_RESULT)
