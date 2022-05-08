@@ -22,24 +22,22 @@ if (TARGET uran-static)
 	return()
 endif ()
 
-option(URAN_MACOS_BUNDLE "Build as macOS bundle." OFF)
-
-set(URAN_LANGUAGES C CXX)
-
-if (${URAN_MACOS_BUNDLE} AND CMAKE_SYSTEM_NAME MATCHES "Darwin")
-	list(APPEND URAN_LANGUAGES OBJC)
-endif ()
-
 project(uran
 	VERSION 0.0.1
 	DESCRIPTION "Open multi-platform game and application engine"
 	HOMEPAGE_URL "https://github.com/cfnptr/uran"
-	LANGUAGES ${URAN_LANGUAGES})
+	LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED TRUE)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+	enable_language(OBJC)
+endif ()
+
+option(URAN_MACOS_BUNDLE "Build as macOS bundle." OFF)
 
 if (NOT DEFINED URAN_PROGRAM_NAME)
 	set(URAN_PROGRAM_NAME uran-editor)
@@ -48,14 +46,11 @@ if (NOT DEFINED URAN_PROGRAM_SOURCES)
 	set(URAN_PROGRAM_SOURCES source/main.c)
 endif ()
 
-if (${URAN_MACOS_BUNDLE} AND NOT DEFINED URAN_MACOS_INFO_PLIST)
+if (URAN_MACOS_BUNDLE AND NOT DEFINED URAN_MACOS_INFO_PLIST)
 	message(FATAL_ERROR "macOS bundle Info.plist is not defined!")
 endif ()
-if (${URAN_MACOS_BUNDLE} AND NOT DEFINED URAN_MACOS_RESOURCES)
+if (URAN_MACOS_BUNDLE AND NOT DEFINED URAN_MACOS_RESOURCES)
 	message(FATAL_ERROR "macOS bundle resources are not defined!")
-endif ()
-if (${URAN_MACOS_BUNDLE} AND NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-	message(FATAL_ERROR "Current system is not macOS!")
 endif ()
 
 set(CONF_BUILD_SHARED OFF CACHE BOOL "" FORCE)
@@ -153,7 +148,7 @@ else ()
 		${URAN_MACOS_RESOURCES})
 endif ()
 
-if (${URAN_MACOS_BUNDLE} AND ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+if (URAN_MACOS_BUNDLE AND ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 	set_target_properties(${URAN_PROGRAM_NAME} PROPERTIES
 		MACOSX_BUNDLE TRUE
 		MACOSX_BUNDLE_INFO_PLIST ${URAN_MACOS_INFO_PLIST}
