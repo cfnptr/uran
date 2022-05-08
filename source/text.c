@@ -1347,6 +1347,60 @@ MpgxResult createFontAtlas(
 		false,
 		true);
 }
+MpgxResult createFontAtlas8(
+	GraphicsPipeline textPipeline,
+	Font* regularFonts,
+	Font* boldFonts,
+	Font* italicFonts,
+	Font* boldItalicFonts,
+	size_t fontCount,
+	uint32_t fontSize,
+	const char* chars,
+	size_t charCount,
+	Logger logger,
+	FontAtlas* fontAtlas)
+{
+	assert(textPipeline);
+	assert(regularFonts);
+	assert(boldFonts);
+	assert(italicFonts);
+	assert(boldItalicFonts);
+	assert(fontCount > 0);
+	assert(fontSize > 0);
+	assert(chars);
+	assert(charCount > 0);
+	assert(fontAtlas);
+	assert(fontSize % 2 == 0);
+	assert(textInitialized);
+
+	uint32_t* chars32;
+	size_t charCount32;
+
+	MpgxResult mpgxResult = allocateStringUTF32(
+		chars,
+		charCount,
+		&chars32,
+		&charCount32);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+		return mpgxResult;
+
+	mpgxResult = createFontAtlas(
+		textPipeline,
+		regularFonts,
+		boldFonts,
+		italicFonts,
+		boldItalicFonts,
+		fontCount,
+		fontSize,
+		chars32,
+		charCount32,
+		logger,
+		fontAtlas);
+
+	free(chars32);
+	return mpgxResult;
+}
 MpgxResult createAsciiFontAtlas(
 	GraphicsPipeline textPipeline,
 	Font* regularFonts,

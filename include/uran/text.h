@@ -80,14 +80,8 @@ typedef void(*OnPipelineText)(
 /*
  * String containing all printable ASCII UTF-8 characters.
  */
-static const char printableAscii[] = {
-	' ', '!', '\"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/',
-	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?', '@',
-	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
-	'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '[', '\\', ']', '^', '_', '`',
-	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
-	'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~', '\0',
-};
+#define printableAscii " !\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_abcdefghijklmnopqrstuvwxyz{|}~\0"
+
 /*
  * String containing all printable ASCII UTF-32 characters.
  */
@@ -225,7 +219,7 @@ Font createFontFromPack(
 void destroyFont(Font font);
 
 /*
- * Create a new font atlas instance.
+ * Create a new UTF-32 font atlas instance.
  * Returns operation MPGX result.
  *
  * textPipeline - text pipeline instance.
@@ -249,6 +243,34 @@ MpgxResult createFontAtlas(
 	size_t fontCount,
 	uint32_t fontSize,
 	const uint32_t* chars,
+	size_t charCount,
+	Logger logger,
+	FontAtlas* fontAtlas);
+/*
+ * Create a new UTF-8 font atlas instance.
+ * Returns operation MPGX result.
+ *
+ * textPipeline - text pipeline instance.
+ * regularFonts - regular font array.
+ * boldFonts - bold font array.
+ * italicFonts - italic font array.
+ * boldItalicFonts - bold italic font array.
+ * fontCount - font array size.
+ * fontSize - font pixel size.
+ * chars - atlas char array.
+ * charCount - char array size.
+ * logger - logger instance or NULL.
+ * fontAtlas - pointer to the font atlas instance.
+ */
+MpgxResult createFontAtlas8(
+	GraphicsPipeline textPipeline,
+	Font* regularFonts,
+	Font* boldFonts,
+	Font* italicFonts,
+	Font* boldItalicFonts,
+	size_t fontCount,
+	uint32_t fontSize,
+	const char* chars,
 	size_t charCount,
 	Logger logger,
 	FontAtlas* fontAtlas);
