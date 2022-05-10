@@ -883,6 +883,12 @@ inline static bool fillPixels(
 		FT_GlyphSlot glyphSlot = charFace->glyph;
 		uint32_t glyphWidth = glyphSlot->bitmap.width;
 		uint32_t glyphHeight = glyphSlot->bitmap.rows;
+		uint32_t baseWidth = glyphWidth;
+
+		if (glyphWidth > fontSize)
+			glyphWidth = fontSize;
+		if (glyphHeight > fontSize)
+			glyphHeight = fontSize;
 
 		glyph.advance = ((float)glyphSlot->advance.x /
 			64.0f) / (float)fontSize;
@@ -915,7 +921,7 @@ inline static bool fillPixels(
 				{
 					pixelBuffer[fontIndex + ((x + pixelPosX) +
 						(y + pixelPosY) * pixelLength) * 4] =
-						bitmap[x + y * glyphWidth];
+						bitmap[x + y * baseWidth];
 				}
 			}
 		}
