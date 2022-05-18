@@ -32,12 +32,14 @@ typedef struct UniformBuffer
 } UniformBuffer;
 typedef struct BaseHandle
 {
+	Logger logger;
 	VertexPushConstants vpc;
 	UniformBuffer ub;
 } BaseHandle;
 #if MPGX_SUPPORT_VULKAN
 typedef struct VkHandle
 {
+	Logger logger;
 	VertexPushConstants vpc;
 	UniformBuffer ub;
 	VkDescriptorSetLayout descriptorSetLayout;
@@ -50,6 +52,7 @@ typedef struct VkHandle
 #if MPGX_SUPPORT_OPENGL
 typedef struct GlHandle
 {
+	Logger logger;
 	VertexPushConstants vpc;
 	UniformBuffer ub;
 	GLint mvpLocation;
@@ -319,7 +322,12 @@ static void onVkResize(
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
 		{
-			// TODO: log
+			if (handle->base.logger)
+			{
+				logMessage(handle->base.logger, ERROR_LOG_LEVEL,
+					"Failed to create descriptor pool. (error: %s)",
+					mpgxResultToString(mpgxResult));
+			}
 			abort();
 		}
 
@@ -332,7 +340,12 @@ static void onVkResize(
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
 		{
-			// TODO: log
+			if (handle->base.logger)
+			{
+				logMessage(handle->base.logger, ERROR_LOG_LEVEL,
+					"Failed to create uniform buffers. (error: %s)",
+					mpgxResultToString(mpgxResult));
+			}
 			abort();
 		}
 
@@ -348,7 +361,12 @@ static void onVkResize(
 
 		if (mpgxResult != SUCCESS_MPGX_RESULT)
 		{
-			// TODO: log
+			if (handle->base.logger)
+			{
+				logMessage(handle->base.logger, ERROR_LOG_LEVEL,
+					"Failed to create descriptor sets. (error: %s)",
+					mpgxResultToString(mpgxResult));
+			}
 			abort();
 		}
 
@@ -757,7 +775,8 @@ MpgxResult createDiffusePipeline(
 	Shader vertexShader,
 	Shader fragmentShader,
 	const GraphicsPipelineState* state,
-	GraphicsPipeline* diffusePipeline)
+	GraphicsPipeline* diffusePipeline,
+	Logger logger)
 {
 	assert(framebuffer);
 	assert(vertexShader);
@@ -787,6 +806,7 @@ MpgxResult createDiffusePipeline(
 			0.0f),
 	};
 
+	handle->base.logger = logger;
 	handle->base.vpc.mvp = identMat4F;
 	handle->base.vpc.normal = identMat4F;
 	handle->base.ub = ub;

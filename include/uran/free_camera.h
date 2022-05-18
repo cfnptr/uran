@@ -14,7 +14,6 @@
 
 #pragma once
 #include "uran/transformer.h"
-
 #include "mpgx/window.h"
 #include "cmmt/camera.h"
 

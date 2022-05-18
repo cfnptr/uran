@@ -15,6 +15,7 @@
 #pragma once
 #include "mpgx/window.h"
 #include "cmmt/color.h"
+#include "logy/logger.h"
 
 #define DIFFUSE_PIPELINE_NAME "Diffuse"
 
@@ -27,13 +28,15 @@
  * fragmentShader - diffuse fragment shader.
  * state - pipeline state or NULL.
  * diffusePipeline - pointer to the diffuse pipeline.
+ * logger - logger instance or NULL.
  */
 MpgxResult createDiffusePipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
 	const GraphicsPipelineState* state,
-	GraphicsPipeline* diffusePipeline);
+	GraphicsPipeline* diffusePipeline,
+	Logger logger);
 
 /*
  * Returns diffuse pipeline model view projection matrix.
