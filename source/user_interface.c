@@ -423,7 +423,7 @@ static void onTabAnyElement(
 	Vec3F bestPosition = data->position;
 	Vec3F newPosition = getInterfaceElementPosition(element);
 
-	if (newPosition.x <= bestPosition.x ||
+	if (newPosition.x <= bestPosition.x &&
 		newPosition.y <= bestPosition.y)
 	{
 		return;
