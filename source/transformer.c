@@ -41,6 +41,7 @@ struct Transform_T
 	Quat rotation;
 	Vec3F scale;
 	Vec3F position;
+	Vec3F pivot;
 	RotationType rotationType;
 	bool isActive;
 };
@@ -56,14 +57,14 @@ inline static void updateTransformModel(
 	Quat rotation = transform->rotation;
 	Transform parent = transform->parent;
 
-	position = addVec3F(position, cameraPosition);
+	position = subVec3F(position, cameraPosition);
 
 	if (forceUpdate)
 	{
 		while (parent)
 		{
 			position = addVec3F(dotQuatVec3F(
-					parent->rotation, position),
+				parent->rotation, position),
 				parent->position);
 			rotation = dotQuat(rotation, parent->rotation);
 			parent = parent->parent;
@@ -77,7 +78,7 @@ inline static void updateTransformModel(
 				return;
 
 			position = addVec3F(dotQuatVec3F(
-					parent->rotation, position),
+				parent->rotation, position),
 				parent->position);
 			rotation = dotQuat(rotation, parent->rotation);
 			parent = parent->parent;
@@ -96,16 +97,24 @@ inline static void updateTransformModel(
 	}
 	else if (rotationType == ORBIT_ROTATION_TYPE)
 	{
-		model = translateMat4F(dotMat4F(
-			identMat4F, getQuatMat4F(
-			normQuat(rotation))),position);
+		model = translateMat4F(getQuatMat4F(
+			normQuat(rotation)),
+			position);
+	}
+	else if (rotationType == CAMERA_ROTATION_TYPE)
+	{
+		model = translateMat4F(getQuatMat4F(
+			normQuat(rotation)),
+			negVec3F(position));
 	}
 	else
 	{
 		model = translateMat4F(identMat4F,position);
 	}
 
-	transform->model = scaleMat4F(model, transform->scale);
+	transform->model = translateMat4F(scaleMat4F(
+		model, transform->scale),
+		negVec3F(transform->pivot));
 }
 
 Transformer createTransformer(
@@ -329,14 +338,6 @@ static void onTransformUpdate(void* argument)
 			cameraPosition,
 			false);
 	}
-
-	if (cameraTransform)
-	{
-		updateTransformModel(
-			cameraTransform,
-			negVec3F(cameraPosition),
-			false);
-	}
 }
 void updateTransformer(Transformer transformer)
 {
@@ -388,14 +389,6 @@ void updateTransformer(Transformer transformer)
 				cameraPosition,
 				false);
 		}
-
-		if (cameraTransform)
-		{
-			updateTransformModel(
-				cameraTransform,
-				negVec3F(cameraPosition),
-				false);
-		}
 	}
 }
 
@@ -404,6 +397,7 @@ Transform createTransform(
 	Vec3F position,
 	Vec3F scale,
 	Quat rotation,
+	Vec3F pivot,
 	RotationType rotationType,
 	Transform parent,
 	void* handle,
@@ -426,6 +420,7 @@ Transform createTransform(
 	transform->rotation = rotation;
 	transform->scale = scale;
 	transform->position = position;
+	transform->pivot = pivot;
 	transform->rotationType = rotationType;
 	transform->isActive = isActive;
 
@@ -537,12 +532,33 @@ void setTransformRotation(
 	assert(transform);
 	transform->rotation = rotation;
 }
+
+Vec3F getTransformEulerAngles(
+	Transform transform)
+{
+	assert(transform);
+	return getQuatEuler(transform->rotation);
+}
 void setTransformEulerAngles(
 	Transform transform,
 	Vec3F eulerAngles)
 {
 	assert(transform);
 	transform->rotation = eulerQuat(eulerAngles);
+}
+
+Vec3F getTransformPivot(
+	Transform transform)
+{
+	assert(transform);
+	return transform->pivot;
+}
+void setTransformPivot(
+	Transform transform,
+	Vec3F pivot)
+{
+	assert(transform);
+	transform->pivot = pivot;
 }
 
 RotationType getTransformRotationType(

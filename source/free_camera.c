@@ -67,7 +67,8 @@ FreeCamera createFreeCamera(
 		zeroVec3F,
 		oneVec3F,
 		oneQuat,
-		ORBIT_ROTATION_TYPE,
+		zeroVec3F,
+		CAMERA_ROTATION_TYPE,
 		NULL,
 		freeCamera,
 		true);
@@ -265,17 +266,17 @@ void updateFreeCamera(FreeCamera freeCamera)
 		Vec3F translation = zeroVec3F;
 
 		if (getWindowKeyboardKey(window, A_KEYBOARD_KEY))
-			translation.x = RIGHT_AXIS_VALUE * deltaTime * moveSpeed;
-		else if (getWindowKeyboardKey(window, D_KEYBOARD_KEY))
 			translation.x = LEFT_AXIS_VALUE * deltaTime * moveSpeed;
+		else if (getWindowKeyboardKey(window, D_KEYBOARD_KEY))
+			translation.x = RIGHT_AXIS_VALUE * deltaTime * moveSpeed;
 		if (getWindowKeyboardKey(window, LEFT_SHIFT_KEYBOARD_KEY))
-			translation.y = TOP_AXIS_VALUE * deltaTime * moveSpeed;
-		else if (getWindowKeyboardKey(window, SPACE_KEYBOARD_KEY))
 			translation.y = BOTTOM_AXIS_VALUE * deltaTime * moveSpeed;
+		else if (getWindowKeyboardKey(window, SPACE_KEYBOARD_KEY))
+			translation.y = TOP_AXIS_VALUE * deltaTime * moveSpeed;
 		if (getWindowKeyboardKey(window, S_KEYBOARD_KEY))
-			translation.z = FRONT_AXIS_VALUE * deltaTime * moveSpeed;
-		else if (getWindowKeyboardKey(window, W_KEYBOARD_KEY))
 			translation.z = BACK_AXIS_VALUE * deltaTime * moveSpeed;
+		else if (getWindowKeyboardKey(window, W_KEYBOARD_KEY))
+			translation.z = FRONT_AXIS_VALUE * deltaTime * moveSpeed;
 
 		translation = dotVecQuat3F(
 			translation,

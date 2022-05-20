@@ -42,7 +42,8 @@ typedef enum RotationType_T
 	NO_ROTATION_TYPE = 0,
 	SPIN_ROTATION_TYPE = 1,
 	ORBIT_ROTATION_TYPE = 2,
-	ROTATION_TYPE_COUNT = 3,
+	CAMERA_ROTATION_TYPE = 3,
+	ROTATION_TYPE_COUNT = 4,
 } RotationType_T;
 /*
  * Rotation type.
@@ -142,6 +143,7 @@ void updateTransformer(Transformer transformer);
  * position - transform position.
  * scale - transform scale.
  * rotation - transform rotation.
+ * pivot - transform pivot.
  * rotationType - transform rotation type.
  * parent - transform parent or NULL.
  * handle - custom handle or NULL.
@@ -152,6 +154,7 @@ Transform createTransform(
 	Vec3F position,
 	Vec3F scale,
 	Quat rotation,
+	Vec3F pivot,
 	RotationType rotationType,
 	Transform parent,
 	void* handle,
@@ -215,6 +218,13 @@ Quat getTransformRotation(
 void setTransformRotation(
 	Transform transform,
 	Quat rotation);
+
+/*
+ * Returns transform euler angles.
+ * transform - transform instance.
+ */
+Vec3F getTransformEulerAngles(
+	Transform transform);
 /*
  * Sets transform euler angles.
  *
@@ -224,6 +234,22 @@ void setTransformRotation(
 void setTransformEulerAngles(
 	Transform transform,
 	Vec3F eulerAngles);
+
+/*
+ * Returns transform pivot.
+ * transform - transform instance.
+ */
+Vec3F getTransformPivot(
+	Transform transform);
+/*
+ * Sets transform pivot.
+ *
+ * transform - transform instance.
+ * scale - transform scale.
+ */
+void setTransformPivot(
+	Transform transform,
+	Vec3F pivot);
 
 /*
  * Returns transform rotation type.
