@@ -219,7 +219,7 @@ static void onTransformerEnumerate(void* argument)
 
 	size_t threadCount = getThreadPoolThreadCount(
 		transformer->threadPool);
-	atomic_int64 threadIndex = atomicFetchAdd64(
+	size_t threadIndex = (size_t)atomicFetchAdd64(
 		&data->threadIndex, 1);
 
 	for (size_t i = threadIndex; i < transformCount; i += threadCount)
@@ -314,7 +314,7 @@ static void onTransformUpdate(void* argument)
 
 	size_t threadCount = getThreadPoolThreadCount(
 		transformer->threadPool);
-	atomic_int64 threadIndex = atomicFetchAdd64(
+	size_t threadIndex = (size_t)atomicFetchAdd64(
 		&data->threadIndex, 1);
 
 	for (size_t i = threadIndex; i < transformCount; i += threadCount)

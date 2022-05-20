@@ -173,7 +173,7 @@ static void onInterfaceEnumerate(void* argument)
 
 	size_t threadCount = getThreadPoolThreadCount(
 		interface->threadPool);
-	atomic_int64 threadIndex = atomicFetchAdd64(
+	size_t threadIndex = (size_t)atomicFetchAdd64(
 		&data->threadIndex, 1);
 
 	for (size_t i = threadIndex; i < elementCount; i += threadCount)
@@ -398,7 +398,7 @@ static void onInterfacePositionsUpdate(void* argument)
 
 	size_t threadCount = getThreadPoolThreadCount(
 		interface->threadPool);
-	atomic_int64 threadIndex = atomicFetchAdd64(
+	size_t threadIndex = (size_t)atomicFetchAdd64(
 		&data->threadIndex, 1);
 
 	for (size_t i = threadIndex; i < elementCount; i += threadCount)

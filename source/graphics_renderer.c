@@ -411,7 +411,7 @@ static void onRendererDraw(void* argument)
 
 	size_t threadCount = getThreadPoolThreadCount(
 		renderer->threadPool);
-	atomic_int64 threadIndex = atomicFetchAdd64(
+	size_t threadIndex = (size_t)atomicFetchAdd64(
 		&updateData->threadIndex, 1);
 	atomic_int64* elementIndex = &updateData->elementIndex;
 
@@ -435,7 +435,7 @@ static void onRendererDraw(void* argument)
 		if (!shouldDraw)
 			continue;
 
-		atomic_int64 index = atomicFetchAdd64(elementIndex, 1);
+		size_t index = (size_t)atomicFetchAdd64(elementIndex, 1);
 		renderElements[index] = element;
 	}
 }

@@ -42,6 +42,7 @@ struct UserInterface_T
 	size_t cursorIndex;
 	bool isMousePressed;
 	bool isButtonPressed;
+	bool isTabPressed;
 };
 
 typedef struct UiBaseHandle_T
@@ -224,6 +225,7 @@ MpgxResult createUserInterface(
 	userInterface->cursorIndex = 0;
 	userInterface->isMousePressed = false;
 	userInterface->isButtonPressed = false;
+	userInterface->isTabPressed = false;
 
 	ThreadPool threadPool =
 		getTransformerThreadPool(transformer);
@@ -330,6 +332,106 @@ GraphicsRender getUserInterfaceCursor(UserInterface ui)
 	return ui->cursorRender;
 }
 
+typedef struct TabData
+{
+	InterfaceElement element;
+	Vec3F position;
+	cmmt_float_t value;
+} TabData;
+static void onTabBottomElement(
+	InterfaceElement element,
+	void* handle)
+{
+	assert(element);
+	assert(handle);
+
+	TabData* data = (TabData*)handle;
+	UiBaseHandle base = getInterfaceElementHandle(element);
+	Transform transform = getInterfaceElementTransform(element);
+
+	if (!isTransformActive(transform) ||
+		!isInterfaceElementEnabled(element) ||
+		base->type != INPUT_FIELD_UI_TYPE)
+	{
+		return;
+	}
+
+	Vec3F basePosition = data->position;
+	Vec3F newPosition = getInterfaceElementPosition(element);
+	cmmt_float_t distancePow = distPowVec3F(basePosition, newPosition);
+
+	if (distancePow >= data->value ||
+		(newPosition.x >= basePosition.x &&
+		newPosition.y >= basePosition.y))
+	{
+		return;
+	}
+
+	data->element = element;
+	data->value = distancePow;
+}
+static void onTabTopElement(
+	InterfaceElement element,
+	void* handle)
+{
+	assert(element);
+	assert(handle);
+
+	TabData* data = (TabData*)handle;
+	UiBaseHandle base = getInterfaceElementHandle(element);
+	Transform transform = getInterfaceElementTransform(element);
+
+	if (!isTransformActive(transform) ||
+		!isInterfaceElementEnabled(element) ||
+		base->type != INPUT_FIELD_UI_TYPE)
+	{
+		return;
+	}
+
+	Vec3F basePosition = data->position;
+	Vec3F newPosition = getInterfaceElementPosition(element);
+	cmmt_float_t distancePow = distPowVec3F(basePosition, newPosition);
+
+	if (distancePow <= data->value ||
+		(newPosition.x <= basePosition.x &&
+		newPosition.y <= basePosition.y))
+	{
+		return;
+	}
+
+	data->element = element;
+	data->value = distancePow;
+}
+static void onTabAnyElement(
+	InterfaceElement element,
+	void* handle)
+{
+	assert(element);
+	assert(handle);
+
+	TabData* data = (TabData*)handle;
+	UiBaseHandle base = getInterfaceElementHandle(element);
+	Transform transform = getInterfaceElementTransform(element);
+
+	if (!isTransformActive(transform) ||
+		!isInterfaceElementEnabled(element) ||
+		base->type != INPUT_FIELD_UI_TYPE)
+	{
+		return;
+	}
+
+	Vec3F bestPosition = data->position;
+	Vec3F newPosition = getInterfaceElementPosition(element);
+
+	if (newPosition.x <= bestPosition.x ||
+		newPosition.y <= bestPosition.y)
+	{
+		return;
+	}
+
+	data->element = element;
+	data->position = newPosition;
+}
 inline static MpgxResult bakeInputFieldText(
 	Text text,
 	uint32_t mask)
@@ -480,183 +582,254 @@ inline static void updateInputFields(UserInterface ui)
 #error Unknown operating system
 #endif
 
-	if (ui->focusedInputField)
+	if (getWindowKeyboardKey(window, TAB_KEYBOARD_KEY))
 	{
-		InterfaceElement focusedInputField = ui->focusedInputField;
-		UiInputFieldHandle handle = getInterfaceElementHandle(focusedInputField);
-		Text text = getTextRenderText(handle->textRender);
-		double updateTime = getWindowUpdateTime(window);
+		if (!ui->isTabPressed)
+		{
+			TabData data;
+			data.element = NULL;
 
-		bool isTextChanged = false, isCursorChanged = false;
+			if (ui->focusedInputField)
+			{
+				data.position = getInterfaceElementPosition(
+					ui->focusedInputField);
+				data.value = INFINITY;
 
-		if (getWindowKeyboardKey(window, BACKSPACE_KEYBOARD_KEY))
-		{
-			if (getTextLength(text) > 0 && ui->cursorIndex > 0 &&
-				(!ui->isButtonPressed || ui->buttonDelay < updateTime))
-			{
-				ui->cursorIndex--;
-				removeTextChar(text, ui->cursorIndex);
-				ui->buttonDelay = ui->isButtonPressed ?
-					updateTime + ACTION_PRESS_DELAY : updateTime + ACTION_START_DELAY;
-				ui->isButtonPressed = isTextChanged = isCursorChanged = true;
-			}
-		}
-		else if (getWindowKeyboardKey(window, DELETE_KEYBOARD_KEY))
-		{
-			if (getTextLength(text) > 0 && ui->cursorIndex < getTextLength(text) &&
-				(!ui->isButtonPressed || ui->buttonDelay < updateTime))
-			{
-				removeTextChar(text, ui->cursorIndex);
-				ui->buttonDelay = ui->isButtonPressed ?
-					updateTime + ACTION_PRESS_DELAY : updateTime + ACTION_START_DELAY;
-				ui->isButtonPressed = isTextChanged = isCursorChanged = true;
-			}
-		}
-		else if (getWindowKeyboardKey(window, LEFT_KEYBOARD_KEY))
-		{
-			if (ui->cursorIndex > 0 &&
-				(!ui->isButtonPressed || ui->buttonDelay < updateTime))
-			{
-				ui->cursorIndex--;
-				ui->buttonDelay = ui->isButtonPressed ?
-					updateTime + ACTION_PRESS_DELAY : updateTime + ACTION_START_DELAY;
-				ui->isButtonPressed = isCursorChanged = true;
-			}
-		}
-		else if (getWindowKeyboardKey(window, RIGHT_KEYBOARD_KEY))
-		{
-			if (ui->cursorIndex < getTextLength(text) &&
-				(!ui->isButtonPressed || ui->buttonDelay < updateTime))
-			{
-				ui->cursorIndex++;
-				ui->buttonDelay = ui->isButtonPressed ?
-					updateTime + ACTION_PRESS_DELAY : updateTime + ACTION_START_DELAY;
-				ui->isButtonPressed = isCursorChanged = true;
-			}
-		}
-		else if (getWindowKeyboardKey(window, V_KEYBOARD_KEY) &&
-			(getWindowKeyboardKey(window, leftSuperKey) ||
-			getWindowKeyboardKey(window, rightSuperKey)))
-		{
-			if (!ui->isButtonPressed || ui->buttonDelay < updateTime)
-			{
-				const char* clipboard = getWindowClipboard(window);
-				size_t length = strlen(clipboard);
+				enumerateInterfaceElements(
+					ui->interface,
+					onTabBottomElement,
+					&data);
 
-				if (length > 0)
+				if (!data.element)
 				{
-					uint32_t* clipboard32;
-					size_t length32;
+					data.value = 0.0f;
 
-					MpgxResult mpgxResult = allocateStringUTF32(
-						clipboard,
-						length,
-						&clipboard32,
-						&length32);
-
-					if (mpgxResult == SUCCESS_MPGX_RESULT)
-					{
-						if (getTextLength(text) + length32 > handle->maxLength)
-							length32 = handle->maxLength - getTextLength(text);
-
-						if (length32 > 0)
-						{
-							bool result = appendTextString32(text,
-								clipboard32,
-								length32,
-								ui->cursorIndex);
-
-							if (result)
-							{
-								ui->cursorIndex += length32;
-								isTextChanged = isCursorChanged = true;
-							}
-						}
-
-						free(clipboard32);
-					}
+					enumerateInterfaceElements(
+						ui->interface,
+						onTabTopElement,
+						&data);
 				}
 
-				ui->buttonDelay = ui->isButtonPressed ?
-					updateTime + ACTION_PRESS_DELAY : updateTime + ACTION_START_DELAY;
-				ui->isButtonPressed = isCursorChanged = true;
-			}
-		}
-		else
-		{
-			ui->isButtonPressed = false;
-		}
-
-		size_t inputLength = getWindowInputLength(window);
-
-		if (getTextLength(text) + inputLength > handle->maxLength)
-			inputLength = handle->maxLength - getTextLength(text);
-
-		if (inputLength > 0)
-		{
-			bool result = appendTextString32(text,
-				getWindowInputBuffer(window),
-				inputLength,
-				ui->cursorIndex);
-
-			if (result)
-			{
-				ui->cursorIndex += inputLength;
-				isTextChanged = isCursorChanged = true;
-			}
-		}
-
-		if (isTextChanged)
-		{
-			if (getTextLength(text) > 0)
-			{
-				MpgxResult mpgxResult = bakeInputFieldText(text, handle->mask);
-
-				if (mpgxResult != SUCCESS_MPGX_RESULT)
-				{
-					Logger logger = getFontAtlasLogger(ui->fontAtlas);
-
-					if (logger)
-					{
-						logMessage(logger, ERROR_LOG_LEVEL,
-							"Failed to bake input field text. (error: %s)",
-							mpgxResultToString(mpgxResult));
-					}
-				}
-
-				setTransformActive(getGraphicsRenderTransform(
-					handle->textRender), true);
-				setTransformActive(getGraphicsRenderTransform(
-					handle->placeholderRender), false);
+				if (data.element)
+					defocusUserInterface(ui);
 			}
 			else
 			{
-				setTransformActive(getGraphicsRenderTransform(
-					handle->textRender), false);
-				setTransformActive(getGraphicsRenderTransform(
-					handle->placeholderRender), true);
+				data.position = vec3F(
+					-INFINITY,
+					-INFINITY,
+					(cmmt_float_t)0.0);
+
+				enumerateInterfaceElements(
+					ui->interface,
+					onTabAnyElement,
+					&data);
 			}
 
-			if (handle->onChange)
-				handle->onChange(focusedInputField);
+			if (data.element)
+			{
+				UiInputFieldHandle handle = (UiInputFieldHandle)
+					getInterfaceElementHandle(data.element);
+				setPanelRenderColor(
+					handle->focusRender,
+					handle->focusedColor);
+
+				Text text = getTextRenderText(handle->textRender);
+				Transform textTransform = getGraphicsRenderTransform(
+					getTextLength(text) > 0 ?
+					handle->textRender : handle->placeholderRender);
+				ui->cursorIndex = getTextLength(text);
+				updateCursor(ui, textTransform, text, handle->mask);
+
+				ui->blinkDelay = getWindowUpdateTime(window) + 0.5f;
+				ui->focusedInputField = data.element;
+			}
+
+			ui->isTabPressed = true;
 		}
-		if (isCursorChanged)
+	}
+	else
+	{
+		ui->isTabPressed = false;
+	}
+
+	if (!ui->focusedInputField)
+		return;
+
+	InterfaceElement focusedInputField = ui->focusedInputField;
+	UiInputFieldHandle handle = getInterfaceElementHandle(focusedInputField);
+	Text text = getTextRenderText(handle->textRender);
+	double updateTime = getWindowUpdateTime(window);
+
+	bool isTextChanged = false, isCursorChanged = false;
+
+	if (getWindowKeyboardKey(window, BACKSPACE_KEYBOARD_KEY))
+	{
+		if (getTextLength(text) > 0 && ui->cursorIndex > 0 &&
+			(!ui->isButtonPressed || ui->buttonDelay < updateTime))
 		{
-			Transform textTransform = getGraphicsRenderTransform(
-				getTextLength(text) > 0 ?
-				handle->textRender : handle->placeholderRender);
-			updateCursor(ui, textTransform, text, handle->mask);
+			ui->cursorIndex--;
+			removeTextChar(text, ui->cursorIndex);
+			ui->buttonDelay = ui->isButtonPressed ?
+				updateTime + ACTION_PRESS_DELAY : updateTime + ACTION_START_DELAY;
+			ui->isButtonPressed = isTextChanged = isCursorChanged = true;
+		}
+	}
+	else if (getWindowKeyboardKey(window, DELETE_KEYBOARD_KEY))
+	{
+		if (getTextLength(text) > 0 && ui->cursorIndex < getTextLength(text) &&
+			(!ui->isButtonPressed || ui->buttonDelay < updateTime))
+		{
+			removeTextChar(text, ui->cursorIndex);
+			ui->buttonDelay = ui->isButtonPressed ?
+				updateTime + ACTION_PRESS_DELAY : updateTime + ACTION_START_DELAY;
+			ui->isButtonPressed = isTextChanged = isCursorChanged = true;
+		}
+	}
+	else if (getWindowKeyboardKey(window, LEFT_KEYBOARD_KEY))
+	{
+		if (ui->cursorIndex > 0 &&
+			(!ui->isButtonPressed || ui->buttonDelay < updateTime))
+		{
+			ui->cursorIndex--;
+			ui->buttonDelay = ui->isButtonPressed ?
+				updateTime + ACTION_PRESS_DELAY : updateTime + ACTION_START_DELAY;
+			ui->isButtonPressed = isCursorChanged = true;
+		}
+	}
+	else if (getWindowKeyboardKey(window, RIGHT_KEYBOARD_KEY))
+	{
+		if (ui->cursorIndex < getTextLength(text) &&
+			(!ui->isButtonPressed || ui->buttonDelay < updateTime))
+		{
+			ui->cursorIndex++;
+			ui->buttonDelay = ui->isButtonPressed ?
+				updateTime + ACTION_PRESS_DELAY : updateTime + ACTION_START_DELAY;
+			ui->isButtonPressed = isCursorChanged = true;
+		}
+	}
+	else if (getWindowKeyboardKey(window, V_KEYBOARD_KEY) &&
+		(getWindowKeyboardKey(window, leftSuperKey) ||
+		getWindowKeyboardKey(window, rightSuperKey)))
+	{
+		if (!ui->isButtonPressed || ui->buttonDelay < updateTime)
+		{
+			const char* clipboard = getWindowClipboard(window);
+			size_t length = strlen(clipboard);
+
+			if (length > 0)
+			{
+				uint32_t* clipboard32;
+				size_t length32;
+
+				MpgxResult mpgxResult = allocateStringUTF32(
+					clipboard,
+					length,
+					&clipboard32,
+					&length32);
+
+				if (mpgxResult == SUCCESS_MPGX_RESULT)
+				{
+					if (getTextLength(text) + length32 > handle->maxLength)
+						length32 = handle->maxLength - getTextLength(text);
+
+					if (length32 > 0)
+					{
+						bool result = appendTextString32(text,
+							clipboard32,
+							length32,
+							ui->cursorIndex);
+
+						if (result)
+						{
+							ui->cursorIndex += length32;
+							isTextChanged = isCursorChanged = true;
+						}
+					}
+
+					free(clipboard32);
+				}
+			}
+
+			ui->buttonDelay = ui->isButtonPressed ?
+				updateTime + ACTION_PRESS_DELAY : updateTime + ACTION_START_DELAY;
+			ui->isButtonPressed = isCursorChanged = true;
+		}
+	}
+	else
+	{
+		ui->isButtonPressed = false;
+	}
+
+	size_t inputLength = getWindowInputLength(window);
+
+	if (getTextLength(text) + inputLength > handle->maxLength)
+		inputLength = handle->maxLength - getTextLength(text);
+
+	if (inputLength > 0)
+	{
+		bool result = appendTextString32(text,
+			getWindowInputBuffer(window),
+			inputLength,
+			ui->cursorIndex);
+
+		if (result)
+		{
+			ui->cursorIndex += inputLength;
+			isTextChanged = isCursorChanged = true;
+		}
+	}
+
+	if (isTextChanged)
+	{
+		if (getTextLength(text) > 0)
+		{
+			MpgxResult mpgxResult = bakeInputFieldText(text, handle->mask);
+
+			if (mpgxResult != SUCCESS_MPGX_RESULT)
+			{
+				Logger logger = getFontAtlasLogger(ui->fontAtlas);
+
+				if (logger)
+				{
+					logMessage(logger, ERROR_LOG_LEVEL,
+						"Failed to bake input field text. (error: %s)",
+						mpgxResultToString(mpgxResult));
+				}
+			}
+
+			setTransformActive(getGraphicsRenderTransform(
+				handle->textRender), true);
+			setTransformActive(getGraphicsRenderTransform(
+				handle->placeholderRender), false);
+		}
+		else
+		{
+			setTransformActive(getGraphicsRenderTransform(
+				handle->textRender), false);
+			setTransformActive(getGraphicsRenderTransform(
+				handle->placeholderRender), true);
 		}
 
-		if (updateTime > ui->blinkDelay)
-		{
-			Transform cursorTransform = getGraphicsRenderTransform(
-				ui->cursorRender);
-			setTransformActive(
-				cursorTransform,
-				!isTransformActive(cursorTransform));
-			ui->blinkDelay = updateTime + 0.5;
-		}
+		if (handle->onChange)
+			handle->onChange(focusedInputField);
+	}
+	if (isCursorChanged)
+	{
+		Transform textTransform = getGraphicsRenderTransform(
+			getTextLength(text) > 0 ?
+			handle->textRender : handle->placeholderRender);
+		updateCursor(ui, textTransform, text, handle->mask);
+	}
+
+	if (updateTime > ui->blinkDelay)
+	{
+		Transform cursorTransform = getGraphicsRenderTransform(
+			ui->cursorRender);
+		setTransformActive(
+			cursorTransform,
+			!isTransformActive(cursorTransform));
+		ui->blinkDelay = updateTime + 0.5;
 	}
 }
 void updateUserInterface(UserInterface ui)
