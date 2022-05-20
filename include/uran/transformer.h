@@ -41,9 +41,8 @@ typedef enum RotationType_T
 {
 	NO_ROTATION_TYPE = 0,
 	SPIN_ROTATION_TYPE = 1,
-	ORBIT_ROTATION_TYPE = 2,
-	CAMERA_ROTATION_TYPE = 3,
-	ROTATION_TYPE_COUNT = 4,
+	CAMERA_ROTATION_TYPE = 2,
+	ROTATION_TYPE_COUNT = 3,
 } RotationType_T;
 /*
  * Rotation type.

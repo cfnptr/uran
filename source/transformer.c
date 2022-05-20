@@ -95,12 +95,6 @@ inline static void updateTransformModel(
 			identMat4F, position),
 			getQuatMat4F(normQuat(rotation)));
 	}
-	else if (rotationType == ORBIT_ROTATION_TYPE)
-	{
-		model = translateMat4F(getQuatMat4F(
-			normQuat(rotation)),
-			position);
-	}
 	else if (rotationType == CAMERA_ROTATION_TYPE)
 	{
 		model = translateMat4F(getQuatMat4F(
