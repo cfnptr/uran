@@ -4067,6 +4067,8 @@ static void onGlResize(
 	{
 		graphicsPipeline->gl.state.scissor = size;
 	}
+
+	Handle handle = graphicsPipeline->gl.handle;
 }
 static void onGlDestroy(
 	Window window,
@@ -4196,6 +4198,8 @@ MpgxResult createTextPipeline(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
+	Vec2I framebufferSize = framebuffer->base.size;
+
 	handle->base.sampler = sampler;
 	handle->base.vpc.mvp = identMat4F;
 	handle->base.fpc.color = whiteLinearColor;
@@ -4217,8 +4221,6 @@ MpgxResult createTextPipeline(
 	const char* name = NULL;
 #endif
 
-	Vec2I framebufferSize =
-		framebuffer->base.size;
 	Vec4I size = vec4I(0, 0,
 		framebufferSize.x,
 		framebufferSize.y);

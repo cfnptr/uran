@@ -119,7 +119,7 @@ inline static void loadSettings(
 			settings.graphicsAPI = VULKAN_GRAPHICS_API;
 			settings.isAutoGraphicsAPI = true;
 		}
-		if (strcmp(stringValue, "vulkan") == 0)
+		else if (strcmp(stringValue, "vulkan") == 0)
 		{
 			settings.graphicsAPI = VULKAN_GRAPHICS_API;
 			settings.isAutoGraphicsAPI = false;
@@ -522,7 +522,7 @@ inline static uint32_t processFontSize(
 
 	return fontSize;
 }
-inline static bool createFontAtlasInstance(
+inline static bool createFontAtlasArray(
 	Logger logger,
 	PackReader packReader,
 	GraphicsPipeline textPipeline,
@@ -728,6 +728,9 @@ DESTROY_FONTS:
 }
 inline static void destroyFontAtlasArray(FontAtlas* fontAtlases)
 {
+	if (!fontAtlases[0])
+		return;
+
 	FontAtlas fontAtlas = fontAtlases[0];
 	Font* fonts = getFontAtlasRegularFonts(fontAtlas);
 	Font regularMainFont = fonts[0];
@@ -985,7 +988,7 @@ inline static Program createProgram(
 
 	FontAtlas* fontAtlases = program->fontAtlases;
 
-	bool result = createFontAtlasInstance(
+	bool result = createFontAtlasArray(
 		logger,
 		packReader,
 		textPipeline,
@@ -1038,6 +1041,7 @@ inline static Program createProgram(
 
 	program->editor = editor;
 
+	destroyPackReader(packReader);
 	showWindow(window);
 	return program;
 }

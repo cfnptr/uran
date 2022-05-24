@@ -200,12 +200,6 @@ inline static BaseWindow createBaseWindow(
 
 	Transform crossTransform = getGraphicsRenderTransform(
 		getUiButtonTextRender(closeButton));
-	setTransformScale(
-		crossTransform,
-		vec3F(
-			(cmmt_float_t)18.0,
-			(cmmt_float_t)18.0,
-			(cmmt_float_t)1.0));
 	setTransformRotationType(
 		crossTransform,
 		SPIN_ROTATION_TYPE);

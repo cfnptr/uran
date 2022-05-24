@@ -42,17 +42,20 @@ static size_t onDraw(
 	assert(model);
 	assert(viewProj);
 
-	Handle handle = getGraphicsRenderHandle(
-		graphicsRender);
-	Mat4F mvp = dotMat4F(
-		*viewProj,
-		*model);
-	setTextPipelineMVP(
-		graphicsPipeline,
-		mvp);
-	setTextPipelineColor(
-		graphicsPipeline,
-		handle->color);
+	Vec2I framebufferSize = graphicsPipeline->base.framebuffer->base.size;
+	Vec2I halfFramebufferSize = divValVec2I(framebufferSize, 2);
+	Handle handle = getGraphicsRenderHandle(graphicsRender);
+	Mat4F mvp = dotMat4F(*viewProj, *model);
+	Vec3F position = getTranslationMat4F(mvp);
+	position.x = cmmtFloor(position.x *
+		(cmmt_float_t)halfFramebufferSize.x) /
+		(cmmt_float_t)halfFramebufferSize.x;
+	position.y = cmmtFloor(position.y *
+		(cmmt_float_t)halfFramebufferSize.y) /
+		(cmmt_float_t)halfFramebufferSize.y;
+	setTranslationMat4F(mvp, position);
+	setTextPipelineMVP(graphicsPipeline, mvp);
+	setTextPipelineColor(graphicsPipeline, handle->color);
 
 	Vec4I stateScissor = graphicsPipeline->base.state.scissor;
 	bool dynamicScissor = stateScissor.z + stateScissor.w == 0;
@@ -60,7 +63,6 @@ static size_t onDraw(
 	if (dynamicScissor)
 	{
 		Vec4I panelScissor = handle->scissor;
-		Vec2I framebufferSize = graphicsPipeline->base.framebuffer->base.size;
 
 		assert(panelScissor.x + panelScissor.z <= framebufferSize.x);
 		assert(panelScissor.y + panelScissor.w <= framebufferSize.y);
