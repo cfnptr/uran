@@ -31,7 +31,8 @@ struct UserInterface_T
 {
 	Window window;
 	Transformer transformer;
-	FontAtlas fontAtlas;
+	FontAtlas* fontAtlases;
+	size_t fontAtlasCount;
 	Interface interface;
 	GraphicsRenderer panelRenderer;
 	GraphicsRenderer textRenderer;
@@ -197,7 +198,8 @@ MpgxResult createUserInterface(
 	Transformer transformer,
 	GraphicsPipeline panelPipeline,
 	GraphicsPipeline textPipeline,
-	FontAtlas fontAtlas,
+	FontAtlas* fontAtlases,
+	size_t fontAtlasCount,
 	cmmt_float_t scale,
 	size_t capacity,
 	UserInterface* ui)
@@ -205,7 +207,8 @@ MpgxResult createUserInterface(
 	assert(transformer);
 	assert(panelPipeline);
 	assert(textPipeline);
-	assert(fontAtlas);
+	assert(fontAtlases);
+	assert(fontAtlasCount > 0);
 	assert(scale > 0.0);
 	assert(ui);
 
@@ -219,7 +222,7 @@ MpgxResult createUserInterface(
 
 	userInterface->window = window;
 	userInterface->transformer = transformer;
-	userInterface->fontAtlas = fontAtlas;
+
 	userInterface->focusedInputField = NULL;
 	userInterface->blinkDelay = 0.0;
 	userInterface->buttonDelay = 0.0;
@@ -227,6 +230,21 @@ MpgxResult createUserInterface(
 	userInterface->isMousePressed = false;
 	userInterface->isButtonPressed = false;
 	userInterface->isTabPressed = false;
+
+	FontAtlas* fontAtlasArray = malloc(
+		fontAtlasCount * sizeof(FontAtlas));
+
+	if (!fontAtlasCount)
+	{
+		destroyUserInterface(userInterface);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	userInterface->fontAtlases = fontAtlasArray;
+	userInterface->fontAtlasCount = fontAtlasCount;
+
+	memcpy(fontAtlasArray, fontAtlases,
+		fontAtlasCount * sizeof(FontAtlas));
 
 	ThreadPool threadPool =
 		getTransformerThreadPool(transformer);
@@ -299,6 +317,7 @@ void destroyUserInterface(UserInterface ui)
 	destroyGraphicsRenderer(ui->textRenderer);
 	destroyGraphicsRenderer(ui->panelRenderer);
 	destroyInterface(ui->interface);
+	free(ui->fontAtlases);
 	free(ui);
 }
 
@@ -317,10 +336,15 @@ GraphicsRenderer getUserInterfaceTextRenderer(UserInterface ui)
 	assert(ui);
 	return ui->textRenderer;
 }
-FontAtlas getUserInterfaceFontAtlas(UserInterface ui)
+FontAtlas* getUserInterfaceFontAtlases(UserInterface ui)
 {
 	assert(ui);
-	return ui->fontAtlas;
+	return ui->fontAtlases;
+}
+size_t getUserInterfaceFontAtlasCount(UserInterface ui)
+{
+	assert(ui);
+	return ui->fontAtlasCount;
 }
 Interface getUserInterface(UserInterface ui)
 {
@@ -789,7 +813,7 @@ inline static void updateInputFields(UserInterface ui)
 
 			if (mpgxResult != SUCCESS_MPGX_RESULT)
 			{
-				Logger logger = getFontAtlasLogger(ui->fontAtlas);
+				Logger logger = getFontAtlasLogger(ui->fontAtlases[0]);
 
 				if (logger)
 				{
@@ -1221,6 +1245,49 @@ GraphicsRender getUiPanelRender(InterfaceElement panel)
 	return handle->render;
 }
 
+inline static FontAtlas getBestFontAtlas(
+	Framebuffer framebuffer,
+	FontAtlas* fontAtlases,
+	size_t fontAtlasCount,
+	cmmt_float_t uiScale,
+	cmmt_float_t fontScale)
+{
+	assert(framebuffer);
+	assert(fontAtlases);
+	assert(fontAtlasCount > 0);
+
+	uint32_t fontSize = (uint32_t)(
+		fontScale * uiScale * getPlatformScale(framebuffer));
+
+	if (fontSize % 2 != 0)
+		fontSize += 1;
+
+	for (size_t i = 0; i < fontAtlasCount; i++)
+	{
+		FontAtlas atlas = fontAtlases[i];
+
+		if (fontSize == getFontAtlasFontSize(atlas))
+			return atlas;
+	}
+
+	FontAtlas biggestFontAtlas = fontAtlases[0];
+	uint32_t biggestFontSize = getFontAtlasFontSize(biggestFontAtlas);
+
+	for (size_t i = 0; i < fontAtlasCount; i++)
+	{
+		FontAtlas atlas = fontAtlases[i];
+		uint32_t size = getFontAtlasFontSize(atlas);
+
+		if (size > biggestFontSize)
+		{
+			biggestFontAtlas = atlas;
+			biggestFontSize = size;
+		}
+	}
+
+	return biggestFontAtlas;
+}
+
 static void onUiLabelDestroy(void* _handle)
 {
 	assert(_handle);
@@ -1302,9 +1369,9 @@ inline static MpgxResult internalCreateUiLabel(
 
 	if (isUniversal)
 	{
-		uint32_t fontSize = (uint32_t)(scale * 2 * getPlatformScale(
+		uint32_t fontSize = (uint32_t)(scale * getPlatformScale(
 			getWindowFramebuffer(ui->window)));
-		FontAtlas fontAtlas = ui->fontAtlas;
+		FontAtlas fontAtlas = ui->fontAtlases[0];
 
 		if (fontSize % 2 != 0)
 			fontSize += 1;
@@ -1354,10 +1421,17 @@ inline static MpgxResult internalCreateUiLabel(
 	}
 	else
 	{
+		FontAtlas fontAtlas = getBestFontAtlas(
+			getWindowFramebuffer(ui->window),
+			ui->fontAtlases,
+			ui->fontAtlasCount,
+			getInterfaceScale(ui->interface),
+			scale);
+
 		if (isUTF8)
 		{
 			mpgxResult = createAtlasText8(
-				ui->fontAtlas,
+				fontAtlas,
 				string,
 				stringLength,
 				alignment,
@@ -1371,7 +1445,7 @@ inline static MpgxResult internalCreateUiLabel(
 		else
 		{
 			mpgxResult = createAtlasText(
-				ui->fontAtlas,
+				fontAtlas,
 				string,
 				stringLength,
 				alignment,
@@ -1847,13 +1921,20 @@ inline static MpgxResult internalCreateUiWindow(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
+	FontAtlas fontAtlas = getBestFontAtlas(
+		getWindowFramebuffer(ui->window),
+		ui->fontAtlases,
+		ui->fontAtlasCount,
+		getInterfaceScale(ui->interface),
+		DEFAULT_UI_TEXT_HEIGHT);
+
 	Text text;
 	MpgxResult mpgxResult;
 
 	if (isUTF8)
 	{
 		mpgxResult = createAtlasText8(
-			ui->fontAtlas,
+			fontAtlas,
 			title,
 			titleLength,
 			CENTER_ALIGNMENT_TYPE,
@@ -1867,7 +1948,7 @@ inline static MpgxResult internalCreateUiWindow(
 	else
 	{
 		mpgxResult = createAtlasText(
-			ui->fontAtlas,
+			fontAtlas,
 			title,
 			titleLength,
 			CENTER_ALIGNMENT_TYPE,
@@ -2277,13 +2358,20 @@ inline static MpgxResult internalCreateUiButton(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
+	FontAtlas fontAtlas = getBestFontAtlas(
+		getWindowFramebuffer(ui->window),
+		ui->fontAtlases,
+		ui->fontAtlasCount,
+		getInterfaceScale(ui->interface),
+		DEFAULT_UI_TEXT_HEIGHT + 2);
+
 	Text textInstance;
 	MpgxResult mpgxResult;
 
 	if (isUTF8)
 	{
 		mpgxResult = createAtlasText8(
-			ui->fontAtlas,
+			fontAtlas,
 			text,
 			textLength,
 			CENTER_ALIGNMENT_TYPE,
@@ -2297,7 +2385,7 @@ inline static MpgxResult internalCreateUiButton(
 	else
 	{
 		mpgxResult = createAtlasText(
-			ui->fontAtlas,
+			fontAtlas,
 			text,
 			textLength,
 			CENTER_ALIGNMENT_TYPE,
@@ -2837,7 +2925,6 @@ inline static MpgxResult internalCreateUiInputField(
 	Transformer transformer = ui->transformer;
 	GraphicsRenderer panelRenderer = ui->panelRenderer;
 	GraphicsRenderer textRenderer = ui->textRenderer;
-	FontAtlas fontAtlas = ui->fontAtlas;
 
 	Transform panelTransform = createTransform(
 		transformer,
@@ -2941,6 +3028,7 @@ inline static MpgxResult internalCreateUiInputField(
 
 	Text textInstance;
 
+	FontAtlas fontAtlas = ui->fontAtlases[0];
 	uint32_t fontSize = (uint32_t)(DEFAULT_UI_TEXT_HEIGHT * 2 *
 		getPlatformScale(getWindowFramebuffer(ui->window)));
 	const uint32_t text[] = { '-', };
@@ -3015,6 +3103,13 @@ inline static MpgxResult internalCreateUiInputField(
 		onUiInputFieldDestroy(handle);
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
+
+	fontAtlas = getBestFontAtlas(
+		getWindowFramebuffer(ui->window),
+		ui->fontAtlases,
+		ui->fontAtlasCount,
+		getInterfaceScale(ui->interface),
+		DEFAULT_UI_TEXT_HEIGHT);
 
 	Text placeholderInstance;
 
@@ -3851,13 +3946,20 @@ inline static MpgxResult internalCreateUiCheckbox(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
+	FontAtlas fontAtlas = getBestFontAtlas(
+		getWindowFramebuffer(ui->window),
+		ui->fontAtlases,
+		ui->fontAtlasCount,
+		getInterfaceScale(ui->interface),
+		DEFAULT_UI_TEXT_HEIGHT);
+
 	Text textInstance;
 	MpgxResult mpgxResult;
 
 	if (isUTF8)
 	{
 		mpgxResult = createAtlasText8(
-			ui->fontAtlas,
+			fontAtlas,
 			text,
 			textLength,
 			LEFT_ALIGNMENT_TYPE,
@@ -3871,7 +3973,7 @@ inline static MpgxResult internalCreateUiCheckbox(
 	else
 	{
 		mpgxResult = createAtlasText(
-			ui->fontAtlas,
+			fontAtlas,
 			text,
 			textLength,
 			LEFT_ALIGNMENT_TYPE,

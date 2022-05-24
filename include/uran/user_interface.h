@@ -74,7 +74,8 @@ typedef UserInterface_T* UserInterface;
  * transformer - transformer instance.
  * panelPipeline - panel pipeline instance.
  * textPipeline - text pipeline instance.
- * fontAtlas - font atlas instance.
+ * fontAtlases - font atlas array.
+ * fontAtlasCount - font atlas array size.
  * scale - interface scale.
  * capacity - initial element array capacity or 0.
  * ui - pointer to the UI instance.
@@ -83,7 +84,8 @@ MpgxResult createUserInterface(
 	Transformer transformer,
 	GraphicsPipeline panelPipeline,
 	GraphicsPipeline textPipeline,
-	FontAtlas fontAtlas,
+	FontAtlas* fontAtlases,
+	size_t fontAtlasCount,
 	cmmt_float_t scale,
 	size_t capacity,
 	UserInterface* ui);
@@ -109,10 +111,15 @@ GraphicsRenderer getUserInterfacePanelRenderer(UserInterface ui);
  */
 GraphicsRenderer getUserInterfaceTextRenderer(UserInterface ui);
 /*
- * Returns user interface font atlas.
+ * Returns user interface font atlas array.
  * ui - user interface instance.
  */
-FontAtlas getUserInterfaceFontAtlas(UserInterface ui);
+FontAtlas* getUserInterfaceFontAtlases(UserInterface ui);
+/*
+ * Returns user interface font atlas array size.
+ * ui - user interface instance.
+ */
+size_t getUserInterfaceFontAtlasCount(UserInterface ui);
 /*
  * Returns user interface instance.
  * ui - user interface instance.

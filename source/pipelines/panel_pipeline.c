@@ -117,7 +117,7 @@ static void onVkBind(GraphicsPipeline graphicsPipeline)
 	vkCmdBindIndexBuffer(
 		commandBuffer,
 		mesh->vk.indexBuffer->vk.handle,
-		mesh->vk.vkIndexOffset,
+		0,
 		mesh->vk.vkIndexType);
 }
 static void onVkUniformsSet(GraphicsPipeline graphicsPipeline)

@@ -46,6 +46,7 @@
 #define ENGINE_NAME "Uran"
 #define APPLICATION_NAME "Editor"
 #define WINDOW_TITLE "Uran Editor"
+#define FONT_ATLAS_COUNT 2
 
 typedef struct Settings
 {
@@ -61,7 +62,7 @@ typedef struct Program_T
 	Window window;
 	GraphicsPipeline panelPipeline;
 	GraphicsPipeline textPipeline;
-	FontAtlas fontAtlas;
+	FontAtlas fontAtlases[FONT_ATLAS_COUNT];
 	UserInterface ui;
 	Editor editor;
 	Settings settings;
@@ -510,16 +511,28 @@ inline static void destroyTextPipelineInstance(
 	destroyShader(vertexShader);
 }
 
-inline static FontAtlas createFontAtlasInstance(
+inline static uint32_t processFontSize(
+	cmmt_float_t scale,
+	uint32_t fontSize)
+{
+	fontSize = (uint32_t)((cmmt_float_t)fontSize * scale);
+
+	if (fontSize % 2 != 0)
+		fontSize += 1;
+
+	return fontSize;
+}
+inline static bool createFontAtlasInstance(
 	Logger logger,
 	PackReader packReader,
 	GraphicsPipeline textPipeline,
-	int fontSize)
+	cmmt_float_t scale,
+	FontAtlas* fontAtlases)
 {
 	assert(logger);
 	assert(packReader);
 	assert(textPipeline);
-	assert(fontSize > 0);
+	assert(fontAtlases);
 
 	Font regularMainFont = createFontFromPack(
 		packReader,
@@ -528,7 +541,7 @@ inline static FontAtlas createFontAtlasInstance(
 		logger);
 
 	if (!regularMainFont)
-		return NULL;
+		return false;
 
 	Font regularFallbackFont = createFontFromPack(
 		packReader,
@@ -539,7 +552,7 @@ inline static FontAtlas createFontAtlasInstance(
 	if (!regularFallbackFont)
 	{
 		destroyFont(regularMainFont);
-		return NULL;
+		return false;
 	}
 
 	Font boldMainFont = createFontFromPack(
@@ -552,7 +565,7 @@ inline static FontAtlas createFontAtlasInstance(
 	{
 		destroyFont(regularFallbackFont);
 		destroyFont(regularMainFont);
-		return NULL;
+		return false;
 	}
 
 	Font boldFallbackFont = createFontFromPack(
@@ -566,7 +579,7 @@ inline static FontAtlas createFontAtlasInstance(
 		destroyFont(boldMainFont);
 		destroyFont(regularFallbackFont);
 		destroyFont(regularMainFont);
-		return NULL;
+		return false;
 	}
 
 	Font italicMainFont = createFontFromPack(
@@ -581,7 +594,7 @@ inline static FontAtlas createFontAtlasInstance(
 		destroyFont(boldMainFont);
 		destroyFont(regularFallbackFont);
 		destroyFont(regularMainFont);
-		return NULL;
+		return false;
 	}
 
 	Font italicFallbackFont = createFontFromPack(
@@ -597,7 +610,7 @@ inline static FontAtlas createFontAtlasInstance(
 		destroyFont(boldMainFont);
 		destroyFont(regularFallbackFont);
 		destroyFont(regularMainFont);
-		return NULL;
+		return false;
 	}
 
 	Font boldItalicMainFont = createFontFromPack(
@@ -614,7 +627,7 @@ inline static FontAtlas createFontAtlasInstance(
 		destroyFont(boldMainFont);
 		destroyFont(regularFallbackFont);
 		destroyFont(regularMainFont);
-		return NULL;
+		return false;
 	}
 
 	Font boldItalicFallbackFont = createFontFromPack(
@@ -632,7 +645,7 @@ inline static FontAtlas createFontAtlasInstance(
 		destroyFont(boldMainFont);
 		destroyFont(regularFallbackFont);
 		destroyFont(regularMainFont);
-		return NULL;
+		return false;
 	}
 
 	Font regularFonts[2] = {
@@ -652,6 +665,10 @@ inline static FontAtlas createFontAtlasInstance(
 		boldItalicFallbackFont
 	};
 
+	scale *= getPlatformScale(
+		getGraphicsPipelineFramebuffer(
+		textPipeline));
+
 	FontAtlas fontAtlas;
 
 	MpgxResult mpgxResult = createAsciiFontAtlas(
@@ -661,33 +678,57 @@ inline static FontAtlas createFontAtlasInstance(
 		italicFonts,
 		boldItalicFonts,
 		2,
-		fontSize,
+		processFontSize(scale, 14),
 		logger,
 		&fontAtlas);
 
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
 		logMessage(logger, ERROR_LOG_LEVEL,
-			"Failed to create regular font atlas. "
-			"(error: %s)", mpgxResultToString(mpgxResult));
-		destroyFont(boldItalicFallbackFont);
-		destroyFont(boldItalicMainFont);
-		destroyFont(italicFallbackFont);
-		destroyFont(italicMainFont);
-		destroyFont(boldFallbackFont);
-		destroyFont(boldMainFont);
-		destroyFont(regularFallbackFont);
-		destroyFont(regularMainFont);
-		return NULL;
+			"Failed to create font atlas. (error: %s)",
+			mpgxResultToString(mpgxResult));
+		goto DESTROY_FONTS;
 	}
 
-	return fontAtlas;
-}
-inline static void destroyFontAtlasInstance(FontAtlas fontAtlas)
-{
-	if (!fontAtlas)
-		return;
+	fontAtlases[0] = fontAtlas;
 
+	mpgxResult = createAsciiFontAtlas(
+		textPipeline,
+		regularFonts,
+		boldFonts,
+		italicFonts,
+		boldItalicFonts,
+		2,
+		processFontSize(scale, 16),
+		logger,
+		&fontAtlas);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		logMessage(logger, ERROR_LOG_LEVEL,
+			"Failed to create font atlas. (error: %s)",
+			mpgxResultToString(mpgxResult));
+		destroyFontAtlas(fontAtlases[0]);
+		goto DESTROY_FONTS;
+	}
+
+	fontAtlases[1] = fontAtlas;
+	return true;
+
+DESTROY_FONTS:
+	destroyFont(boldItalicFallbackFont);
+	destroyFont(boldItalicMainFont);
+	destroyFont(italicFallbackFont);
+	destroyFont(italicMainFont);
+	destroyFont(boldFallbackFont);
+	destroyFont(boldMainFont);
+	destroyFont(regularFallbackFont);
+	destroyFont(regularMainFont);
+	return false;
+}
+inline static void destroyFontAtlasArray(FontAtlas* fontAtlases)
+{
+	FontAtlas fontAtlas = fontAtlases[0];
 	Font* fonts = getFontAtlasRegularFonts(fontAtlas);
 	Font regularMainFont = fonts[0];
 	Font regularFallbackFont = fonts[1];
@@ -700,7 +741,10 @@ inline static void destroyFontAtlasInstance(FontAtlas fontAtlas)
 	fonts = getFontAtlasBoldItalicFonts(fontAtlas);
 	Font boldItalicMainFont = fonts[0];
 	Font boldItalicFallbackFont = fonts[1];
-	destroyFontAtlas(fontAtlas);
+
+	for (size_t i = 0; i < FONT_ATLAS_COUNT; i++)
+		destroyFontAtlas(fontAtlases[i]);
+
 	destroyFont(boldItalicFallbackFont);
 	destroyFont(boldItalicMainFont);
 	destroyFont(italicFallbackFont);
@@ -755,7 +799,7 @@ inline static void destroyProgram(Program program)
 
 	destroyEditor(program->editor);
 	destroyUserInterface(program->ui);
-	destroyFontAtlasInstance(program->fontAtlas);
+	destroyFontAtlasArray(program->fontAtlases);
 	destroyTextPipelineInstance(program->textPipeline);
 	destroyPanelPipelineInstance(program->panelPipeline);
 	destroyWindow(program->window);
@@ -939,20 +983,21 @@ inline static Program createProgram(
 
 	program->textPipeline = textPipeline;
 
-	FontAtlas fontAtlas = createFontAtlasInstance(
+	FontAtlas* fontAtlases = program->fontAtlases;
+
+	bool result = createFontAtlasInstance(
 		logger,
 		packReader,
 		textPipeline,
-		(int)(56 * settings->uiScale));
+		settings->uiScale,
+		fontAtlases);
 
-	if (!fontAtlas)
+	if (!result)
 	{
 		destroyPackReader(packReader);
 		destroyProgram(program);
 		return NULL;
 	}
-
-	program->fontAtlas = fontAtlas;
 
 	UserInterface ui;
 
@@ -960,7 +1005,8 @@ inline static Program createProgram(
 		transformer,
 		panelPipeline,
 		textPipeline,
-		fontAtlas,
+		fontAtlases,
+		FONT_ATLAS_COUNT,
 		settings->uiScale,
 		1,
 		&ui);
