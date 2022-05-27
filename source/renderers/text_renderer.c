@@ -53,7 +53,7 @@ static size_t onDraw(
 	position.y = cmmtFloor(position.y *
 		(cmmt_float_t)halfFramebufferSize.y) /
 		(cmmt_float_t)halfFramebufferSize.y;
-	setTranslationMat4F(mvp, position);
+	mvp = setTranslationMat4F(mvp, position);
 	setTextPipelineMVP(graphicsPipeline, mvp);
 	setTextPipelineColor(graphicsPipeline, handle->color);
 

@@ -1858,6 +1858,7 @@ inline static bool fillVertices(
 	const Glyph* italicGlyphs,
 	const Glyph* boldItalicGlyphs,
 	size_t glyphCount,
+	float fontSize,
 	float newLineAdvance,
 	AlignmentType alignment,
 	SrgbColor color,
@@ -1873,6 +1874,7 @@ inline static bool fillVertices(
 	assert(italicGlyphs);
 	assert(boldItalicGlyphs);
 	assert(glyphCount > 0);
+	assert(fontSize > 0);
 	assert(alignment < ALIGNMENT_TYPE_COUNT);
 	assert(vertices);
 	assert(vertexCount);
@@ -1886,6 +1888,9 @@ inline static bool fillVertices(
 	float sizeX = 0.0f, sizeY = 0.0f;
 	float vertexOffsetX = 0.0f, vertexOffsetY = -newLineAdvance * 0.5f;
 	uint32_t vertexIndex = 0, lastNewLineIndex = 0;
+
+	// TODO: probably round newLineAdvance and other as well
+	// using offset = floorf(offset * fontSize) / fontSize;
 
 	const Glyph* glyphs;
 	float atlasIndex;
@@ -1925,6 +1930,7 @@ inline static bool fillVertices(
 				abort();
 			case CENTER_ALIGNMENT_TYPE:
 				offset = vertexOffsetX * -0.5f;
+				offset = floorf(offset * fontSize) / fontSize;
 
 				for (uint32_t j = lastNewLineIndex; j < vertexIndex; j++)
 					vertices[j].position.x += offset;
@@ -1939,12 +1945,14 @@ inline static bool fillVertices(
 				break;
 			case BOTTOM_ALIGNMENT_TYPE:
 				offset = vertexOffsetX * -0.5f;
+				offset = floorf(offset * fontSize) / fontSize;
 
 				for (uint32_t j = lastNewLineIndex; j < vertexIndex; j++)
 					vertices[j].position.x += offset;
 				break;
 			case TOP_ALIGNMENT_TYPE:
 				offset = vertexOffsetX * -0.5f;
+				offset = floorf(offset * fontSize) / fontSize;
 
 				for (uint32_t j = lastNewLineIndex; j < vertexIndex; j++)
 					vertices[j].position.x += offset;
@@ -2202,17 +2210,20 @@ inline static bool fillVertices(
 		abort();
 	case CENTER_ALIGNMENT_TYPE:
 		offset = vertexOffsetX * -0.5f;
+		offset = floorf(offset * fontSize) / fontSize;
 
 		for (uint32_t i = lastNewLineIndex; i < vertexIndex; i++)
 			vertices[i].position.x += offset;
 
 		offset = sizeY * 0.5f;
+		offset = floorf(offset * fontSize) / fontSize;
 
 		for (uint32_t i = 0; i < vertexIndex; i++)
 			vertices[i].position.y += offset;
 		break;
 	case LEFT_ALIGNMENT_TYPE:
 		offset = sizeY * 0.5f;
+		offset = floorf(offset * fontSize) / fontSize;
 
 		for (uint32_t i = 0; i < vertexIndex; i++)
 			vertices[i].position.y += offset;
@@ -2224,12 +2235,14 @@ inline static bool fillVertices(
 			vertices[i].position.x += offset;
 
 		offset = sizeY * 0.5f;
+		offset = floorf(offset * fontSize) / fontSize;
 
 		for (uint32_t i = 0; i < vertexIndex; i++)
 			vertices[i].position.y += offset;
 		break;
 	case BOTTOM_ALIGNMENT_TYPE:
 		offset = vertexOffsetX * -0.5f;
+		offset = floorf(offset * fontSize) / fontSize;
 
 		for (uint32_t i = lastNewLineIndex; i < vertexIndex; i++)
 			vertices[i].position.x += offset;
@@ -2241,6 +2254,7 @@ inline static bool fillVertices(
 		break;
 	case TOP_ALIGNMENT_TYPE:
 		offset = vertexOffsetX * -0.5f;
+		offset = floorf(offset * fontSize) / fontSize;
 
 		for (uint32_t i = lastNewLineIndex; i < vertexIndex; i++)
 			vertices[i].position.x += offset;
@@ -2427,6 +2441,7 @@ inline static MpgxResult internalCreateText(
 		glyphs + glyphCapacity * 2,
 		glyphs + glyphCapacity * 2,
 		fontAtlas->glyphCount,
+		(float)fontAtlas->fontSize,
 		fontAtlas->newLineAdvance,
 		alignment,
 		color,
@@ -3504,6 +3519,7 @@ MpgxResult bakeText(Text text)
 		glyphs + glyphCapacity * 2,
 		glyphs + glyphCapacity * 3,
 		fontAtlas->glyphCount,
+		(float)fontAtlas->fontSize,
 		fontAtlas->newLineAdvance,
 		text->base.alignment,
 		text->base.color,
@@ -4067,8 +4083,6 @@ static void onGlResize(
 	{
 		graphicsPipeline->gl.state.scissor = size;
 	}
-
-	Handle handle = graphicsPipeline->gl.handle;
 }
 static void onGlDestroy(
 	Window window,
@@ -4198,8 +4212,6 @@ MpgxResult createTextPipeline(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
-	Vec2I framebufferSize = framebuffer->base.size;
-
 	handle->base.sampler = sampler;
 	handle->base.vpc.mvp = identMat4F;
 	handle->base.fpc.color = whiteLinearColor;
@@ -4221,6 +4233,8 @@ MpgxResult createTextPipeline(
 	const char* name = NULL;
 #endif
 
+	Vec2I framebufferSize =
+		framebuffer->base.size;
 	Vec4I size = vec4I(0, 0,
 		framebufferSize.x,
 		framebufferSize.y);
