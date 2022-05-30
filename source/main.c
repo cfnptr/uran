@@ -28,6 +28,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#if __linux__ || __APPLE__
+#include <sys/utsname.h>
+#endif
+
 #if _WIN32
 #ifdef NDEBUG
 #include <windows.h>
@@ -1076,17 +1080,18 @@ MAIN_FUNCTION
 	logMessage(logger, INFO_LOG_LEVEL,
 		"Uran - Editor (v" URAN_VERSION_STRING ")");
 
-#if __linux__
-	const char* osString = "OS: Linux.";
-#elif __APPLE__
-	const char* osString = "OS: macOS.";
+#if __linux__ || __APPLE__
+	struct utsname unameData;
+	int result = uname(&unameData);
+
+	logMessage(logger, INFO_LOG_LEVEL, "OS: %s %s %s %s.",
+		unameData.sysname, unameData.release,
+		unameData.version, unameData.machine);
 #elif _WIN32
-	const char* osString = "OS: Windows.";
+	logMessage(logger, INFO_LOG_LEVEL, "OS: Windows.");
 #else
 #error Unknown operating system
 #endif
-
-	logMessage(logger, INFO_LOG_LEVEL, osString);
 
 	int cpuCount = getCpuCount();
 
