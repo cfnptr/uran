@@ -762,21 +762,18 @@ inline static void destroyFontAtlasArray(FontAtlas* fontAtlases)
 	destroyFont(regularMainFont);
 }
 
-static void onProgramUpdate(void* argument)
+inline static void onDraw(Program program)
 {
-	assert(argument);
-	Program program = (Program)argument;
+	assert(program);
 	Window window = program->window;
 	UserInterface ui = program->ui;
 	Framebuffer framebuffer = getWindowFramebuffer(window);
-
+	GraphicsRendererResult result = createGraphicsRendererResult();
+	GraphicsRendererResult tmpResult;
 	FramebufferClear clearValues[2];
 	clearValues[0].color = zeroLinearColor;
 	DepthStencilClear depthClear = { 1.0f, 0 };
 	clearValues[1].depthStencil = depthClear;
-
-	updateUserInterface(ui);
-	updateTransformer(program->transformer);
 
 	MpgxResult mpgxResult = beginWindowRecord(window);
 
@@ -784,19 +781,32 @@ static void onProgramUpdate(void* argument)
 	{
 		logMessage(program->logger, FATAL_LOG_LEVEL,
 			"Failed to begin window record. (error: %s)",
-			mpgxResultToString(mpgxResult));
+		mpgxResultToString(mpgxResult));
 		abort();
 	}
 
 	beginFramebufferRender(
 		framebuffer,
 		clearValues,
-		2);
-	drawUserInterface(ui);
+	2);
+
+	tmpResult = drawUserInterface(ui);
+	result = addGraphicsRendererResult(result, tmpResult);
+
 	endFramebufferRender(framebuffer);
 
-	postUpdateEditor(program->editor);
+	Editor editor = program->editor;
+	setEditorRendererResult(editor, result);
+	postUpdateEditor(editor);
 	endWindowRecord(window);
+}
+static void onProgramUpdate(void* argument)
+{
+	assert(argument);
+	Program program = (Program)argument;
+	updateUserInterface(program->ui);
+	updateTransformer(program->transformer);
+	onDraw(program);
 }
 
 inline static void destroyProgram(Program program)

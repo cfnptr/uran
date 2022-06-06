@@ -20,17 +20,26 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#define LERP_FACTOR (cmmt_float_t)20.0
+
 struct FreeCamera_T
 {
 	Framebuffer framebuffer;
 	Transform transform;
 	Vec2F rotation;
 	Vec2F lastCursorPosition;
+	Vec3F velocity;
 	cmmt_float_t moveSpeed;
 	cmmt_float_t viewSpeed;
 	cmmt_float_t fieldOfView;
 	cmmt_float_t nearClipPlane;
 	cmmt_float_t farClipPlane;
+	KeyboardKey moveLeftKey;
+	KeyboardKey moveRightKey;
+	KeyboardKey moveDownKey;
+	KeyboardKey moveUpKey;
+	KeyboardKey moveBackwardKey;
+	KeyboardKey moveForwardKey;
 };
 
 FreeCamera createFreeCamera(
@@ -40,7 +49,13 @@ FreeCamera createFreeCamera(
 	cmmt_float_t viewSpeed,
 	cmmt_float_t fieldOfView,
 	cmmt_float_t nearClipPlane,
-	cmmt_float_t farClipPlane)
+	cmmt_float_t farClipPlane,
+	KeyboardKey moveLeftKey,
+	KeyboardKey moveRightKey,
+	KeyboardKey moveDownKey,
+	KeyboardKey moveUpKey,
+	KeyboardKey moveBackwardKey,
+	KeyboardKey moveForwardKey)
 {
 	assert(framebuffer);
 	assert(transformer);
@@ -56,11 +71,18 @@ FreeCamera createFreeCamera(
 	freeCamera->framebuffer = framebuffer;
 	freeCamera->rotation = zeroVec2F;
 	freeCamera->lastCursorPosition = zeroVec2F;
+	freeCamera->velocity = zeroVec3F;
 	freeCamera->moveSpeed = moveSpeed;
 	freeCamera->viewSpeed = viewSpeed;
 	freeCamera->fieldOfView = fieldOfView;
 	freeCamera->nearClipPlane = nearClipPlane;
 	freeCamera->farClipPlane = farClipPlane;
+	freeCamera->moveLeftKey = moveLeftKey;
+	freeCamera->moveRightKey = moveRightKey;
+	freeCamera->moveDownKey = moveDownKey;
+	freeCamera->moveUpKey = moveUpKey;
+	freeCamera->moveBackwardKey = moveBackwardKey;
+	freeCamera->moveForwardKey = moveForwardKey;
 
 	Transform transform = createTransform(
 		transformer,
@@ -217,22 +239,108 @@ void setFreeCameraFarClipPlane(
 	freeCamera->farClipPlane = farClipPlane;
 }
 
+KeyboardKey getFreeCameraMoveLeftKey(
+	FreeCamera freeCamera)
+{
+	assert(freeCamera);
+	return freeCamera->moveLeftKey;
+}
+void setFreeCameraMoveLeftKey(
+	FreeCamera freeCamera,
+	KeyboardKey moveLeftKey)
+{
+	assert(freeCamera);
+	assert(moveLeftKey <= LAST_KEYBOARD_KEY);
+	freeCamera->moveLeftKey = moveLeftKey;
+}
+
+KeyboardKey getFreeCameraMoveRightKey(
+	FreeCamera freeCamera)
+{
+	assert(freeCamera);
+	return freeCamera->moveRightKey;
+}
+void setFreeCameraMoveRightKey(
+	FreeCamera freeCamera,
+	KeyboardKey moveRightKey)
+{
+	assert(freeCamera);
+	assert(moveRightKey <= LAST_KEYBOARD_KEY);
+	freeCamera->moveRightKey = moveRightKey;
+}
+
+KeyboardKey getFreeCameraMoveDownKey(
+	FreeCamera freeCamera)
+{
+	assert(freeCamera);
+	return freeCamera->moveDownKey;
+}
+void setFreeCameraMoveDownKey(
+	FreeCamera freeCamera,
+	KeyboardKey moveDownKey)
+{
+	assert(freeCamera);
+	assert(moveDownKey <= LAST_KEYBOARD_KEY);
+	freeCamera->moveDownKey = moveDownKey;
+}
+
+KeyboardKey getFreeCameraMoveUpKey(
+	FreeCamera freeCamera)
+{
+	assert(freeCamera);
+	return freeCamera->moveUpKey;
+}
+void setFreeCameraMoveUpKey(
+	FreeCamera freeCamera,
+	KeyboardKey moveUpKey)
+{
+	assert(freeCamera);
+	assert(moveUpKey <= LAST_KEYBOARD_KEY);
+	freeCamera->moveUpKey = moveUpKey;
+}
+
+KeyboardKey getFreeCameraMoveBackwardKey(
+	FreeCamera freeCamera)
+{
+	assert(freeCamera);
+	return freeCamera->moveBackwardKey;
+}
+void setFreeCameraMoveBackwardKey(
+	FreeCamera freeCamera,
+	KeyboardKey moveBackwardKey)
+{
+	assert(freeCamera);
+	assert(moveBackwardKey <= LAST_KEYBOARD_KEY);
+	freeCamera->moveBackwardKey = moveBackwardKey;
+}
+
+KeyboardKey getFreeCameraMoveForwardKey(
+	FreeCamera freeCamera)
+{
+	assert(freeCamera);
+	return freeCamera->moveForwardKey;
+}
+void setFreeCameraMoveForwardKey(
+	FreeCamera freeCamera,
+	KeyboardKey moveForwardKey)
+{
+	assert(freeCamera);
+	assert(moveForwardKey <= LAST_KEYBOARD_KEY);
+	freeCamera->moveForwardKey = moveForwardKey;
+}
+
 void updateFreeCamera(FreeCamera freeCamera)
 {
 	assert(freeCamera);
 
-	Window window = getFramebufferWindow(
-		freeCamera->framebuffer);
+	Window window = getFramebufferWindow(freeCamera->framebuffer);
 
 	if (!isWindowFocused(window))
 		return;
 
 	if (getWindowMouseButton(window, RIGHT_MOUSE_BUTTON))
 	{
-		setWindowCursorMode(
-			window,
-			LOCKED_CURSOR_MODE);
-
+		setWindowCursorMode(window, LOCKED_CURSOR_MODE);
 		cmmt_float_t deltaTime = (cmmt_float_t)getWindowDeltaTime(window);
 		Transform transform = freeCamera->transform;
 		Vec2F rotation = freeCamera->rotation;
@@ -254,48 +362,38 @@ void updateFreeCamera(FreeCamera freeCamera)
 		freeCamera->rotation = rotation;
 		freeCamera->lastCursorPosition = cursorPosition;
 
-		Quat transformRotation = axisQuat(
-			rotation.x, leftVec3F);
-		transformRotation = dotQuat(
-			transformRotation,
+		Quat transformRotation = axisQuat(rotation.x, leftVec3F);
+		transformRotation = dotQuat(transformRotation,
 			axisQuat(rotation.y, bottomVec3F));
-		setTransformRotation(
-			transform,
-			transformRotation);
+		setTransformRotation(transform, transformRotation);
 
-		Vec3F translation = zeroVec3F;
+		Vec3F moveVector = zeroVec3F;
 
-		if (getWindowKeyboardKey(window, A_KEYBOARD_KEY))
-			translation.x = LEFT_AXIS_VALUE * deltaTime * moveSpeed;
-		else if (getWindowKeyboardKey(window, D_KEYBOARD_KEY))
-			translation.x = RIGHT_AXIS_VALUE * deltaTime * moveSpeed;
-		if (getWindowKeyboardKey(window, LEFT_SHIFT_KEYBOARD_KEY))
-			translation.y = BOTTOM_AXIS_VALUE * deltaTime * moveSpeed;
-		else if (getWindowKeyboardKey(window, SPACE_KEYBOARD_KEY))
-			translation.y = TOP_AXIS_VALUE * deltaTime * moveSpeed;
-		if (getWindowKeyboardKey(window, S_KEYBOARD_KEY))
-			translation.z = BACK_AXIS_VALUE * deltaTime * moveSpeed;
-		else if (getWindowKeyboardKey(window, W_KEYBOARD_KEY))
-			translation.z = FRONT_AXIS_VALUE * deltaTime * moveSpeed;
+		if (getWindowKeyboardKey(window, freeCamera->moveLeftKey))
+			moveVector.x = LEFT_AXIS_VALUE * deltaTime * moveSpeed;
+		else if (getWindowKeyboardKey(window, freeCamera->moveRightKey))
+			moveVector.x = RIGHT_AXIS_VALUE * deltaTime * moveSpeed;
+		if (getWindowKeyboardKey(window, freeCamera->moveDownKey))
+			moveVector.y = BOTTOM_AXIS_VALUE * deltaTime * moveSpeed;
+		else if (getWindowKeyboardKey(window, freeCamera->moveUpKey))
+			moveVector.y = TOP_AXIS_VALUE * deltaTime * moveSpeed;
+		if (getWindowKeyboardKey(window, freeCamera->moveBackwardKey))
+			moveVector.z = BACK_AXIS_VALUE * deltaTime * moveSpeed;
+		else if (getWindowKeyboardKey(window, freeCamera->moveForwardKey))
+			moveVector.z = FRONT_AXIS_VALUE * deltaTime * moveSpeed;
 
-		translation = dotVecQuat3F(
-			translation,
-			transformRotation);
+		Vec3F velocity = freeCamera->velocity;
+		moveVector = dotVecQuat3F(moveVector, transformRotation);
+		velocity = lerpValVec3F(velocity, moveVector, deltaTime * LERP_FACTOR);
+		freeCamera->velocity = velocity;
 
-		Vec3F transformPosition =
-			getTransformPosition(transform);
-		transformPosition = addVec3F(
-			transformPosition,
-			translation);
-		setTransformPosition(
-			transform,
-			transformPosition);
+		Vec3F transformPosition = getTransformPosition(transform);
+		transformPosition = addVec3F(transformPosition, moveVector);
+		setTransformPosition(transform, transformPosition);
 	}
 	else
 	{
-		setWindowCursorMode(
-			window,
-			DEFAULT_CURSOR_MODE);
+		setWindowCursorMode(window, DEFAULT_CURSOR_MODE);
 		freeCamera->lastCursorPosition = zeroVec2F;
 	}
 }

@@ -221,32 +221,49 @@ static void onStatsLabelUpdate(InterfaceElement element)
 {
 	assert(element);
 	StatsWindow statsWindow = getUiLabelHandle(element);
-	double updateTime = getWindowUpdateTime(statsWindow->window);
+	Window window = statsWindow->window;
+	double updateTime = getWindowUpdateTime(window);
 
 	if (updateTime < statsWindow->lastUpdateTime)
 		return;
 
-	double deltaTime = getWindowDeltaTime(statsWindow->window);
+	double deltaTime = getWindowDeltaTime(window);
 	GraphicsRendererResult rendererResult = statsWindow->rendererResult;
+	Framebuffer framebuffer = getWindowFramebuffer(window);
 
-	char buffer[256];
+	char buffer[512];
 
 	// TODO: GPU time
 
 	size_t count = snprintf(
-		buffer,
-		256,
+		buffer, 512,
 		"<b>FPS</b>: %d (<i>%dms</i>)\n"
 		"<b>CPU time</b>: %.3fms\n"
 		"<b>Draw count</b>: %zu\n"
 		"<b>Polygon count</b>: %zu\n"
-		"<b>Pass count</b>: %zu",
+		"<b>Pass count</b>: %zu\n"
+		"<b>Buffer count</b>: %zu\n"
+		"<b>Image count</b>: %zu\n"
+		"<b>Sampler count</b>: %zu\n"
+		"<b>Framebuffer count</b>: %zu\n"
+		"<b>Shader count</b>: %zu\n"
+		"<b>Graphics mesh count</b>: %zu\n"
+		"<b>Compute pipeline count</b>: %zu\n"
+		"<b>Manin FB pipeline count</b>: %zu\n",
 		(int)(1.0 / deltaTime),
 		(int)(deltaTime * 1000.0),
 		(float)(statsWindow->cpuTime),
 		rendererResult.drawCount,
 		rendererResult.indexCount / 3,
-		rendererResult.passCount);
+		rendererResult.passCount,
+		getWindowBufferCount(window),
+		getWindowImageCount(window),
+		getWindowSamplerCount(window),
+		getWindowFramebufferCount(window) + 1,
+		getWindowShaderCount(window),
+		getWindowGraphicsMeshCount(window),
+		getWindowComputePipelineCount(window),
+		getFramebufferPipelineCount(framebuffer));
 
 	MpgxResult mpgxResult = setUiLabelText8(
 		element, buffer, count);
@@ -306,7 +323,7 @@ inline static StatsWindow createStatsWindow(
 		zeroVec3F,
 		vec2F(
 			(cmmt_float_t)256.0,
-			(cmmt_float_t)128.0),
+			(cmmt_float_t)256.0),
 		logger);
 
 	if (!base)

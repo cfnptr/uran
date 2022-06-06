@@ -2,9 +2,6 @@
 
 Work in Progress!
 
-## Features
-* TODO
-
 ## Supported operating systems
 
 * Ubuntu

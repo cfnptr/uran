@@ -265,7 +265,7 @@ MpgxResult createUserInterface(
 
 	GraphicsRenderer panelRenderer = createPanelRenderer(
 		panelPipeline,
-		UI_DESCENDING_GRAPHICS_RENDER_SORTING,
+		UI_ASCENDING_GRAPHICS_RENDER_SORTING, // Note: change if using transparency
 		false,
 		1,
 		threadPool);

@@ -31,8 +31,8 @@ float calcDiffuse(vec3 normal, vec3 lightDirection)
 }
 void main()
 {
-    vec4 ambientColor = ub.objectColor * ub.ambientColor;
     float diffuse = calcDiffuse(f_Normal, ub.lightDirection.xyz);
-    vec4 diffuseColor = ub.lightColor * diffuse;
-    o_Color = (ambientColor + diffuseColor) * ub.objectColor;
+    vec3 ambientColor = ub.objectColor.rgb * ub.ambientColor.rgb;
+    vec3 color = ambientColor + ub.lightColor.rgb * diffuse;
+    o_Color = vec4(color * ub.objectColor.rgb, ub.objectColor.a);
 }
