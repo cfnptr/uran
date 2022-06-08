@@ -1256,8 +1256,8 @@ inline static FontAtlas getBestFontAtlas(
 	assert(fontAtlases);
 	assert(fontAtlasCount > 0);
 
-	uint32_t fontSize = (uint32_t)(
-		fontScale * uiScale * getPlatformScale(framebuffer));
+	uint32_t fontSize = (uint32_t)(fontScale *
+		uiScale * getPlatformScale(framebuffer));
 
 	if (fontSize % 2 != 0)
 		fontSize += 1;
@@ -1369,8 +1369,9 @@ inline static MpgxResult internalCreateUiLabel(
 
 	if (isUniversal)
 	{
-		uint32_t fontSize = (uint32_t)(scale * getPlatformScale(
-			getWindowFramebuffer(ui->window)));
+		uint32_t fontSize = (uint32_t)(scale *
+			getInterfaceScale(ui->interface) *
+			getPlatformScale(getWindowFramebuffer(ui->window)));
 		FontAtlas fontAtlas = ui->fontAtlases[0];
 
 		if (fontSize % 2 != 0)
@@ -3028,10 +3029,15 @@ inline static MpgxResult internalCreateUiInputField(
 
 	Text textInstance;
 
-	FontAtlas fontAtlas = ui->fontAtlases[0];
-	uint32_t fontSize = (uint32_t)(DEFAULT_UI_TEXT_HEIGHT * 2 *
+	uint32_t fontSize = (uint32_t)(DEFAULT_UI_TEXT_HEIGHT *
+		getInterfaceScale(ui->interface) *
 		getPlatformScale(getWindowFramebuffer(ui->window)));
+
+	if (fontSize % 2 != 0)
+		fontSize += 1;
+
 	const uint32_t text[] = { '-', };
+	FontAtlas fontAtlas = ui->fontAtlases[0];
 
 	MpgxResult mpgxResult = createFontText(
 		getFontAtlasPipeline(fontAtlas),

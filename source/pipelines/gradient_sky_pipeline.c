@@ -637,10 +637,17 @@ MpgxResult createGradientSkyPipeline(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
+	Vec3F sunDirection = normVec3F(
+		vec3F(1.0f, 3.0f, 6.0f));
+
 	handle->base.texture = texture;
 	handle->base.sampler = sampler;
 	handle->base.vpc.mvp = identMat4F;
-	handle->base.fpc.sunDirection = zeroVec4F;
+	handle->base.fpc.sunDirection = vec4F(
+		sunDirection.x,
+		sunDirection.y,
+		sunDirection.z,
+		0.0f);
 	handle->base.fpc.sunColor = whiteLinearColor;
 
 #ifndef NDEBUG

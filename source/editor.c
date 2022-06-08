@@ -230,6 +230,7 @@ static void onStatsLabelUpdate(InterfaceElement element)
 	double deltaTime = getWindowDeltaTime(window);
 	GraphicsRendererResult rendererResult = statsWindow->rendererResult;
 	Framebuffer framebuffer = getWindowFramebuffer(window);
+	Vec2I framebufferSize = getFramebufferSize(framebuffer);
 
 	char buffer[512];
 
@@ -249,7 +250,8 @@ static void onStatsLabelUpdate(InterfaceElement element)
 		"<b>Shader count</b>: %zu\n"
 		"<b>Graphics mesh count</b>: %zu\n"
 		"<b>Compute pipeline count</b>: %zu\n"
-		"<b>Manin FB pipeline count</b>: %zu\n",
+		"<b>Main FB pipeline count</b>: %zu\n"
+		"<b>Main FB size</b>: %dx%d\n",
 		(int)(1.0 / deltaTime),
 		(int)(deltaTime * 1000.0),
 		(float)(statsWindow->cpuTime),
@@ -263,7 +265,8 @@ static void onStatsLabelUpdate(InterfaceElement element)
 		getWindowShaderCount(window),
 		getWindowGraphicsMeshCount(window),
 		getWindowComputePipelineCount(window),
-		getFramebufferPipelineCount(framebuffer));
+		getFramebufferPipelineCount(framebuffer),
+		framebufferSize.x, framebufferSize.y);
 
 	MpgxResult mpgxResult = setUiLabelText8(
 		element, buffer, count);
@@ -323,7 +326,7 @@ inline static StatsWindow createStatsWindow(
 		zeroVec3F,
 		vec2F(
 			(cmmt_float_t)256.0,
-			(cmmt_float_t)256.0),
+			(cmmt_float_t)270.0),
 		logger);
 
 	if (!base)

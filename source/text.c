@@ -1886,11 +1886,9 @@ inline static bool fillVertices(
 	SrgbColor useColor = color;
 	bool useBold = isBold, useItalic = isItalic;
 	float sizeX = 0.0f, sizeY = 0.0f;
-	float vertexOffsetX = 0.0f, vertexOffsetY = -newLineAdvance * 0.5f;
+	float vertexOffsetX = 0.0f, vertexOffsetY = newLineAdvance * 0.5f;
 	uint32_t vertexIndex = 0, lastNewLineIndex = 0;
-
-	// TODO: probably round newLineAdvance and other as well
-	// using offset = floorf(offset * fontSize) / fontSize;
+	vertexOffsetY = -floorf(vertexOffsetY * fontSize) / fontSize;
 
 	const Glyph* glyphs;
 	float atlasIndex;
