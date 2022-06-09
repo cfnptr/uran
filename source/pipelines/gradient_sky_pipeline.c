@@ -25,7 +25,7 @@ typedef struct VertexPushConstants
 } VertexPushConstants;
 typedef struct FragmentPushConstants
 {
-	Vec4F sunDirection;
+	Vec4F sunDirSize;
 	LinearColor sunColor;
 } FragmentPushConstants;
 typedef struct BaseHandle
@@ -55,7 +55,7 @@ typedef struct GlHandle
 	VertexPushConstants vpc;
 	FragmentPushConstants fpc;
 	GLint mvpLocation;
-	GLint sunDirectionLocation;
+	GLint sunDirSizeLocation;
 	GLint sunColorLocation;
 	GLint textureLocation;
 } GlHandle;
@@ -479,9 +479,9 @@ static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 		GL_FALSE,
 		(const GLfloat*)&handle->gl.vpc.mvp);
 	glUniform4fv(
-		handle->gl.sunDirectionLocation,
+		handle->gl.sunDirSizeLocation,
 		1,
-		(const GLfloat*)&handle->gl.fpc.sunDirection);
+		(const GLfloat*)&handle->gl.fpc.sunDirSize);
 	glUniform4fv(
 		handle->gl.sunColorLocation,
 		1,
@@ -572,7 +572,7 @@ inline static MpgxResult createGlPipeline(
 
 	GLuint glHandle = graphicsPipelineInstance->gl.glHandle;
 
-	GLint mvpLocation, sunDirectionLocation,
+	GLint mvpLocation, sunDirSizeLocation,
 		sunColorLocation, textureLocation;
 
 	bool result = getGlUniformLocation(
@@ -581,8 +581,8 @@ inline static MpgxResult createGlPipeline(
 		&mvpLocation);
 	result &= getGlUniformLocation(
 		glHandle,
-		"u_SunDirection",
-		&sunDirectionLocation);
+		"u_SunDirSize",
+		&sunDirSizeLocation);
 	result &= getGlUniformLocation(
 		glHandle,
 		"u_SunColor",
@@ -601,7 +601,7 @@ inline static MpgxResult createGlPipeline(
 	assertOpenGL();
 
 	handle->gl.mvpLocation = mvpLocation;
-	handle->gl.sunDirectionLocation = sunDirectionLocation;
+	handle->gl.sunDirSizeLocation = sunDirSizeLocation;
 	handle->gl.sunColorLocation = sunColorLocation;
 	handle->gl.textureLocation = textureLocation;
 
@@ -638,16 +638,16 @@ MpgxResult createGradientSkyPipeline(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
 	Vec3F sunDirection = normVec3F(
-		vec3F(1.0f, 3.0f, 6.0f));
+		vec3F(-1.0f, 3.0f, -6.0f));
 
 	handle->base.texture = texture;
 	handle->base.sampler = sampler;
 	handle->base.vpc.mvp = identMat4F;
-	handle->base.fpc.sunDirection = vec4F(
+	handle->base.fpc.sunDirSize = vec4F(
 		sunDirection.x,
 		sunDirection.y,
 		sunDirection.z,
-		0.0f);
+		1024.0f);
 	handle->base.fpc.sunColor = whiteLinearColor;
 
 #ifndef NDEBUG
@@ -785,7 +785,7 @@ Vec3F getGradientSkyPipelineSunDirection(
 	assert(strcmp(gradientSkyPipeline->base.name,
 		GRADIENT_SKY_PIPELINE_NAME) == 0);
 	Handle handle = gradientSkyPipeline->base.handle;
-	Vec4F sunDirection = handle->base.fpc.sunDirection;
+	Vec4F sunDirection = handle->base.fpc.sunDirSize;
 	return vec3F(
 		sunDirection.x,
 		sunDirection.y,
@@ -799,11 +799,29 @@ void setGradientSkyPipelineSunDirection(
 	assert(strcmp(gradientSkyPipeline->base.name,
 		GRADIENT_SKY_PIPELINE_NAME) == 0);
 	Handle handle = gradientSkyPipeline->base.handle;
-	handle->base.fpc.sunDirection = vec4F(
-		sunDirection.x,
-		sunDirection.y,
-		sunDirection.z,
-		0.0f);
+	handle->base.fpc.sunDirSize.x = sunDirection.x;
+	handle->base.fpc.sunDirSize.y = sunDirection.y;
+	handle->base.fpc.sunDirSize.z = sunDirection.z;
+}
+
+cmmt_float_t getGradientSkyPipelineSunSize(
+	GraphicsPipeline gradientSkyPipeline)
+{
+	assert(gradientSkyPipeline);
+	assert(strcmp(gradientSkyPipeline->base.name,
+		GRADIENT_SKY_PIPELINE_NAME) == 0);
+	Handle handle = gradientSkyPipeline->base.handle;
+	return handle->base.fpc.sunDirSize.w;
+}
+void setGradientSkyPipelineSunSize(
+	GraphicsPipeline gradientSkyPipeline,
+	cmmt_float_t sunSize)
+{
+	assert(gradientSkyPipeline);
+	assert(strcmp(gradientSkyPipeline->base.name,
+		GRADIENT_SKY_PIPELINE_NAME) == 0);
+	Handle handle = gradientSkyPipeline->base.handle;
+	handle->base.fpc.sunDirSize.w = sunSize;
 }
 
 LinearColor getGradientSkyPipelineSunColor(

@@ -96,6 +96,22 @@ void setGradientSkyPipelineSunDirection(
 	Vec3F sunDirection);
 
 /*
+ * Returns gradient sky pipeline sun size.
+ * gradientSkyPipeline - gradient sky pipeline instance.
+ */
+cmmt_float_t getGradientSkyPipelineSunSize(
+	GraphicsPipeline gradientSkyPipeline);
+/*
+ * Sets gradient sky pipeline sun size.
+ *
+ * gradientSkyPipeline - gradient sky pipeline instance.
+ * sunSize - sun size value.
+ */
+void setGradientSkyPipelineSunSize(
+	GraphicsPipeline gradientSkyPipeline,
+	cmmt_float_t sunSize);
+
+/*
  * Returns gradient sky pipeline sun color.
  * gradientSkyPipeline - gradient sky pipeline instance.
  */

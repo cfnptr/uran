@@ -34,7 +34,6 @@ MpgxResult createSimpleShadowSampler(
  * framebuffer - framebuffer instance.
  * vertexShader - simple shadow vertex shader.
  * fragmentShader - simple shadow fragment shader.
- * shadowMapLength - shadow map pixel length.
  * state - pipeline state or NULL.
  * simpleShadowPipeline - pointer to the simple shadow pipeline.
  */
@@ -42,7 +41,6 @@ MpgxResult createSimpleShadowPipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
-	cmmt_int_t shadowMapLength,
 	const GraphicsPipelineState* state,
 	GraphicsPipeline* simpleShadowPipeline);
 

@@ -306,14 +306,12 @@ MpgxResult createSimpleShadowPipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
-	cmmt_int_t shadowMapLength,
 	const GraphicsPipelineState* state,
 	GraphicsPipeline* simpleShadowPipeline)
 {
 	assert(framebuffer);
 	assert(vertexShader);
 	assert(fragmentShader);
-	assert(shadowMapLength > 0);
 	assert(simpleShadowPipeline);
 	assert(vertexShader->base.type == VERTEX_SHADER_TYPE);
 	assert(fragmentShader->base.type == FRAGMENT_SHADER_TYPE);
@@ -333,9 +331,11 @@ MpgxResult createSimpleShadowPipeline(
 	const char* name = NULL;
 #endif
 
+	Vec2I framebufferSize = framebuffer->base.size;
+
 	Vec4I size = vec4I(0, 0,
-		shadowMapLength,
-		shadowMapLength);
+		framebufferSize.x,
+		framebufferSize.y);
 	Vec2F depthBias = vec2F(
 		1.1f,4.0f);
 

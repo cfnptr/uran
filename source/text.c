@@ -288,7 +288,7 @@ size_t stringUTF8toUTF32(
 			i += 1;
 		}
 		else if (i + 1 < sourceLength &&
-			!((value & 0b11100000) ^ 0b11000000 |
+			!((value & 0b11100000) ^ 0b11000000 ||
 			(source[i + 1] & 0b11000000) ^ 0b10000000))
 		{
 			destination[length] =
@@ -297,8 +297,8 @@ size_t stringUTF8toUTF32(
 			i += 2;
 		}
 		else if (i + 2 < sourceLength &&
-			!((value & 0b11110000) ^ 0b11100000 |
-			(source[i + 1] & 0b11000000) ^ 0b10000000 |
+			!((value & 0b11110000) ^ 0b11100000 ||
+			(source[i + 1] & 0b11000000) ^ 0b10000000 ||
 			(source[i + 2] & 0b11000000) ^ 0b10000000))
 		{
 			destination[length] =
@@ -308,9 +308,9 @@ size_t stringUTF8toUTF32(
 			i += 3;
 		}
 		else if (i + 3 < sourceLength &&
-			!((value & 0b11111000) ^ 0b11110000 |
-			(source[i + 1] & 0b11000000) ^ 0b10000000 |
-			(source[i + 2] & 0b11000000) ^ 0b10000000 |
+			!((value & 0b11111000) ^ 0b11110000 ||
+			(source[i + 1] & 0b11000000) ^ 0b10000000 ||
+			(source[i + 2] & 0b11000000) ^ 0b10000000 ||
 			(source[i + 3] & 0b11000000) ^ 0b10000000))
 		{
 			destination[length] =
@@ -413,18 +413,18 @@ bool validateStringUTF8(
 		if ((value & 0b10000000) ^ 0 ||
 
 			(i + 1 >= stringLength ||
-			(value & 0b11100000) ^ 0b11000000 |
+			(value & 0b11100000) ^ 0b11000000 ||
 			(string[i + 1] & 0b11000000) ^ 0b10000000) ||
 
 			(i + 2 >= stringLength ||
-			(value & 0b11110000) ^ 0b11100000 |
-			(string[i + 1] & 0b11000000) ^ 0b10000000 |
+			(value & 0b11110000) ^ 0b11100000 ||
+			(string[i + 1] & 0b11000000) ^ 0b10000000 ||
 			(string[i + 2] & 0b11000000) ^ 0b10000000) ||
 
 			(i + 3 >= stringLength ||
-			(value & 0b11111000) ^ 0b11110000 |
-			(string[i + 1] & 0b11000000) ^ 0b10000000 |
-			(string[i + 2] & 0b11000000) ^ 0b10000000 |
+			(value & 0b11111000) ^ 0b11110000 ||
+			(string[i + 1] & 0b11000000) ^ 0b10000000 ||
+			(string[i + 2] & 0b11000000) ^ 0b10000000 ||
 			(string[i + 3] & 0b11000000) ^ 0b10000000))
 		{
 			return false;
@@ -456,22 +456,22 @@ MpgxResult allocateStringUTF32(
 			i += 1;
 		}
 		else if (i + 1 < sourceLength &&
-			!((value & 0b11100000) ^ 0b11000000 |
+			!((value & 0b11100000) ^ 0b11000000 ||
 			(source[i + 1] & 0b11000000) ^ 0b10000000))
 		{
 			i += 2;
 		}
 		else if (i + 2 < sourceLength &&
-			!((value & 0b11110000) ^ 0b11100000 |
-			(source[i + 1] & 0b11000000) ^ 0b10000000 |
+			!((value & 0b11110000) ^ 0b11100000 ||
+			(source[i + 1] & 0b11000000) ^ 0b10000000 ||
 			(source[i + 2] & 0b11000000) ^ 0b10000000))
 		{
 			i += 3;
 		}
 		else if (i + 3 < sourceLength &&
-			!((value & 0b11111000) ^ 0b11110000 |
-			(source[i + 1] & 0b11000000) ^ 0b10000000 |
-			(source[i + 2] & 0b11000000) ^ 0b10000000 |
+			!((value & 0b11111000) ^ 0b11110000 ||
+			(source[i + 1] & 0b11000000) ^ 0b10000000 ||
+			(source[i + 2] & 0b11000000) ^ 0b10000000 ||
 			(source[i + 3] & 0b11000000) ^ 0b10000000))
 		{
 			i += 4;

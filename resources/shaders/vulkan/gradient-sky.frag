@@ -21,8 +21,9 @@ layout(location = 0) out vec4 o_Color;
 
 layout(push_constant) uniform FragmentPushConstants
 {
-    layout(offset = 64) vec4 sunDirection;
-    layout(offset = 80) vec4 sunColor;
+    layout(offset = 64)
+    vec4 sunDirSize;
+    vec4 sunColor;
 } fpc;
 
 layout(binding = 0) uniform sampler2D u_Texture;
@@ -32,15 +33,15 @@ vec4 calcSkyColor(sampler2D skyTexture, float sunHeight, float texCoord)
     vec2 texCoords = vec2(max(sunHeight, 0.0), texCoord);
     return texture(skyTexture, texCoords);
 }
-float calcSunLight(vec3 fragDir, vec3 sunDirection)
+float calcSunLight(vec3 fragDir, vec3 sunDir, float size)
 {
-    float light = dot(normalize(fragDir), sunDirection);
-    return max((light - 0.999) * 1000.0, 0.0);
+    float light = dot(normalize(fragDir), sunDir);
+    return pow(max(light, 0.0), size);
 }
 void main()
 {
-    vec4 skyColor = calcSkyColor(u_Texture, fpc.sunDirection.y, f_TexCoords);
-    float sunLight = calcSunLight(f_FragDir, fpc.sunDirection.xyz);
+    vec4 skyColor = calcSkyColor(u_Texture, fpc.sunDirSize.y, f_TexCoords);
+    float sunLight = calcSunLight(f_FragDir, fpc.sunDirSize.xyz, fpc.sunDirSize.w);
     o_Color = (fpc.sunColor * sunLight) + skyColor;
     gl_FragDepth = 0.9999999;
 }

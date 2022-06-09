@@ -28,5 +28,5 @@ void main()
 {
     gl_Position = vpc.mvp * vec4(v_Position, 1.0);
     f_FragDir = v_Position;
-    f_TexCoords = clamp(v_Position.y, 0.0, 1.0);
+    f_TexCoords = 1.0 - clamp(v_Position.y, 0.0, 1.0);
 }
