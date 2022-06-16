@@ -334,6 +334,7 @@ void updateFreeCamera(FreeCamera freeCamera)
 	assert(freeCamera);
 
 	Window window = getFramebufferWindow(freeCamera->framebuffer);
+	cmmt_float_t deltaTime = (cmmt_float_t)getWindowDeltaTime(window);
 
 	if (!isWindowFocused(window))
 		return;
@@ -341,7 +342,6 @@ void updateFreeCamera(FreeCamera freeCamera)
 	if (getWindowMouseButton(window, RIGHT_MOUSE_BUTTON))
 	{
 		setWindowCursorMode(window, LOCKED_CURSOR_MODE);
-		cmmt_float_t deltaTime = (cmmt_float_t)getWindowDeltaTime(window);
 		Transform transform = freeCamera->transform;
 		Vec2F rotation = freeCamera->rotation;
 		Vec2F lastCursorPosition = freeCamera->lastCursorPosition;
@@ -388,13 +388,22 @@ void updateFreeCamera(FreeCamera freeCamera)
 		freeCamera->velocity = velocity;
 
 		Vec3F transformPosition = getTransformPosition(transform);
-		transformPosition = addVec3F(transformPosition, moveVector);
+		transformPosition = addVec3F(transformPosition, velocity);
 		setTransformPosition(transform, transformPosition);
 	}
 	else
 	{
 		setWindowCursorMode(window, DEFAULT_CURSOR_MODE);
 		freeCamera->lastCursorPosition = zeroVec2F;
+
+		Transform transform = freeCamera->transform;
+		Vec3F velocity = freeCamera->velocity;
+		velocity = lerpValVec3F(velocity, zeroVec3F, deltaTime * LERP_FACTOR);
+		freeCamera->velocity = velocity;
+
+		Vec3F transformPosition = getTransformPosition(transform);
+		transformPosition = addVec3F(transformPosition, velocity);
+		setTransformPosition(transform, transformPosition);
 	}
 }
 Camera getFreeCamera(FreeCamera freeCamera)

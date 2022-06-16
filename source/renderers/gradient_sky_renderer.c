@@ -76,7 +76,7 @@ void destroyGradientSkyAmbient(GradientSkyAmbient gradientSkyAmbient)
 }
 LinearColor getGradientSkyAmbientColor(
 	GradientSkyAmbient gradientSkyAmbient,
-	float dayTime)
+	cmmt_float_t dayTime)
 {
 	assert(gradientSkyAmbient);
 	assert(dayTime >= 0.0f);
@@ -85,10 +85,11 @@ LinearColor getGradientSkyAmbientColor(
 	LinearColor* colors = gradientSkyAmbient->colors;
 	size_t colorCount = gradientSkyAmbient->count;
 
-	dayTime = (float)(colorCount - 1) * dayTime;
+	dayTime = (cmmt_float_t)(colorCount - 1) * dayTime;
 
-	float secondValue = dayTime - (float)((int)dayTime);
-	float firstValue = 1.0f - secondValue;
+	cmmt_float_t secondValue = dayTime -
+		(cmmt_float_t)((cmmt_int_t)dayTime);
+	cmmt_float_t firstValue = 1.0f - secondValue;
 
 	LinearColor firstColor = colors[(size_t)dayTime];
 	LinearColor secondColor = colors[(size_t)dayTime + 1];
@@ -99,4 +100,3 @@ LinearColor getGradientSkyAmbientColor(
 		firstColor.b * firstValue + secondColor.b * secondValue,
 		firstColor.a * firstValue + secondColor.a * secondValue);
 }
-

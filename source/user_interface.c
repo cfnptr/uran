@@ -265,7 +265,7 @@ MpgxResult createUserInterface(
 
 	GraphicsRenderer panelRenderer = createPanelRenderer(
 		panelPipeline,
-		UI_ASCENDING_GRAPHICS_RENDER_SORTING, // Note: change if using transparency
+		UI_DESCENDING_GRAPHICS_RENDER_SORTING,
 		false,
 		1,
 		threadPool);
@@ -1025,7 +1025,7 @@ static void onElementScissor(
 	{
 		UiButtonHandle handle = (UiButtonHandle)base;
 		setPanelRenderScissor(handle->panelRender, scissor);
-		setTextRenderScissor(handle->textRender, scissor);
+		if (handle->textRender) setTextRenderScissor(handle->textRender, scissor);
 	}
 	else if (type == INPUT_FIELD_UI_TYPE)
 	{
@@ -2336,94 +2336,103 @@ inline static MpgxResult internalCreateUiButton(
 
 	handle->panelRender = panelRender;
 
-	Transform textTransform = createTransform(
-		transformer,
-		vec3F(
-			(cmmt_float_t)0.0,
-			(cmmt_float_t)0.0,
-			(cmmt_float_t)-0.001),
-		vec3F(
-			(cmmt_float_t)(DEFAULT_UI_TEXT_HEIGHT + 2.0),
-			(cmmt_float_t)(DEFAULT_UI_TEXT_HEIGHT + 2.0),
-			(cmmt_float_t)1.0),
-		oneQuat,
-		zeroVec3F,
-		NO_ROTATION_TYPE,
-		panelTransform,
-		NULL,
-		true);
+	Transform textTransform;
 
-	if (!textTransform)
+	if (textLength > 0)
 	{
-		onUiButtonDestroy(handle);
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
-	}
+		textTransform = createTransform(
+			transformer,
+			vec3F(
+				(cmmt_float_t)0.0,
+				(cmmt_float_t)0.0,
+				(cmmt_float_t)-0.001),
+			vec3F(
+				(cmmt_float_t)(DEFAULT_UI_TEXT_HEIGHT + 2.0),
+				(cmmt_float_t)(DEFAULT_UI_TEXT_HEIGHT + 2.0),
+				(cmmt_float_t)1.0),
+			oneQuat,
+			zeroVec3F,
+			NO_ROTATION_TYPE,
+			panelTransform,
+			NULL,
+			true);
 
-	FontAtlas fontAtlas = getBestFontAtlas(
-		getWindowFramebuffer(ui->window),
-		ui->fontAtlases,
-		ui->fontAtlasCount,
-		getInterfaceScale(ui->interface),
-		DEFAULT_UI_TEXT_HEIGHT + 2);
+		if (!textTransform)
+		{
+			onUiButtonDestroy(handle);
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+		}
 
-	Text textInstance;
-	MpgxResult mpgxResult;
+		FontAtlas fontAtlas = getBestFontAtlas(
+			getWindowFramebuffer(ui->window),
+			ui->fontAtlases,
+			ui->fontAtlasCount,
+			getInterfaceScale(ui->interface),
+			DEFAULT_UI_TEXT_HEIGHT + 2);
 
-	if (isUTF8)
-	{
-		mpgxResult = createAtlasText8(
-			fontAtlas,
-			text,
-			textLength,
-			CENTER_ALIGNMENT_TYPE,
-			DEFAULT_UI_TEXT_COLOR,
-			true,
-			false,
-			true,
-			true,
-			&textInstance);
+		Text textInstance;
+		MpgxResult mpgxResult;
+
+		if (isUTF8)
+		{
+			mpgxResult = createAtlasText8(
+				fontAtlas,
+				text,
+				textLength,
+				CENTER_ALIGNMENT_TYPE,
+				DEFAULT_UI_TEXT_COLOR,
+				true,
+				false,
+				true,
+				true,
+				&textInstance);
+		}
+		else
+		{
+			mpgxResult = createAtlasText(
+				fontAtlas,
+				text,
+				textLength,
+				CENTER_ALIGNMENT_TYPE,
+				DEFAULT_UI_TEXT_COLOR,
+				true,
+				false,
+				true,
+				true,
+				&textInstance);
+		}
+
+		if (mpgxResult != SUCCESS_MPGX_RESULT)
+		{
+			destroyTransform(textTransform);
+			onUiButtonDestroy(handle);
+			return mpgxResult;
+		}
+
+		GraphicsRender textRender = createTextRender(
+			ui->textRenderer,
+			textTransform,
+			createTextBox3F(
+				CENTER_ALIGNMENT_TYPE,
+				getTextSize(textInstance)),
+			whiteLinearColor,
+			textInstance,
+			zeroVec4I);
+
+		if (!textRender)
+		{
+			destroyText(textInstance);
+			destroyTransform(textTransform);
+			onUiButtonDestroy(handle);
+			return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+		}
+
+		handle->textRender = textRender;
 	}
 	else
 	{
-		mpgxResult = createAtlasText(
-			fontAtlas,
-			text,
-			textLength,
-			CENTER_ALIGNMENT_TYPE,
-			DEFAULT_UI_TEXT_COLOR,
-			true,
-			false,
-			true,
-			true,
-			&textInstance);
+		handle->textRender = NULL;
 	}
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-	{
-		destroyTransform(textTransform);
-		onUiButtonDestroy(handle);
-		return mpgxResult;
-	}
-
-	GraphicsRender textRender = createTextRender(
-		ui->textRenderer,
-		textTransform,
-		createTextBox3F(
-			CENTER_ALIGNMENT_TYPE,
-			getTextSize(textInstance)),
-		whiteLinearColor,
-		textInstance,
-		zeroVec4I);
-
-	if (!textRender)
-	{
-		destroyText(textInstance);
-		destroyTransform(textTransform);
-		onUiButtonDestroy(handle);
-		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
-	}
-
-	handle->textRender = textRender;
 
 	InterfaceElementEvents elementEvents = events ?
 		*events : emptyInterfaceElementEvents;
@@ -2458,7 +2467,9 @@ inline static MpgxResult internalCreateUiButton(
 	}
 
 	setTransformHandle(panelTransform, element);
-	setTransformHandle(textTransform, element);
+
+	if (textLength > 0)
+		setTransformHandle(textTransform, element);
 
 	*uiButton = element;
 	return SUCCESS_MPGX_RESULT;

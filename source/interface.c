@@ -424,7 +424,7 @@ void updateInterface(Interface interface)
 	size_t elementCount = interface->elementCount;
 	Window window = interface->window;
 
-	if (!elementCount)
+	if (elementCount == 0)
 		return;
 
 	cmmt_float_t interfaceScale = interface->scale;
@@ -502,89 +502,100 @@ void updateInterface(Interface interface)
 		continue;
 	}
 
-	if (!isWindowFocused(window))
-		return;
-
-	bool isLeftButtonPressed = getWindowMouseButton(
-		window, LEFT_MOUSE_BUTTON);
-	InterfaceElement lastElement = interface->lastElement;
-
-	bool isChanged;
-
-	if (isLeftButtonPressed)
+	if (isWindowFocused(window) && getWindowCursorMode(window) == DEFAULT_CURSOR_MODE)
 	{
-		if (!interface->isPressed)
-		{
-			isChanged = true;
-			interface->isPressed = true;
-		}
-		else
-		{
-			isChanged = false;
-		}
-	}
-	else
-	{
-		if (interface->isPressed)
-		{
-			isChanged = true;
-			interface->isPressed = false;
-		}
-		else
-		{
-			isChanged = false;
-		}
-	}
+		bool isLeftButtonPressed = getWindowMouseButton(
+			window, LEFT_MOUSE_BUTTON);
+		InterfaceElement lastElement = interface->lastElement;
 
-	if (lastElement)
-	{
-		if (lastElement != newElement)
-		{
-			interface->lastElement = newElement;
+		bool isChanged;
 
-			if (lastElement->events.onExit)
-				lastElement->events.onExit(lastElement);
-			if (newElement && newElement->events.onEnter)
-				newElement->events.onEnter(newElement);
-		}
-		else
+		if (isLeftButtonPressed)
 		{
-			if (isLeftButtonPressed)
+			if (!interface->isPressed)
 			{
-				if (isChanged)
-				{
-					if (lastElement->events.onPress)
-						lastElement->events.onPress(lastElement);
-				}
-				else
-				{
-					if (lastElement->events.onStay)
-						lastElement->events.onStay(lastElement);
-				}
+				isChanged = true;
+				interface->isPressed = true;
 			}
 			else
 			{
-				if (isChanged)
+				isChanged = false;
+			}
+		}
+		else
+		{
+			if (interface->isPressed)
+			{
+				isChanged = true;
+				interface->isPressed = false;
+			}
+			else
+			{
+				isChanged = false;
+			}
+		}
+
+		if (lastElement)
+		{
+			if (lastElement != newElement)
+			{
+				interface->lastElement = newElement;
+
+				if (lastElement->events.onExit)
+					lastElement->events.onExit(lastElement);
+				if (newElement && newElement->events.onEnter)
+					newElement->events.onEnter(newElement);
+			}
+			else
+			{
+				if (isLeftButtonPressed)
 				{
-					if (lastElement->events.onRelease)
-						lastElement->events.onRelease(lastElement);
+					if (isChanged)
+					{
+						if (lastElement->events.onPress)
+							lastElement->events.onPress(lastElement);
+					}
+					else
+					{
+						if (lastElement->events.onStay)
+							lastElement->events.onStay(lastElement);
+					}
 				}
 				else
 				{
-					if (lastElement->events.onStay)
-						lastElement->events.onStay(lastElement);
+					if (isChanged)
+					{
+						if (lastElement->events.onRelease)
+							lastElement->events.onRelease(lastElement);
+					}
+					else
+					{
+						if (lastElement->events.onStay)
+							lastElement->events.onStay(lastElement);
+					}
 				}
+			}
+		}
+		else
+		{
+			if (newElement)
+			{
+				interface->lastElement = newElement;
+
+				if (newElement->events.onEnter)
+					newElement->events.onEnter(newElement);
 			}
 		}
 	}
 	else
 	{
-		if (newElement)
+		if (interface->lastElement)
 		{
-			interface->lastElement = newElement;
+			InterfaceElement lastElement = interface->lastElement;
+			interface->lastElement = NULL;
 
-			if (newElement->events.onEnter)
-				newElement->events.onEnter(newElement);
+			if (lastElement->events.onExit)
+				lastElement->events.onExit(lastElement);
 		}
 	}
 
@@ -755,13 +766,13 @@ void* getInterfaceElementHandle(InterfaceElement element)
 	return element->handle;
 }
 
-AlignmentType getInterfaceElementAnchor(
+AlignmentType getInterfaceElementAlignment(
 	InterfaceElement element)
 {
 	assert(element);
 	return element->alignment;
 }
-void setInterfaceElementAnchor(
+void setInterfaceElementAlignment(
 	InterfaceElement element,
 	AlignmentType alignment)
 {

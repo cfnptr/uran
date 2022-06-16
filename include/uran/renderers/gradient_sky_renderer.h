@@ -37,4 +37,4 @@ void destroyGradientSkyAmbient(GradientSkyAmbient gradientSkyAmbient);
  */
 LinearColor getGradientSkyAmbientColor(
 	GradientSkyAmbient gradientSkyAmbient,
-	float dayTime);
+	cmmt_float_t dayTime);
