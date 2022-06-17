@@ -2775,20 +2775,8 @@ static void onUiInputFieldPress(InterfaceElement element)
 		handle->textRender : handle->placeholderRender);
 	Vec3F textPosition = getTranslationMat4F(
 		getTransformModel(textTransform));
-	cmmt_float_t interfaceScale = getInterfaceScale(
-		getUserInterface(ui));
 	Vec3F textScale = getTransformScale(textTransform);
-	Vec2I windowSize = getWindowSize(window);
-	Vec2F cursorPosition = getWindowCursorPosition(window);
-
-	Vec2F size = vec2F(
-		(cmmt_float_t)windowSize.x / interfaceScale,
-		(cmmt_float_t)windowSize.y / interfaceScale);
-	Vec2F halfSize = mulValVec2F(size, (cmmt_float_t)0.5);
-
-	cursorPosition = vec2F(
-		(cursorPosition.x / interfaceScale) - halfSize.x,
-		(size.y - (cursorPosition.y / interfaceScale)) - halfSize.y);
+	Vec2F cursorPosition = getInterfaceCursorPosition(getUserInterface(ui));
 	cursorPosition.x = (cursorPosition.x - textPosition.x) / textScale.x;
 	cursorPosition.y = (cursorPosition.y - textPosition.y) / textScale.y;
 

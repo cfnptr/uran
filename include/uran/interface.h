@@ -172,6 +172,11 @@ void destroyAllInterfaceElements(
  * interface - interface instance.
  */
 Camera createInterfaceCamera(Interface interface);
+/*
+ * Returns interface relative cursor position.
+ * interface - interface instance.
+ */
+Vec2F getInterfaceCursorPosition(Interface interface);
 
 /*
  * Processes interface events and bakes data.

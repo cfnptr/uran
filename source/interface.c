@@ -278,6 +278,24 @@ Camera createInterfaceCamera(
 		(cmmt_float_t)0.0,
 		(cmmt_float_t)1.0);
 }
+Vec2F getInterfaceCursorPosition(Interface interface)
+{
+	assert(interface);
+
+	Window window = interface->window;
+	cmmt_float_t interfaceScale = interface->scale;
+	Vec2I windowSize = getWindowSize(window);
+	Vec2F cursorPosition = getWindowCursorPosition(window);
+
+	Vec2F size = vec2F(
+		(cmmt_float_t)windowSize.x / interfaceScale,
+		(cmmt_float_t)windowSize.y / interfaceScale);
+	Vec2F halfSize = mulValVec2F(size, (cmmt_float_t)0.5);
+
+	return vec2F(
+		(cursorPosition.x / interfaceScale) - halfSize.x,
+		(size.y - (cursorPosition.y / interfaceScale)) - halfSize.y);
+}
 
 inline static void updateInterfaceElementPosition(
 	InterfaceElement element,
