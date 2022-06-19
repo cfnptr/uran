@@ -195,7 +195,7 @@ Font createFont(
  * logger - logger instance or NULL.
  */
 Font createFontFromFile(
-	const void* path,
+	const char* path,
 	size_t index,
 	Logger logger);
 /*

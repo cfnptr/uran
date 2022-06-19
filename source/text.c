@@ -620,7 +620,7 @@ Font createFont(
 	return font;
 }
 Font createFontFromFile(
-	const void* path,
+	const char* path,
 	size_t index,
 	Logger logger)
 {
@@ -901,7 +901,7 @@ inline static bool fillPixels(
 		{
 			uint8_t* bitmap = glyphSlot->bitmap.buffer;
 			uint32_t glyphPosY = (uint32_t)(i / glyphLength);
-			uint32_t glyphPosX = (uint32_t)(i - glyphPosY * glyphLength);
+			uint32_t glyphPosX = (uint32_t)(i - (size_t)glyphPosY * glyphLength);
 			uint32_t pixelPosX = glyphPosX * fontSize;
 			uint32_t pixelPosY = glyphPosY * fontSize;
 
@@ -1149,7 +1149,7 @@ inline static MpgxResult internalCreateFontAtlas(
 	uint32_t pixelLength = glyphLength * fontSize;
 
 	uint8_t* pixelBuffer = calloc(
-		pixelLength * pixelLength,
+		(size_t)pixelLength * pixelLength,
 		4 * sizeof(uint8_t));
 
 	if (!pixelBuffer)
@@ -1580,9 +1580,9 @@ inline static MpgxResult bakeFontAtlas(
 	uint8_t* pixelBuffer = pipelineHandle->base.pixelBuffer;
 	size_t pixelCapacity = pipelineHandle->base.pixelCapacity;
 
-	if (pixelCapacity < newPixelLength * newPixelLength * 4)
+	if (pixelCapacity < (size_t)newPixelLength * newPixelLength * 4)
 	{
-		pixelCapacity = newPixelLength * newPixelLength * 4;
+		pixelCapacity = (size_t)newPixelLength * newPixelLength * 4;
 
 		uint8_t* newPixelBuffer;
 
