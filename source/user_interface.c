@@ -234,7 +234,7 @@ MpgxResult createUserInterface(
 	FontAtlas* fontAtlasArray = malloc(
 		fontAtlasCount * sizeof(FontAtlas));
 
-	if (!fontAtlasCount)
+	if (!fontAtlasArray)
 	{
 		destroyUserInterface(userInterface);
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;

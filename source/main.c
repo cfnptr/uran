@@ -115,6 +115,7 @@ inline static void loadSettings(
 		logMessage(logger, WARN_LOG_LEVEL,
 			"Failed to read \"graphicsAPI\" settings value.");
 		settings.graphicsAPI = VULKAN_GRAPHICS_API;
+		settings.isAutoGraphicsAPI = true;
 	}
 	else
 	{
