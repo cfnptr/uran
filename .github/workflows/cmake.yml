@@ -23,15 +23,15 @@ jobs:
         sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-focal.list http://packages.lunarg.com/vulkan/lunarg-vulkan-focal.list
         sudo apt update
         sudo apt install vulkan-sdk
-       
+
     - if: matrix.os == 'ubuntu-latest' 
-      name: Install Ubuntu xorg-dev
-      run: sudo apt-get update && sudo apt-get install xorg-dev
-      
+      name: Install Ubuntu OpenSSL and xorg-dev
+      run: sudo apt-get update && sudo apt-get install openssl libssl-dev xorg-dev
+
     - if: matrix.os == 'macos-latest'
       name: Install macOS OpenSSL
       run: brew update && brew install openssl
-        
+
     - if: matrix.os == 'windows-latest'
       name: Install Windows OpenSSL
       run: choco install openssl
