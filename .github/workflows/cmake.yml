@@ -26,7 +26,7 @@ jobs:
 
     - if: matrix.os == 'ubuntu-latest' 
       name: Install Ubuntu OpenSSL and xorg-dev
-      run: sudo apt-get update && sudo apt-get install openssl libssl-dev xorg-dev
+      run: sudo apt-get install openssl libssl-dev xorg-dev
 
     - if: matrix.os == 'macos-latest'
       name: Install macOS OpenSSL
