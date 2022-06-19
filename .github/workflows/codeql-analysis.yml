@@ -49,8 +49,8 @@ jobs:
         sudo apt update
         sudo apt install vulkan-sdk
 
-    - name: Install Ubuntu xorg-dev
-      run: sudo apt-get update && sudo apt-get install xorg-dev
+    - name: Install Ubuntu OpenSSL and xorg-dev
+      run: sudo apt-get install openssl libssl-dev xorg-dev
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
