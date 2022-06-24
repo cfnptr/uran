@@ -3415,6 +3415,14 @@ size_t getUiInputFieldMaxLength(InterfaceElement inputField)
 	assert(handle->type == INPUT_FIELD_UI_TYPE);
 	return handle->maxLength;
 }
+bool isUiInputFieldFocused(InterfaceElement inputField)
+{
+	assert(inputField);
+	UiInputFieldHandle handle =
+		getInterfaceElementHandle(inputField);
+	assert(handle->type == INPUT_FIELD_UI_TYPE);
+	return inputField == handle->ui->focusedInputField;
+}
 
 LinearColor getUiInputFieldDisabledColor(
 	InterfaceElement inputField)

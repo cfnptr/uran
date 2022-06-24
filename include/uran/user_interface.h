@@ -720,6 +720,13 @@ OnInterfaceElementEvent getUiInputFieldOnDefocusEvent(InterfaceElement inputFiel
  * inputField - UI input field instance.
  */
 size_t getUiInputFieldMaxLength(InterfaceElement inputField);
+/*
+ * Returns true if input field is currently focused.
+ * inputField - UI input field instance.
+ */
+bool isUiInputFieldFocused(InterfaceElement inputField);
+
+// TODO: focusUiInputField(InterfaceElement inputField);
 
 /*
  * Returns UI input field disabled color.

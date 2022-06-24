@@ -3042,12 +3042,10 @@ bool setTextString8(
 
 	if (length > 0)
 	{
-		size_t newLength = stringUTF8toUTF32(
+		text->base.length = stringUTF8toUTF32(
 			string,
 			length,
 			text->base.string);
-
-		text->base.length = newLength;
 	}
 	else
 	{

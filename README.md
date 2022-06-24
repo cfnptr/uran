@@ -20,6 +20,8 @@ Work in Progress!
 * [X11](https://www.x.org/) (Linux only)
 * [OpenSSL 1.1.1+](https://openssl.org/)
 
+**macOS**: select ```System global installation``` during Vulkan SDK setup.
+
 ### X11 installation
 
 * Ubuntu: sudo apt install xorg-dev
