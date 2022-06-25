@@ -126,7 +126,7 @@ set(URAN_LINK_LIBRARIES
 	mpnw-static
 	${URAN_PROGRAM_LIBRARIES})
 
-configure_file(cmake/defines.h.in uran/defines.h)
+configure_file(cmake/defines.h.in include/uran/defines.h)
 
 add_library(uran-static STATIC
 	${URAN_SOURCES})
@@ -135,7 +135,7 @@ set_target_properties(uran-static PROPERTIES
 target_link_libraries(uran-static PUBLIC
 	${URAN_LINK_LIBRARIES})
 target_include_directories(uran-static PUBLIC
-	${PROJECT_BINARY_DIR}
+	${PROJECT_BINARY_DIR}/include
 	${PROJECT_SOURCE_DIR}/include)
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows" AND
@@ -158,7 +158,7 @@ endif ()
 target_link_libraries(${URAN_PROGRAM_NAME} PRIVATE
 	uran-static)
 target_include_directories(${URAN_PROGRAM_NAME} PRIVATE
-	${PROJECT_BINARY_DIR}
+	${PROJECT_BINARY_DIR}/include
 	${PROJECT_SOURCE_DIR}/include
 	${URAN_PROGRAM_INCLUDES})
 
