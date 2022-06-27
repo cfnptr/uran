@@ -43,22 +43,10 @@ typedef struct StatsWindow_T
 
 typedef StatsWindow_T* StatsWindow;
 
-typedef struct MenuBar_T
-{
-	Window window;
-	Interface interface;
-	StatsWindow statsWindow;
-	InterfaceElement panel;
-	InterfaceElement statsButton;
-} MenuBar_T;
-
-typedef MenuBar_T* MenuBar;
-
 struct Editor_T
 {
 	Logger logger;
 	StatsWindow statsWindow;
-	MenuBar menuBar;
 };
 
 static void onBaseWindowEnter(InterfaceElement element)
@@ -274,7 +262,7 @@ static void onStatsLabelUpdate(InterfaceElement element)
 	if (mpgxResult != SUCCESS_MPGX_RESULT)
 	{
 		logMessage(statsWindow->logger, FATAL_LOG_LEVEL,
-			"Failed to bake stats text. (error: %s)",
+			"Failed to set stats label text. (error: %s)",
 			mpgxResultToString(mpgxResult));
 		abort();
 	}
@@ -388,137 +376,6 @@ inline static StatsWindow createStatsWindow(
 	return statsWindow;
 }
 
-inline static void onMenuBarUpdate(InterfaceElement element)
-{
-	assert(element);
-	MenuBar menuBar = getUiPanelHandle(element);
-	Transform transform = getInterfaceElementTransform(menuBar->panel);
-	Vec2I windowSize = getWindowSize(menuBar->window);
-	Vec3F scale = vec3F(
-		(cmmt_float_t)windowSize.x /
-			getInterfaceScale(menuBar->interface),
-		(cmmt_float_t)(DEFAULT_UI_TEXT_HEIGHT * 2.0),
-		(cmmt_float_t)1.0);
-	setTransformScale(transform, scale);
-}
-inline static void onMenuBarStatsRelease(InterfaceElement element)
-{
-	assert(element);
-	MenuBar menuBar = getUiButtonHandle(element);
-	InterfaceElement window = menuBar->statsWindow->base->window;
-	Transform transform = getInterfaceElementTransform(window);
-	setInterfaceElementPosition(window,
-		vec3F(
-			(cmmt_float_t)384.0,
-			(cmmt_float_t)-128.0,
-			(cmmt_float_t)0.1));
-	setTransformActive(transform, true);
-}
-inline static void destroyMenuBar(MenuBar menuBar)
-{
-	if (!menuBar)
-		return;
-
-	destroyInterfaceElement(menuBar->statsButton);
-	destroyInterfaceElement(menuBar->panel);
-	free(menuBar);
-}
-inline static MenuBar createMenuBar(
-	UserInterface ui,
-	Logger logger,
-	Window window,
-	StatsWindow statsWindow)
-{
-	assert(ui);
-	assert(logger);
-	assert(window);
-	assert(statsWindow);
-
-	MenuBar menuBar = calloc(1,
-		sizeof(MenuBar_T));
-
-	if (!menuBar)
-		return NULL;
-
-	menuBar->window = window;
-	menuBar->interface = getUserInterface(ui);
-	menuBar->statsWindow = statsWindow;
-
-	InterfaceElementEvents events = emptyInterfaceElementEvents;
-	events.onUpdate = onMenuBarUpdate;
-
-	InterfaceElement element;
-
-	MpgxResult mpgxResult = createUiPanel(ui,
-		TOP_ALIGNMENT_TYPE,
-		vec3F(
-			(cmmt_float_t)0.0,
-			(cmmt_float_t)-14.0,
-			(cmmt_float_t)-0.1),
-		vec2F(
-			(cmmt_float_t)defaultWindowSize.x /
-				getInterfaceScale(menuBar->interface),
-			(cmmt_float_t)(DEFAULT_UI_TEXT_HEIGHT * 2.0)),
-		NULL,
-		&events,
-		menuBar,
-		true,
-		&element);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-	{
-		logMessage(logger, ERROR_LOG_LEVEL,
-			"Failed to create UI panel. (error: %s)",
-			mpgxResultToString(mpgxResult));
-		destroyMenuBar(menuBar);
-		return NULL;
-	}
-
-	setPanelRenderColor(getUiPanelRender(element),
-		srgbToLinearColor(DEFAULT_UI_ENABLED_BUTTON_COLOR));
-
-	menuBar->panel = element;
-
-	Transform panelTransform =
-		getInterfaceElementTransform(element);
-
-	const uint32_t statsText[] = {
-		'S', 't', 'a', 't', 's',
-	};
-	events.onUpdate = NULL;
-	events.onRelease = onMenuBarStatsRelease;
-
-	mpgxResult = createUiButton(ui,
-		statsText,
-		sizeof(statsText) / sizeof(uint32_t),
-		LEFT_ALIGNMENT_TYPE,
-		vec3F(
-			(cmmt_float_t)32.0,
-			(cmmt_float_t)0.0,
-			(cmmt_float_t)-0.01),
-		vec2F(
-			(cmmt_float_t)64.0,
-			(cmmt_float_t)(DEFAULT_UI_TEXT_HEIGHT * 2.0)),
-		true,
-		panelTransform,
-		&events,
-		menuBar,
-		true,
-		&element);
-
-	if (mpgxResult != SUCCESS_MPGX_RESULT)
-	{
-		logMessage(logger, ERROR_LOG_LEVEL,
-			"Failed to create UI button. (error: %s)",
-			mpgxResultToString(mpgxResult));
-		destroyMenuBar(menuBar);
-		return NULL;
-	}
-
-	menuBar->statsButton = element;
-	return menuBar;
-}
-
 Editor createEditor(
 	Logger logger,
 	Window window,
@@ -550,22 +407,6 @@ Editor createEditor(
 	}
 
 	editor->statsWindow = statsWindow;
-
-	MenuBar menuBar = createMenuBar(
-		ui,
-		logger,
-		window,
-		statsWindow);
-
-	if (!menuBar)
-	{
-		logMessage(logger, ERROR_LOG_LEVEL,
-			"Failed to create menu bar.");
-		destroyEditor(editor);
-		return NULL;
-	}
-
-	editor->menuBar = menuBar;
 	return editor;
 }
 void destroyEditor(Editor editor)
@@ -573,7 +414,6 @@ void destroyEditor(Editor editor)
 	if (!editor)
 		return;
 
-	destroyMenuBar(editor->menuBar);
 	destroyStatsWindow(editor->statsWindow);
 	free(editor);
 }
@@ -592,6 +432,9 @@ void postUpdateEditor(Editor editor)
 
 	Transform statsTransform = getInterfaceElementTransform(
 		editor->statsWindow->base->window);
+
+	if (getWindowKeyboardKey(editor->statsWindow->window, B_KEYBOARD_KEY))
+		setTransformActive(statsTransform, true);
 
 	if (isTransformActive(statsTransform))
 	{
