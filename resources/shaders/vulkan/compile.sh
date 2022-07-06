@@ -1,22 +1,28 @@
 #!/bin/bash
-
-shopt -s nullglob
 cd $(dirname "$BASH_SOURCE")
+shopt -s nullglob
 
-if ! glslc --version ; then
+glslc --version > /dev/null
+status=$?
+
+if [ $status -ne 0 ]; then
     echo "Failed to get GLSLC version, please check if Vulkan SDK is installed."
-    exit
+    exit $status
 fi
 
-echo ""
 echo "Compiling shaders..."
 
 for f in *.vert *.tesc *.tese *.geom *.frag *.comp *.rgen *.rahit *.rchit *.rmiss *.rint *.rcall *.task *.mesh
 do
-    if glslc --target-env=vulkan1.2 -c -O $f -o $f.spv ; then
+    glslc --target-env=vulkan1.2 -c -O $f -o $f.spv
+    status=$?
+
+    if [ $status -eq 0 ]; then
         echo "Compiled \"$f\" shader."
     else
         echo "Failed to compile \"$f\" shader."
-        exit
+        exit $status
     fi
 done
+
+exit 0

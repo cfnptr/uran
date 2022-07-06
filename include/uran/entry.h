@@ -13,15 +13,15 @@
 // limitations under the License.
 
 #pragma once
-#include <stdint.h>
 
-#define __URAN__
-
-#define URAN_VERSION_MAJOR @uran_VERSION_MAJOR@
-#define URAN_VERSION_MINOR @uran_VERSION_MINOR@
-#define URAN_VERSION_PATCH @uran_VERSION_PATCH@
-
-#define URAN_VERSION_STRING \
-	"@uran_VERSION_MAJOR@." \
-	"@uran_VERSION_MINOR@." \
-	"@uran_VERSION_PATCH@"
+#if _WIN32
+#ifdef NDEBUG
+#include <windows.h>
+#define URAN_MAIN_FUNCTION int APIENTRY WinMain(                     \
+	HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow)
+#else
+#define URAN_MAIN_FUNCTION int main(int argc, char *argv[])
+#endif
+#else
+#define URAN_MAIN_FUNCTION int main(int argc, char *argv[])
+#endif

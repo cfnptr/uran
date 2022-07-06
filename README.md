@@ -54,7 +54,16 @@ Work in Progress!
 git clone --recursive https://github.com/cfnptr/uran
 ```
 
-TODO: tutorial on how to make pack files.
+## Pack creation
+
+Using a runtime-optimized [Pack](https://github.com/cfnptr/pack/) library, you can store all game resources in compressed archives.
+It produces a `resources.pack` file with locally zipped and sorted game resources. (shaders, images, models, etc.) You can easily clone and build **Pack** utilities using the `scripts/build-pack.sh` script.
+
+And then create archives with `packer` utility.
+
+```
+./packer resources.pack phong.vert skybox.png teapot.fbx...
+```
 
 ## Third-party
 

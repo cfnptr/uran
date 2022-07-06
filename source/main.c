@@ -17,6 +17,7 @@
 // =================================================================
 
 #include "uran/defines.h"
+#include "uran/entry.h"
 #include "uran/editor.h"
 #include "uran/shader_data.h"
 #include "uran/primitives/square_primitive.h"
@@ -30,18 +31,6 @@
 
 #if __linux__ || __APPLE__
 #include <sys/utsname.h>
-#endif
-
-#if _WIN32
-#ifdef NDEBUG
-#include <windows.h>
-#define MAIN_FUNCTION int APIENTRY WinMain(                          \
-	HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow)
-#else
-#define MAIN_FUNCTION int main(int argc, char *argv[])
-#endif
-#else
-#define MAIN_FUNCTION int main(int argc, char *argv[])
 #endif
 
 #define LOG_DIRECTORY_PATH "logs"
@@ -1061,7 +1050,7 @@ inline static Program createProgram(
 	return program;
 }
 
-MAIN_FUNCTION
+URAN_MAIN_FUNCTION
 {
 #ifndef NDEBUG
 	LogLevel logLevel = ALL_LOG_LEVEL;

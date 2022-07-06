@@ -1,16 +1,19 @@
 @ECHO OFF
 
-spirv-cross --revision
+spirv-cross --revision > nul
 
 IF NOT %ERRORLEVEL% == 0 (
     ECHO Failed to get SPIRV-CROSS version, please check if Vulkan SDK is installed.
-    PAUSE
-    EXIT
+    EXIT /B %ERRORLEVEL%
 )
 
-mkdir _decompiled
+MKDIR decompiled
 
-ECHO(
+IF NOT %ERRORLEVEL% == 0 (
+    ECHO Failed to create decompiled directory.
+    EXIT /B %ERRORLEVEL%
+)
+
 ECHO Decompiling shaders...
 
 FOR %%f IN (*.spv) DO (
@@ -20,9 +23,8 @@ FOR %%f IN (*.spv) DO (
         ECHO Decompiled "%%f" shader.
     ) ELSE (
         ECHO Failed to decompile "%%f" shader.
-        PAUSE
-        EXIT
+        EXIT /B %ERRORLEVEL%
     )
 )
 
-PAUSE
+EXIT /B 0
