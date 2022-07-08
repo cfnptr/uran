@@ -20,6 +20,10 @@
 #include "cmmt/bounding.h"
 #include "mpmt/thread_pool.h"
 
+#if _WIN32
+#undef interface
+#endif
+
 /*
  * Interface structure.
  */
