@@ -139,7 +139,9 @@ target_include_directories(uran-static PUBLIC
 	${PROJECT_SOURCE_DIR}/include)
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows" AND
-	${CMAKE_BUILD_TYPE} MATCHES "Release")
+	(${CMAKE_BUILD_TYPE} MATCHES "Release" OR
+	${CMAKE_BUILD_TYPE} MATCHES "RelWithDebInfo" OR
+	${CMAKE_BUILD_TYPE} MATCHES "MinSizeRel"))
 	add_executable(${URAN_PROGRAM_NAME} WIN32
 		${URAN_PROGRAM_SOURCES})
 else ()
