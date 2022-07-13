@@ -54,6 +54,10 @@ if (URAN_MACOS_BUNDLE AND NOT DEFINED URAN_MACOS_RESOURCES)
 	message(FATAL_ERROR "macOS bundle resources are not defined!")
 endif ()
 
+if (URAN_BUILD_SHARED)
+	set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif ()
+
 set(CONF_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 set(CONF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory(libraries/conf)
