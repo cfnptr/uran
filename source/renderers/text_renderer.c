@@ -54,7 +54,7 @@ static size_t onDraw(
 		(cmmt_float_t)halfFramebufferSize.y) /
 		(cmmt_float_t)halfFramebufferSize.y;
 	mvp = setTranslationMat4F(mvp, position);
-	setTextPipelineMVP(graphicsPipeline, mvp);
+	setTextPipelineMVP(graphicsPipeline, &mvp);
 	setTextPipelineColor(graphicsPipeline, handle->color);
 
 	Vec4I stateScissor = graphicsPipeline->base.state.scissor;
@@ -63,13 +63,9 @@ static size_t onDraw(
 	if (dynamicScissor)
 	{
 		Vec4I panelScissor = handle->scissor;
-
 		assert(panelScissor.x + panelScissor.z <= framebufferSize.x);
 		assert(panelScissor.y + panelScissor.w <= framebufferSize.y);
-
-		setWindowScissor(
-			graphicsPipeline->base.window,
-			panelScissor);
+		setWindowScissor(graphicsPipeline->base.window, panelScissor);
 	}
 
 	return drawText(handle->text);
@@ -98,6 +94,7 @@ GraphicsRenderer createTextRenderer(
 		capacity,
 		threadPool);
 }
+
 GraphicsRender createTextRender(
 	GraphicsRenderer textRenderer,
 	Transform transform,

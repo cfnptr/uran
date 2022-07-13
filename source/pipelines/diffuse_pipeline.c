@@ -20,15 +20,15 @@
 
 typedef struct VertexPushConstants
 {
-	Mat4F mvp;
-	Mat4F normal;
+	mat4 mvp;
+	mat4 normal;
 } VertexPushConstants;
 typedef struct UniformBuffer
 {
-	LinearColor objectColor;
-	LinearColor ambientColor;
-	LinearColor lightColor;
-	Vec4F lightDirection;
+	vec4 objectColor;
+	vec4 ambientColor;
+	vec4 lightColor;
+	vec4 lightDirection;
 } UniformBuffer;
 typedef struct BaseHandle
 {
@@ -297,12 +297,12 @@ static void onVkUniformsSet(GraphicsPipeline graphicsPipeline)
 static void onVkResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
-	void* createData)
+	void* vkCreateData)
 {
 	assert(graphicsPipeline);
 	assert(newSize.x > 0);
 	assert(newSize.y > 0);
-	assert(createData);
+	assert(vkCreateData);
 
 	Handle handle = graphicsPipeline->vk.handle;
 	Window window = graphicsPipeline->vk.window;
@@ -400,7 +400,7 @@ static void onVkResize(
 		graphicsPipeline->vk.state.scissor = size;
 	}
 
-	VkGraphicsPipelineCreateData _createData = {
+	VkGraphicsPipelineCreateData createData = {
 		1,
 		vertexInputBindingDescriptions,
 		2,
@@ -411,7 +411,7 @@ static void onVkResize(
 		pushConstantRanges,
 	};
 
-	*(VkGraphicsPipelineCreateData*)createData = _createData;
+	*(VkGraphicsPipelineCreateData*)vkCreateData = createData;
 }
 static void onVkDestroy(
 	Window window,
@@ -639,12 +639,12 @@ static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 static void onGlResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
-	void* createData)
+	void* vkCreateData)
 {
 	assert(graphicsPipeline);
 	assert(newSize.x > 0);
 	assert(newSize.y > 0);
-	assert(!createData);
+	assert(!vkCreateData);
 
 	Vec4I size = vec4I(0, 0,
 		newSize.x, newSize.y);
@@ -775,8 +775,8 @@ MpgxResult createDiffusePipeline(
 	Shader vertexShader,
 	Shader fragmentShader,
 	const GraphicsPipelineState* state,
-	GraphicsPipeline* diffusePipeline,
-	Logger logger)
+	Logger logger,
+	GraphicsPipeline* diffusePipeline)
 {
 	assert(framebuffer);
 	assert(vertexShader);
@@ -796,19 +796,13 @@ MpgxResult createDiffusePipeline(
 		vec3F(1.0f, -3.0f, 6.0f));
 
 	UniformBuffer ub = {
-		whiteLinearColor,
-		valueLinearColor(0.5f),
-		whiteLinearColor,
-		vec4F(
-			lightDirection.x,
-			lightDirection.y,
-			lightDirection.z,
-			0.0f),
+		{ 1.0f, 1.0f, 1.0f, 1.0f },
+		{ 0.5f, 0.5f, 0.5f, 1.0f },
+		{ 1.0f, 1.0f, 1.0f, 1.0f },
+		{ lightDirection.x, lightDirection.y, lightDirection.z, 0.0f },
 	};
 
 	handle->base.logger = logger;
-	handle->base.vpc.mvp = identMat4F;
-	handle->base.vpc.normal = identMat4F;
 	handle->base.ub = ub;
 
 #ifndef NDEBUG
@@ -898,47 +892,47 @@ MpgxResult createDiffusePipeline(
 	}
 }
 
-Mat4F getDiffusePipelineMvp(
+const mat4* getDiffusePipelineMvp(
 	GraphicsPipeline diffusePipeline)
 {
 	assert(diffusePipeline);
 	assert(strcmp(diffusePipeline->base.name,
 		DIFFUSE_PIPELINE_NAME) == 0);
 	Handle handle = diffusePipeline->base.handle;
-	return handle->base.vpc.mvp;
+	return &handle->base.vpc.mvp;
 }
 void setDiffusePipelineMvp(
 	GraphicsPipeline diffusePipeline,
-	Mat4F mvp)
+	const Mat4F* mvp)
 {
 	assert(diffusePipeline);
 	assert(strcmp(diffusePipeline->base.name,
 		DIFFUSE_PIPELINE_NAME) == 0);
 	Handle handle = diffusePipeline->base.handle;
-	handle->base.vpc.mvp = mvp;
+	handle->base.vpc.mvp = cmmtToMat4(*mvp);
 }
 
-Mat4F getDiffusePipelineNormal(
+const mat4* getDiffusePipelineNormal(
 	GraphicsPipeline diffusePipeline)
 {
 	assert(diffusePipeline);
 	assert(strcmp(diffusePipeline->base.name,
 		DIFFUSE_PIPELINE_NAME) == 0);
 	Handle handle = diffusePipeline->base.handle;
-	return handle->base.vpc.normal;
+	return &handle->base.vpc.normal;
 }
 void setDiffusePipelineNormal(
 	GraphicsPipeline diffusePipeline,
-	Mat4F normal)
+	const Mat4F* normal)
 {
 	assert(diffusePipeline);
 	assert(strcmp(diffusePipeline->base.name,
 		DIFFUSE_PIPELINE_NAME) == 0);
 	Handle handle = diffusePipeline->base.handle;
-	handle->base.vpc.normal = normal;
+	handle->base.vpc.normal = cmmtToMat4(*normal);
 }
 
-LinearColor getDiffusePipelineObjectColor(
+vec4 getDiffusePipelineObjectColor(
 	GraphicsPipeline diffusePipeline)
 {
 	assert(diffusePipeline);
@@ -955,10 +949,10 @@ void setDiffusePipelineObjectColor(
 	assert(strcmp(diffusePipeline->base.name,
 		DIFFUSE_PIPELINE_NAME) == 0);
 	Handle handle = diffusePipeline->base.handle;
-	handle->base.ub.objectColor = objectColor;
+	handle->base.ub.objectColor = cmmtColorToVec4(objectColor);
 }
 
-LinearColor getDiffusePipelineAmbientColor(
+vec4 getDiffusePipelineAmbientColor(
 	GraphicsPipeline diffusePipeline)
 {
 	assert(diffusePipeline);
@@ -969,16 +963,16 @@ LinearColor getDiffusePipelineAmbientColor(
 }
 void setDiffusePipelineAmbientColor(
 	GraphicsPipeline diffusePipeline,
-	LinearColor ambientColor)
+	struct LinearColor ambientColor)
 {
 	assert(diffusePipeline);
 	assert(strcmp(diffusePipeline->base.name,
 		DIFFUSE_PIPELINE_NAME) == 0);
 	Handle handle = diffusePipeline->base.handle;
-	handle->base.ub.ambientColor = ambientColor;
+	handle->base.ub.ambientColor = cmmtColorToVec4(ambientColor);
 }
 
-LinearColor getDiffusePipelineLightColor(
+vec4 getDiffusePipelineLightColor(
 	GraphicsPipeline diffusePipeline)
 {
 	assert(diffusePipeline);
@@ -995,21 +989,17 @@ void setDiffusePipelineLightColor(
 	assert(strcmp(diffusePipeline->base.name,
 		DIFFUSE_PIPELINE_NAME) == 0);
 	Handle handle = diffusePipeline->base.handle;
-	handle->base.ub.lightColor = lightColor;
+	handle->base.ub.lightColor = cmmtColorToVec4(lightColor);
 }
 
-Vec3F getDiffusePipelineLightDirection(
+vec4 getDiffusePipelineLightDirection(
 	GraphicsPipeline diffusePipeline)
 {
 	assert(diffusePipeline);
 	assert(strcmp(diffusePipeline->base.name,
 		DIFFUSE_PIPELINE_NAME) == 0);
 	Handle handle = diffusePipeline->base.handle;
-	Vec4F lightDirection = handle->base.ub.lightDirection;
-	return vec3F(
-		lightDirection.x,
-		lightDirection.y,
-		lightDirection.z);
+	return handle->base.ub.lightDirection;
 }
 void setDiffusePipelineLightDirection(
 	GraphicsPipeline diffusePipeline,
@@ -1019,10 +1009,11 @@ void setDiffusePipelineLightDirection(
 	assert(strcmp(diffusePipeline->base.name,
 		DIFFUSE_PIPELINE_NAME) == 0);
 	Handle handle = diffusePipeline->base.handle;
-	lightDirection = normVec3F(lightDirection);
-	handle->base.ub.lightDirection = vec4F(
-		lightDirection.x,
-		lightDirection.y,
-		lightDirection.z,
-		0.0f);
+	Vec3F direction = normVec3F(lightDirection);
+
+	vec4 vector = {
+		direction.x, direction.y, direction.z, 0.0f,
+	};
+
+	handle->base.ub.lightDirection = vector;
 }

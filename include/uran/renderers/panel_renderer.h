@@ -15,6 +15,7 @@
 #pragma once
 #include "uran/graphics_renderer.h"
 #include "uran/pipelines/panel_pipeline.h"
+#include "uran/primitives/square_primitive.h"
 
 /*
  * Create a new panel renderer instance.
@@ -32,6 +33,7 @@ GraphicsRenderer createPanelRenderer(
 	bool useCulling,
 	size_t capacity,
 	ThreadPool threadPool);
+
 /*
  * Create a new panel render instance.
  * Returns panel render instance on success, otherwise NULL.

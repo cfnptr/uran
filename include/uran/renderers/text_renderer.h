@@ -32,6 +32,7 @@ GraphicsRenderer createTextRenderer(
 	bool useCulling,
 	size_t capacity,
 	ThreadPool threadPool);
+
 /*
  * Create a new text render instance.
  * Returns text render instance on success, otherwise NULL.

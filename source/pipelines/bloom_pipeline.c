@@ -21,7 +21,7 @@
 
 typedef struct FragmentPushConstants
 {
-	LinearColor threshold;
+	vec4 threshold;
 } FragmentPushConstants;
 typedef struct BaseHandle
 {
@@ -229,12 +229,12 @@ static void onVkUniformsSet(GraphicsPipeline graphicsPipeline)
 static void onVkResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
-	void* createData)
+	void* vkCreateData)
 {
 	assert(graphicsPipeline );
 	assert(newSize.x > 0);
 	assert(newSize.y > 0);
-	assert(createData);
+	assert(vkCreateData);
 
 	Handle handle = graphicsPipeline->vk.handle;
 
@@ -252,7 +252,7 @@ static void onVkResize(
 		graphicsPipeline->vk.state.scissor = size;
 	}
 
-	VkGraphicsPipelineCreateData _createData = {
+	VkGraphicsPipelineCreateData createData = {
 		1,
 		vertexInputBindingDescriptions,
 		2,
@@ -263,7 +263,7 @@ static void onVkResize(
 		pushConstantRanges,
 	};
 
-	*(VkGraphicsPipelineCreateData*)createData = _createData;
+	*(VkGraphicsPipelineCreateData*)vkCreateData = createData;
 }
 static void onVkDestroy(
 	Window window,
@@ -459,12 +459,12 @@ static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 static void onGlResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
-	void* createData)
+	void* vkCreateData)
 {
 	assert(graphicsPipeline);
 	assert(newSize.x > 0);
 	assert(newSize.y > 0);
-	assert(!createData);
+	assert(!vkCreateData);
 
 	Vec4I size = vec4I(0, 0,
 		newSize.x, newSize.y);
@@ -583,9 +583,13 @@ MpgxResult createBloomPipeline(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
+	vec4 threshold = {
+		1.0f, 1.0f, 1.0f, 1.0f,
+	};
+
 	handle->base.buffer = buffer;
 	handle->base.sampler = sampler;
-	handle->base.fpc.threshold = whiteLinearColor;
+	handle->base.fpc.threshold = threshold;
 
 #ifndef NDEBUG
 	const char* name = BLOOM_PIPELINE_NAME;
@@ -695,7 +699,7 @@ Sampler getBloomPipelineSampler(
 	return handle->base.sampler;
 }
 
-LinearColor getBloomPipelineThreshold(
+vec4 getBloomPipelineThreshold(
 	GraphicsPipeline bloomPipeline)
 {
 	assert(bloomPipeline);
@@ -712,5 +716,5 @@ void setBloomPipelineThreshold(
 	assert(strcmp(bloomPipeline->base.name,
 		BLOOM_PIPELINE_NAME) == 0);
 	Handle handle = bloomPipeline->base.handle;
-	handle->base.fpc.threshold = threshold;
+	handle->base.fpc.threshold = cmmtColorToVec4(threshold);
 }

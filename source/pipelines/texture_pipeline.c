@@ -21,13 +21,13 @@
 
 typedef struct VertexPushConstants
 {
-	Mat4F mvp;
-	Vec2F size;
-	Vec2F offset;
+	mat4 mvp;
+	vec2 size;
+	vec2 offset;
 } VertexPushConstants;
 typedef struct FragmentPushConstants
 {
-	LinearColor color;
+	vec4 color;
 } FragmentPushConstants;
 typedef struct BaseHandle
 {
@@ -255,12 +255,12 @@ static void onVkUniformsSet(GraphicsPipeline graphicsPipeline)
 static void onVkResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
-	void* createData)
+	void* vkCreateData)
 {
 	assert(graphicsPipeline);
 	assert(newSize.x > 0);
 	assert(newSize.y > 0);
-	assert(createData);
+	assert(vkCreateData);
 
 	Handle handle = graphicsPipeline->vk.handle;
 
@@ -278,7 +278,7 @@ static void onVkResize(
 		graphicsPipeline->vk.state.scissor = size;
 	}
 
-	VkGraphicsPipelineCreateData _createData = {
+	VkGraphicsPipelineCreateData createData = {
 		1,
 		vertexInputBindingDescriptions,
 		2,
@@ -289,7 +289,7 @@ static void onVkResize(
 		pushConstantRanges,
 	};
 
-	*(VkGraphicsPipelineCreateData*)createData = _createData;
+	*(VkGraphicsPipelineCreateData*)vkCreateData = createData;
 }
 static void onVkDestroy(
 	Window window,
@@ -498,12 +498,12 @@ static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 static void onGlResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
-	void* createData)
+	void* vkCreateData)
 {
 	assert(graphicsPipeline);
 	assert(newSize.x > 0);
 	assert(newSize.y > 0);
-	assert(!createData);
+	assert(!vkCreateData);
 
 	Vec4I size = vec4I(0, 0,
 		newSize.x, newSize.y);
@@ -638,12 +638,21 @@ MpgxResult createTexturePipeline(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
+	vec2 vpcSize = {
+		1.0f, 1.0f,
+	};
+	vec2 vpcOffset = {
+		0.0f, 0.0f,
+	};
+	vec4 color = {
+		1.0f, 1.0f, 1.0f, 1.0f,
+	};
+
 	handle->base.texture = texture;
 	handle->base.sampler = sampler;
-	handle->base.vpc.mvp = identMat4F;
-	handle->base.vpc.size = oneVec2F;
-	handle->base.vpc.offset = zeroVec2F;
-	handle->base.fpc.color = whiteLinearColor;
+	handle->base.vpc.size = vpcSize;
+	handle->base.vpc.offset = vpcOffset;
+	handle->base.fpc.color = color;
 
 #ifndef NDEBUG
 	const char* name = TEXTURE_PIPELINE_NAME;
@@ -753,27 +762,27 @@ Sampler getTexturePipelineSampler(
 	return handle->base.sampler;
 }
 
-Mat4F getTexturePipelineMvp(
+const mat4* getTexturePipelineMvp(
 	GraphicsPipeline texturePipeline)
 {
 	assert(texturePipeline);
 	assert(strcmp(texturePipeline->base.name,
 		TEXTURE_PIPELINE_NAME) == 0);
 	Handle handle = texturePipeline->base.handle;
-	return handle->base.vpc.mvp;
+	return &handle->base.vpc.mvp;
 }
 void setTexturePipelineMvp(
 	GraphicsPipeline texturePipeline,
-	Mat4F mvp)
+	const Mat4F* mvp)
 {
 	assert(texturePipeline);
 	assert(strcmp(texturePipeline->base.name,
 		TEXTURE_PIPELINE_NAME) == 0);
 	Handle handle = texturePipeline->base.handle;
-	handle->base.vpc.mvp = mvp;
+	handle->base.vpc.mvp = cmmtToMat4(*mvp);
 }
 
-Vec2F getTexturePipelineSize(
+vec2 getTexturePipelineSize(
 	GraphicsPipeline texturePipeline)
 {
 	assert(texturePipeline);
@@ -790,10 +799,10 @@ void setTexturePipelineSize(
 	assert(strcmp(texturePipeline->base.name,
 		TEXTURE_PIPELINE_NAME) == 0);
 	Handle handle = texturePipeline->base.handle;
-	handle->base.vpc.size = size;
+	handle->base.vpc.size = cmmtToVec2(size);
 }
 
-Vec2F getTexturePipelineOffset(
+vec2 getTexturePipelineOffset(
 	GraphicsPipeline texturePipeline)
 {
 	assert(texturePipeline);
@@ -810,10 +819,10 @@ void setTexturePipelineOffset(
 	assert(strcmp( texturePipeline->base.name,
 		TEXTURE_PIPELINE_NAME) == 0);
 	Handle handle = texturePipeline->base.handle;
-	handle->base.vpc.offset = offset;
+	handle->base.vpc.offset = cmmtToVec2(offset);
 }
 
-LinearColor getTexturePipelineColor(
+vec4 getTexturePipelineColor(
 	GraphicsPipeline texturePipeline)
 {
 	assert(texturePipeline);
@@ -830,5 +839,5 @@ void setTexturePipelineColor(
 	assert(strcmp(texturePipeline->base.name,
 		TEXTURE_PIPELINE_NAME) == 0);
 	Handle handle = texturePipeline->base.handle;
-	handle->base.fpc.color = color;
+	handle->base.fpc.color = cmmtColorToVec4(color);
 }

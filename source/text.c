@@ -139,11 +139,11 @@ union Text_T
 
 typedef struct VertexPushConstants
 {
-	Mat4F mvp;
+	mat4 mvp;
 } VertexPushConstants;
 typedef struct FragmentPushConstants
 {
-	LinearColor color;
+	vec4 color;
 } FragmentPushConstants;
 typedef struct BaseHandle
 {
@@ -4208,9 +4208,12 @@ MpgxResult createTextPipeline(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 	}
 
+	vec4 color = {
+		1.0f, 1.0f, 1.0f, 1.0f,
+	};
+
 	handle->base.sampler = sampler;
-	handle->base.vpc.mvp = identMat4F;
-	handle->base.fpc.color = whiteLinearColor;
+	handle->base.fpc.color = color;
 	handle->base.texts = texts;
 	handle->base.textCapacity = capacity;
 	handle->base.textCount = 0;
@@ -4328,27 +4331,27 @@ size_t getTextPipelineCount(GraphicsPipeline textPipeline)
 	return handle->base.textCount;
 }
 
-Mat4F getTextPipelineMVP(
+const mat4* getTextPipelineMVP(
 	GraphicsPipeline textPipeline)
 {
 	assert(textPipeline);
 	assert(strcmp(textPipeline->base.name,
 		TEXT_PIPELINE_NAME) == 0);
 	Handle handle = textPipeline->base.handle;
-	return handle->base.vpc.mvp;
+	return &handle->base.vpc.mvp;
 }
 void setTextPipelineMVP(
 	GraphicsPipeline textPipeline,
-	Mat4F mvp)
+	const Mat4F* mvp)
 {
 	assert(textPipeline);
 	assert(strcmp(textPipeline->base.name,
 		TEXT_PIPELINE_NAME) == 0);
 	Handle handle = textPipeline->base.handle;
-	handle->base.vpc.mvp = mvp;
+	handle->base.vpc.mvp = cmmtToMat4(*mvp);
 }
 
-LinearColor getTextPipelineColor(
+vec4 getTextPipelineColor(
 	GraphicsPipeline textPipeline)
 {
 	assert(textPipeline);
@@ -4365,7 +4368,7 @@ void setTextPipelineColor(
 	assert(strcmp(textPipeline->base.name,
 		TEXT_PIPELINE_NAME) == 0);
 	Handle handle = textPipeline->base.handle;
-	handle->base.fpc.color = color;
+	handle->base.fpc.color = cmmtColorToVec4(color);
 }
 
 void enumeratePipelineTexts(

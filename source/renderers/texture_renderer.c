@@ -41,27 +41,13 @@ static size_t onDraw(
 	assert(graphicsPipeline);
 	assert(model);
 	assert(viewProj);
-
-	Handle handle = getGraphicsRenderHandle(
-		graphicsRender);
-	Mat4F mvp = dotMat4F(
-		*viewProj,
-		*model);
-	setTexturePipelineMvp(
-		graphicsPipeline,
-		mvp);
-	setTexturePipelineColor(
-		graphicsPipeline,
-		handle->color);
-	setTexturePipelineSize(
-		graphicsPipeline,
-		handle->size);
-	setTexturePipelineOffset(
-		graphicsPipeline,
-		handle->offset);
-	return drawGraphicsMesh(
-		graphicsPipeline,
-		handle->mesh);
+	Handle handle = getGraphicsRenderHandle(graphicsRender);
+	Mat4F mvp = dotMat4F(*viewProj, *model);
+	setTexturePipelineMvp(graphicsPipeline, &mvp);
+	setTexturePipelineColor(graphicsPipeline, handle->color);
+	setTexturePipelineSize(graphicsPipeline, handle->size);
+	setTexturePipelineOffset(graphicsPipeline, handle->offset);
+	return drawGraphicsMesh(graphicsPipeline, handle->mesh);
 }
 GraphicsRenderer createTextureRenderer(
 	GraphicsPipeline texturePipeline,

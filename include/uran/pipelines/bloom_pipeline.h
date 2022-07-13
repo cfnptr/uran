@@ -14,7 +14,6 @@
 
 #pragma once
 #include "mpgx/window.h"
-#include "cmmt/color.h"
 
 #define BLOOM_PIPELINE_NAME "Bloom"
 
@@ -56,7 +55,7 @@ Sampler getBloomPipelineSampler(
  * Returns bloom pipeline threshold.
  * bloomPipeline - bloom pipeline instance.
  */
-LinearColor getBloomPipelineThreshold(
+vec4 getBloomPipelineThreshold(
 	GraphicsPipeline bloomPipeline);
 /*
  * Returns bloom pipeline threshold.

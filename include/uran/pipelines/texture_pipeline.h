@@ -56,7 +56,7 @@ Sampler getTexturePipelineSampler(
  * Returns texture pipeline model view projection matrix.
  * texturePipeline - texture pipeline instance.
  */
-Mat4F getTexturePipelineMvp(
+const mat4* getTexturePipelineMvp(
 	GraphicsPipeline texturePipeline);
 /*
  * Returns texture pipeline model view projection matrix.
@@ -66,13 +66,13 @@ Mat4F getTexturePipelineMvp(
  */
 void setTexturePipelineMvp(
 	GraphicsPipeline texturePipeline,
-	Mat4F mvp);
+	const Mat4F* mvp);
 
 /*
  * Returns texture pipeline size.
  * texturePipeline - texture pipeline instance.
  */
-Vec2F getTexturePipelineSize(
+vec2 getTexturePipelineSize(
 	GraphicsPipeline texturePipeline);
 /*
  * Sets texture pipeline size.
@@ -88,7 +88,7 @@ void setTexturePipelineSize(
  * Returns texture pipeline offset.
  * texturePipeline - texture pipeline instance.
  */
-Vec2F getTexturePipelineOffset(
+vec2 getTexturePipelineOffset(
 	GraphicsPipeline texturePipeline);
 /*
  * Sets texture pipeline offset.
@@ -104,7 +104,7 @@ void setTexturePipelineOffset(
  * Returns texture pipeline color.
  * texturePipeline - texture pipeline instance.
  */
-LinearColor getTexturePipelineColor(
+vec4 getTexturePipelineColor(
 	GraphicsPipeline texturePipeline);
 /*
  * Sets texture pipeline color.

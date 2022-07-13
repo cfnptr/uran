@@ -38,23 +38,12 @@ static size_t onDraw(
 	assert(graphicsPipeline);
 	assert(model);
 	assert(viewProj);
-
-	Handle handle = getGraphicsRenderHandle(
-		graphicsRender);
-	Mat4F mvp = dotMat4F(
-		*viewProj,
-		*model);
-	Mat4F normal = transposeMat4F(
-		invMat4F(*model));
-	setDiffusePipelineMvp(
-		graphicsPipeline,
-		mvp);
-	setDiffusePipelineNormal(
-		graphicsPipeline,
-		normal);
-	return drawGraphicsMesh(
-		graphicsPipeline,
-		handle->mesh);
+	Handle handle = getGraphicsRenderHandle(graphicsRender);
+	Mat4F mvp = dotMat4F(*viewProj, *model);
+	Mat4F normal = transposeMat4F(invMat4F(*model));
+	setDiffusePipelineMvp(graphicsPipeline, &mvp);
+	setDiffusePipelineNormal(graphicsPipeline, &normal);
+	return drawGraphicsMesh(graphicsPipeline, handle->mesh);
 }
 GraphicsRenderer createDiffuseRenderer(
 	GraphicsPipeline diffusePipeline,
@@ -80,6 +69,7 @@ GraphicsRenderer createDiffuseRenderer(
 		capacity,
 		threadPool);
 }
+
 GraphicsRender createDiffuseRender(
 	GraphicsRenderer diffuseRenderer,
 	Transform transform,

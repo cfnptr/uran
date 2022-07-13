@@ -48,7 +48,7 @@ MpgxResult createSimpleShadowPipeline(
  * Returns simple shadow pipeline model view projection matrix.
  * simpleShadowPipeline - simple shadow pipeline instance.
  */
-Mat4F getSimpleShadowPipelineMvp(
+const mat4* getSimpleShadowPipelineMvp(
 	GraphicsPipeline simpleShadowPipeline);
 /*
  * Sets simple shadow pipeline model view projection matrix.
@@ -58,4 +58,4 @@ Mat4F getSimpleShadowPipelineMvp(
  */
 void setSimpleShadowPipelineMvp(
 	GraphicsPipeline simpleShadowPipeline,
-	Mat4F mvp);
+	const Mat4F* mvp);

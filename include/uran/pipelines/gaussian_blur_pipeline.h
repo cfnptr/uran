@@ -55,7 +55,7 @@ Sampler getGaussianBlurPipelineSampler(
  * Returns gaussian blur pipeline radius.
  * gaussianBlurPipeline - gaussian blur pipeline instance.
  */
-int getGaussianBlurPipelineRadius(
+int32_t getGaussianBlurPipelineRadius(
 	GraphicsPipeline gaussianBlurPipeline);
 /*
  * Sets gaussian blur pipeline radius.
@@ -65,4 +65,4 @@ int getGaussianBlurPipelineRadius(
  */
 void setGaussianBlurPipelineRadius(
 	GraphicsPipeline gaussianBlurPipeline,
-	int radius);
+	int32_t radius);

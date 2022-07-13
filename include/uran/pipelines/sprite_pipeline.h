@@ -26,7 +26,7 @@
  * vertexShader - sprite vertex shader.
  * fragmentShader - sprite fragment shader.
  * texture - texture instance.
- * sampler - texture sampler.
+ * sampler - sampler instance.
  * state - pipeline state or NULL.
  * spritePipeline - pointer to the sprite pipeline.
  */
@@ -56,7 +56,7 @@ Sampler getSpritePipelineSampler(
  * Returns sprite pipeline model view projection matrix.
  * spritePipeline - sprite pipeline instance.
  */
-Mat4F getSpritePipelineMvp(
+const mat4* getSpritePipelineMvp(
 	GraphicsPipeline spritePipeline);
 /*
  * Sets sprite pipeline model view projection matrix.
@@ -66,13 +66,13 @@ Mat4F getSpritePipelineMvp(
  */
 void setSpritePipelineMvp(
 	GraphicsPipeline spritePipeline,
-	Mat4F mvp);
+	const Mat4F* mvp);
 
 /*
  * Returns sprite pipeline size.
  * spritePipeline - sprite pipeline instance.
  */
-Vec2F getSpritePipelineSize(
+vec2 getSpritePipelineSize(
 	GraphicsPipeline spritePipeline);
 /*
  * Sets sprite pipeline size.
@@ -88,7 +88,7 @@ void setSpritePipelineSize(
  * Returns sprite pipeline offset.
  * spritePipeline - sprite pipeline instance.
  */
-Vec2F getSpritePipelineOffset(
+vec2 getSpritePipelineOffset(
 	GraphicsPipeline spritePipeline);
 /*
  * Sets sprite pipeline offset.
@@ -104,7 +104,7 @@ void setSpritePipelineOffset(
  * Returns sprite pipeline color.
  * spritePipeline - sprite pipeline instance.
  */
-LinearColor getSpritePipelineColor(
+vec4 getSpritePipelineColor(
 	GraphicsPipeline spritePipeline);
 /*
  * Sets sprite pipeline color.

@@ -32,6 +32,7 @@ GraphicsRenderer createDiffuseRenderer(
 	bool useCulling,
 	size_t capacity,
 	ThreadPool threadPool);
+
 /*
  * Create a new diffuse render instance.
  * Returns diffuse render instance on success, otherwise NULL.

@@ -43,19 +43,11 @@ static size_t onDraw(
 	assert(model);
 	assert(viewProj);
 
-	GraphicsMesh mesh = getPanelPipelineMesh(
-		graphicsPipeline);
-	Handle handle = getGraphicsRenderHandle(
-		graphicsRender);
-	Mat4F mvp = dotMat4F(
-		*viewProj,
-		*model);
-	setPanelPipelineMvp(
-		graphicsPipeline,
-		mvp);
-	setPanelPipelineColor(
-		graphicsPipeline,
-		handle->color);
+	GraphicsMesh mesh = getPanelPipelineMesh(graphicsPipeline);
+	Handle handle = getGraphicsRenderHandle(graphicsRender);
+	Mat4F mvp = dotMat4F(*viewProj, *model);
+	setPanelPipelineMvp(graphicsPipeline, &mvp);
+	setPanelPipelineColor(graphicsPipeline, handle->color);
 
 	Vec4I stateScissor = graphicsPipeline->base.state.scissor;
 	bool dynamicScissor = stateScissor.z + stateScissor.w == 0;
@@ -64,13 +56,9 @@ static size_t onDraw(
 	{
 		Vec4I panelScissor = handle->scissor;
 		Vec2I framebufferSize = graphicsPipeline->base.framebuffer->base.size;
-
 		assert(panelScissor.x + panelScissor.z <= framebufferSize.x);
 		assert(panelScissor.y + panelScissor.w <= framebufferSize.y);
-
-		setWindowScissor(
-			graphicsPipeline->base.window,
-			panelScissor);
+		setWindowScissor(graphicsPipeline->base.window, panelScissor);
 	}
 
 	GraphicsAPI api = getGraphicsAPI();
@@ -142,6 +130,7 @@ GraphicsRenderer createPanelRenderer(
 		capacity,
 		threadPool);
 }
+
 GraphicsRender createPanelRender(
 	GraphicsRenderer panelRenderer,
 	Transform transform,

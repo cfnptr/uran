@@ -30,14 +30,14 @@ MpgxResult createRayColorPipeline(
 RayTracingScene getRayColorPipelineScene(
 	RayTracingPipeline rayColorPipeline);
 
-Mat4F getRayColorPipelineInvView(
+const mat4* getRayColorPipelineInvView(
 	RayTracingPipeline rayColorPipeline);
 void setRayColorPipelineInvView(
 	RayTracingPipeline rayColorPipeline,
-	Mat4F invView);
+	const Mat4F* invView);
 
-Mat4F getRayColorPipelineInvProj(
+const mat4* getRayColorPipelineInvProj(
 	RayTracingPipeline rayColorPipeline);
 void setRayColorPipelineInvProj(
 	RayTracingPipeline rayColorPipeline,
-	Mat4F invProj);
+	const Mat4F* invProj);

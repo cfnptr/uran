@@ -22,11 +22,11 @@
 
 typedef struct VertexPushConstants
 {
-	Mat4F mvp;
+	mat4 mvp;
 } VertexPushConstants;
 typedef struct FragmentPushConstants
 {
-	LinearColor color;
+	vec4 color;
 } FragmentPushConstants;
 typedef struct BaseHandle
 {
@@ -146,12 +146,12 @@ static void onVkUniformsSet(GraphicsPipeline graphicsPipeline)
 static void onVkResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
-	void* createData)
+	void* vkCreateData)
 {
 	assert(graphicsPipeline);
 	assert(newSize.x > 0);
 	assert(newSize.y > 0);
-	assert(createData);
+	assert(vkCreateData);
 
 	Vec4I size = vec4I(0, 0,
 		newSize.x, newSize.y);
@@ -167,7 +167,7 @@ static void onVkResize(
 		graphicsPipeline->vk.state.scissor = size;
 	}
 
-	VkGraphicsPipelineCreateData _createData = {
+	VkGraphicsPipelineCreateData createData = {
 		1,
 		vertexInputBindingDescriptions,
 		1,
@@ -178,7 +178,7 @@ static void onVkResize(
 		pushConstantRanges,
 	};
 
-	*(VkGraphicsPipelineCreateData*)createData = _createData;
+	*(VkGraphicsPipelineCreateData*)vkCreateData = createData;
 }
 static void onVkDestroy(
 	Window window,
@@ -288,12 +288,12 @@ static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 static void onGlResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
-	void* createData)
+	void* vkCreateData)
 {
 	assert(graphicsPipeline);
 	assert(newSize.x > 0);
 	assert(newSize.y > 0);
-	assert(!createData);
+	assert(!vkCreateData);
 
 	Vec4I size = vec4I(0, 0,
 		newSize.x, newSize.y);
@@ -411,9 +411,12 @@ MpgxResult createPanelPipeline(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
+	vec4 color = {
+		1.0f, 1.0f, 1.0f, 1.0f,
+	};
+
 	handle->base.mesh = mesh;
-	handle->base.vpc.mvp = identMat4F;
-	handle->base.fpc.color = whiteLinearColor;
+	handle->base.fpc.color = color;
 
 #ifndef NDEBUG
 	const char* name = PANEL_PIPELINE_NAME;
@@ -525,27 +528,27 @@ void setPanelPipelineMesh(
 	handle->base.mesh = mesh;
 }
 
-Mat4F getPanelPipelineMvp(
+const mat4* getPanelPipelineMvp(
 	GraphicsPipeline panelPipeline)
 {
 	assert(panelPipeline);
 	assert(strcmp(panelPipeline->base.name,
 		PANEL_PIPELINE_NAME) == 0);
 	Handle handle = panelPipeline->base.handle;
-	return handle->base.vpc.mvp;
+	return &handle->base.vpc.mvp;
 }
 void setPanelPipelineMvp(
 	GraphicsPipeline panelPipeline,
-	Mat4F mvp)
+	const Mat4F * mvp)
 {
 	assert(panelPipeline);
 	assert(strcmp(panelPipeline->base.name,
 		PANEL_PIPELINE_NAME) == 0);
 	Handle handle = panelPipeline->base.handle;
-	handle->base.vpc.mvp = mvp;
+	handle->base.vpc.mvp = cmmtToMat4(*mvp);
 }
 
-LinearColor getPanelPipelineColor(
+vec4 getPanelPipelineColor(
 	GraphicsPipeline panelPipeline)
 {
 	assert(panelPipeline);
@@ -562,5 +565,5 @@ void setPanelPipelineColor(
 	assert(strcmp(panelPipeline->base.name,
 		PANEL_PIPELINE_NAME) == 0);
 	Handle handle = panelPipeline->base.handle;
-	handle->base.fpc.color = color;
+	handle->base.fpc.color = cmmtColorToVec4(color);
 }

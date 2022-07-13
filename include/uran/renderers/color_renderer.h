@@ -32,6 +32,7 @@ GraphicsRenderer createColorRenderer(
 	bool useCulling,
 	size_t capacity,
 	ThreadPool threadPool);
+
 /*
  * Create a new color render instance.
  * Returns color render instance on success, otherwise NULL.

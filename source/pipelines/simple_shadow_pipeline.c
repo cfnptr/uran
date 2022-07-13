@@ -20,7 +20,7 @@
 
 typedef struct VertexPushConstants
 {
-	Mat4F mvp;
+	mat4 mvp;
 } VertexPushConstants;
 typedef struct BaseHandle
 {
@@ -116,14 +116,14 @@ static void onVkUniformsSet(GraphicsPipeline graphicsPipeline)
 static void onVkResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
-	void* createData)
+	void* vkCreateData)
 {
 	assert(graphicsPipeline);
 	assert(newSize.x > 0);
 	assert(newSize.y > 0);
-	assert(createData);
+	assert(vkCreateData);
 
-	VkGraphicsPipelineCreateData _createData = {
+	VkGraphicsPipelineCreateData createData = {
 		1,
 		vertexInputBindingDescriptions,
 		1,
@@ -134,7 +134,7 @@ static void onVkResize(
 		pushConstantRanges,
 	};
 
-	*(VkGraphicsPipelineCreateData*)createData = _createData;
+	*(VkGraphicsPipelineCreateData*)vkCreateData = createData;
 }
 static void onVkDestroy(
 	Window window,
@@ -224,12 +224,12 @@ static void onGlUniformsSet(
 static void onGlResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
-	void* createData)
+	void* vkCreateData)
 {
 	assert(graphicsPipeline);
 	assert(newSize.x > 0);
 	assert(newSize.y > 0);
-	assert(!createData);
+	assert(!vkCreateData);
 }
 static void onGlDestroy(
 	Window window,
@@ -323,8 +323,6 @@ MpgxResult createSimpleShadowPipeline(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
-	handle->base.vpc.mvp = identMat4F;
-
 #ifndef NDEBUG
 	const char* name = SIMPLE_SHADOW_PIPELINE_NAME;
 #else
@@ -414,22 +412,22 @@ MpgxResult createSimpleShadowPipeline(
 	}
 }
 
-Mat4F getSimpleShadowPipelineMvp(
+const mat4* getSimpleShadowPipelineMvp(
 	GraphicsPipeline simpleShadowPipeline)
 {
 	assert(simpleShadowPipeline);
 	assert(strcmp(simpleShadowPipeline->base.name,
 		SIMPLE_SHADOW_PIPELINE_NAME) == 0);
 	Handle handle = simpleShadowPipeline->base.handle;
-	return handle->base.vpc.mvp;
+	return &handle->base.vpc.mvp;
 }
 void setSimpleShadowPipelineMvp(
 	GraphicsPipeline simpleShadowPipeline,
-	Mat4F mvp)
+	const Mat4F* mvp)
 {
 	assert(simpleShadowPipeline);
 	assert(strcmp(simpleShadowPipeline->base.name,
 		SIMPLE_SHADOW_PIPELINE_NAME) == 0);
 	Handle handle = simpleShadowPipeline->base.handle;
-	handle->base.vpc.mvp = mvp;
+	handle->base.vpc.mvp = cmmtToMat4(*mvp);
 }

@@ -32,6 +32,7 @@ GraphicsRenderer createSpriteRenderer(
 	bool useCulling,
 	size_t capacity,
 	ThreadPool threadPool);
+
 /*
  * Create a new sprite render instance.
  * Returns sprite render instance on success, otherwise NULL.

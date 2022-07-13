@@ -61,7 +61,7 @@ void setPanelPipelineMesh(
  * Returns panel pipeline model view projection matrix.
  * panelPipeline - panel pipeline instance.
  */
-Mat4F getPanelPipelineMvp(
+const mat4* getPanelPipelineMvp(
 	GraphicsPipeline panelPipeline);
 /*
  * Sets panel pipeline model view projection matrix.
@@ -71,13 +71,13 @@ Mat4F getPanelPipelineMvp(
  */
 void setPanelPipelineMvp(
 	GraphicsPipeline panelPipeline,
-	Mat4F mvp);
+	const Mat4F * mvp);
 
 /*
  * Returns panel pipeline color.
  * panelPipeline - panel pipeline instance.
  */
-LinearColor getPanelPipelineColor(
+vec4 getPanelPipelineColor(
 	GraphicsPipeline panelPipeline);
 /*
  * Sets panel pipeline color.

@@ -27,22 +27,22 @@
  * vertexShader - diffuse vertex shader.
  * fragmentShader - diffuse fragment shader.
  * state - pipeline state or NULL.
- * diffusePipeline - pointer to the diffuse pipeline.
  * logger - logger instance or NULL.
+ * diffusePipeline - pointer to the diffuse pipeline.
  */
 MpgxResult createDiffusePipeline(
 	Framebuffer framebuffer,
 	Shader vertexShader,
 	Shader fragmentShader,
 	const GraphicsPipelineState* state,
-	GraphicsPipeline* diffusePipeline,
-	Logger logger);
+	Logger logger,
+	GraphicsPipeline* diffusePipeline);
 
 /*
  * Returns diffuse pipeline model view projection matrix.
  * diffusePipeline - diffuse pipeline instance.
  */
-Mat4F getDiffusePipelineMvp(
+const mat4* getDiffusePipelineMvp(
 	GraphicsPipeline diffusePipeline);
 /*
  * Sets diffuse pipeline model view projection matrix.
@@ -52,13 +52,13 @@ Mat4F getDiffusePipelineMvp(
  */
 void setDiffusePipelineMvp(
 	GraphicsPipeline diffusePipeline,
-	Mat4F mvp);
+	const Mat4F* mvp);
 
 /*
  * Returns diffuse pipeline normal matrix.
  * diffusePipeline - diffuse pipeline instance.
  */
-Mat4F getDiffusePipelineNormal(
+const mat4* getDiffusePipelineNormal(
 	GraphicsPipeline diffusePipeline);
 /*
  * Sets diffuse pipeline normal matrix.
@@ -68,13 +68,13 @@ Mat4F getDiffusePipelineNormal(
  */
 void setDiffusePipelineNormal(
 	GraphicsPipeline diffusePipeline,
-	Mat4F normal);
+	const Mat4F* normal);
 
 /*
  * Returns diffuse pipeline object color.
  * diffusePipeline - diffuse pipeline instance.
  */
-LinearColor getDiffusePipelineObjectColor(
+vec4 getDiffusePipelineObjectColor(
 	GraphicsPipeline diffusePipeline);
 /*
  * Sets diffuse pipeline object color.
@@ -90,7 +90,7 @@ void setDiffusePipelineObjectColor(
  * Returns diffuse pipeline ambient color.
  * diffusePipeline - diffuse pipeline instance.
  */
-LinearColor getDiffusePipelineAmbientColor(
+vec4 getDiffusePipelineAmbientColor(
 	GraphicsPipeline diffusePipeline);
 /*
  * Sets diffuse pipeline ambient color.
@@ -106,7 +106,7 @@ void setDiffusePipelineAmbientColor(
  * Returns diffuse pipeline light color.
  * diffusePipeline - diffuse pipeline instance.
  */
-LinearColor getDiffusePipelineLightColor(
+vec4 getDiffusePipelineLightColor(
 	GraphicsPipeline diffusePipeline);
 /*
  * Sets diffuse pipeline light color.
@@ -122,7 +122,7 @@ void setDiffusePipelineLightColor(
  * Returns diffuse pipeline light direction vector.
  * diffusePipeline - diffuse pipeline instance.
  */
-Vec3F getDiffusePipelineLightDirection(
+vec4 getDiffusePipelineLightDirection(
 	GraphicsPipeline diffusePipeline);
 /*
  * Sets diffuse pipeline light direction vector.

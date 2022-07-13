@@ -32,6 +32,7 @@ GraphicsRenderer createTextureRenderer(
 	bool useCulling,
 	size_t capacity,
 	ThreadPool threadPool);
+
 /*
  * Create a new texture render instance.
  * Returns texture render instance on success, otherwise NULL.

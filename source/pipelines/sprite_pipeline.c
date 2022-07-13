@@ -21,13 +21,13 @@
 
 typedef struct VertexPushConstants
 {
-	Mat4F mvp;
-	Vec2F size;
-	Vec2F offset;
+	mat4 mvp;
+	vec2 size;
+	vec2 offset;
 } VertexPushConstants;
 typedef struct FragmentPushConstants
 {
-	LinearColor color;
+	vec4 color;
 } FragmentPushConstants;
 typedef struct BaseHandle
 {
@@ -255,12 +255,12 @@ static void onVkUniformsSet(GraphicsPipeline graphicsPipeline)
 static void onVkResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
-	void* createData)
+	void* vkCreateData)
 {
 	assert(graphicsPipeline);
 	assert(newSize.x > 0);
 	assert(newSize.y > 0);
-	assert(createData);
+	assert(vkCreateData);
 
 	Handle handle = graphicsPipeline->vk.handle;
 
@@ -278,7 +278,7 @@ static void onVkResize(
 		graphicsPipeline->vk.state.scissor = size;
 	}
 
-	VkGraphicsPipelineCreateData _createData = {
+	VkGraphicsPipelineCreateData createData = {
 		1,
 		vertexInputBindingDescriptions,
 		2,
@@ -289,7 +289,7 @@ static void onVkResize(
 		pushConstantRanges,
 	};
 
-	*(VkGraphicsPipelineCreateData*)createData = _createData;
+	*(VkGraphicsPipelineCreateData*)vkCreateData = createData;
 }
 static void onVkDestroy(
 	Window window,
@@ -498,12 +498,12 @@ static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 static void onGlResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
-	void* createData)
+	void* vkCreateData)
 {
 	assert(graphicsPipeline);
 	assert(newSize.x > 0);
 	assert(newSize.y > 0);
-	assert(!createData);
+	assert(!vkCreateData);
 
 	Vec4I size = vec4I(0, 0,
 		newSize.x, newSize.y);
@@ -638,12 +638,20 @@ MpgxResult createSpritePipeline(
 	if (!handle)
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
+	vec2 vpcSize = {
+		1.0f, 1.0f,
+	};
+	vec2 vpcOffset = {
+		0.0f, 0.0f,
+	};
+	vec4 color = {
+		1.0f, 1.0f, 1.0f, 1.0f
+	};
 	handle->base.texture = texture;
 	handle->base.sampler = sampler;
-	handle->base.vpc.mvp = identMat4F;
-	handle->base.vpc.size = oneVec2F;
-	handle->base.vpc.offset = zeroVec2F;
-	handle->base.fpc.color = whiteLinearColor;
+	handle->base.vpc.size = vpcSize;
+	handle->base.vpc.offset = vpcOffset;
+	handle->base.fpc.color = color;
 
 #ifndef NDEBUG
 	const char* name = SPRITE_PIPELINE_NAME;
@@ -753,27 +761,27 @@ Sampler getSpritePipelineSampler(
 	return handle->base.sampler;
 }
 
-Mat4F getSpritePipelineMvp(
+const mat4* getSpritePipelineMvp(
 	GraphicsPipeline spritePipeline)
 {
 	assert(spritePipeline);
 	assert(strcmp(spritePipeline->base.name,
 		SPRITE_PIPELINE_NAME) == 0);
 	Handle handle = spritePipeline->base.handle;
-	return handle->base.vpc.mvp;
+	return &handle->base.vpc.mvp;
 }
 void setSpritePipelineMvp(
 	GraphicsPipeline spritePipeline,
-	Mat4F mvp)
+	const Mat4F* mvp)
 {
 	assert(spritePipeline);
 	assert(strcmp(spritePipeline->base.name,
 		SPRITE_PIPELINE_NAME) == 0);
 	Handle handle = spritePipeline->base.handle;
-	handle->base.vpc.mvp = mvp;
+	handle->base.vpc.mvp = cmmtToMat4(*mvp);
 }
 
-Vec2F getSpritePipelineSize(
+vec2 getSpritePipelineSize(
 	GraphicsPipeline spritePipeline)
 {
 	assert(spritePipeline);
@@ -790,10 +798,10 @@ void setSpritePipelineSize(
 	assert(strcmp(spritePipeline->base.name,
 		SPRITE_PIPELINE_NAME) == 0);
 	Handle handle = spritePipeline->base.handle;
-	handle->base.vpc.size = size;
+	handle->base.vpc.size = cmmtToVec2(size);
 }
 
-Vec2F getSpritePipelineOffset(
+vec2 getSpritePipelineOffset(
 	GraphicsPipeline spritePipeline)
 {
 	assert(spritePipeline);
@@ -810,10 +818,10 @@ void setSpritePipelineOffset(
 	assert(strcmp(spritePipeline->base.name,
 		SPRITE_PIPELINE_NAME) == 0);
 	Handle handle = spritePipeline->base.handle;
-	handle->base.vpc.offset = offset;
+	handle->base.vpc.offset = cmmtToVec2(offset);
 }
 
-LinearColor getSpritePipelineColor(
+vec4 getSpritePipelineColor(
 	GraphicsPipeline spritePipeline)
 {
 	assert(spritePipeline);
@@ -830,5 +838,5 @@ void setSpritePipelineColor(
 	assert(strcmp(spritePipeline->base.name,
 		SPRITE_PIPELINE_NAME) == 0);
 	Handle handle = spritePipeline->base.handle;
-	handle->base.fpc.color = color;
+	handle->base.fpc.color = cmmtColorToVec4(color);
 }

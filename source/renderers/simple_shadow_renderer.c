@@ -39,17 +39,10 @@ static size_t onDraw(
 	assert(model);
 	assert(viewProj);
 
-	Handle handle = getGraphicsRenderHandle(
-		graphicsRender);
-	Mat4F mvp = dotMat4F(
-		*viewProj,
-		*model);
-	setSimpleShadowPipelineMvp(
-		graphicsPipeline,
-		mvp);
-	return drawGraphicsMesh(
-		graphicsPipeline,
-		handle->mesh);
+	Handle handle = getGraphicsRenderHandle(graphicsRender);
+	Mat4F mvp = dotMat4F(*viewProj, *model);
+	setSimpleShadowPipelineMvp(graphicsPipeline, &mvp);
+	return drawGraphicsMesh(graphicsPipeline, handle->mesh);
 }
 GraphicsRenderer createSimpleShadowRenderer(
 	GraphicsPipeline simpleShadowPipeline,
@@ -75,6 +68,7 @@ GraphicsRenderer createSimpleShadowRenderer(
 		capacity,
 		threadPool);
 }
+
 GraphicsRender createSimpleShadowRender(
 	GraphicsRenderer simpleShadowRenderer,
 	Transform transform,

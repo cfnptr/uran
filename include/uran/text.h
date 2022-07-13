@@ -719,8 +719,8 @@ MpgxResult createTextSampler(
  * fragmentShader - text fragment shader instance.
  * sampler - image sampler instance.
  * state - sprite pipeline state or NULL.
- * capacity - initial text array capacity.
  * useScissors - use scissors for text rendering.
+ * capacity - initial text array capacity.
  * textPipeline - pointer to the text pipeline.
  */
 MpgxResult createTextPipeline(
@@ -748,7 +748,7 @@ size_t getTextPipelineCount(GraphicsPipeline textPipeline);
  * Returns text pipeline MVP matrix.
  * textPipeline - text pipeline instance.
  */
-Mat4F getTextPipelineMVP(
+const mat4* getTextPipelineMVP(
 	GraphicsPipeline textPipeline);
 /*
  * Sets text pipeline image sampler.
@@ -758,13 +758,13 @@ Mat4F getTextPipelineMVP(
  */
 void setTextPipelineMVP(
 	GraphicsPipeline textPipeline,
-	Mat4F mvp);
+	const Mat4F* mvp);
 
 /*
  * Returns text pipeline MVP matrix.
  * textPipeline - text pipeline instance.
  */
-LinearColor getTextPipelineColor(
+vec4 getTextPipelineColor(
 	GraphicsPipeline textPipeline);
 /*
  * Sets text pipeline image sampler.

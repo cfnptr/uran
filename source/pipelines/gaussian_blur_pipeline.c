@@ -21,8 +21,8 @@
 
 typedef struct FragmentPushConstants
 {
-	int radius;
-	int offset;
+	int32_t radius;
+	int32_t offset;
 } FragmentPushConstants;
 typedef struct BaseHandle
 {
@@ -232,12 +232,12 @@ static void onVkUniformsSet(GraphicsPipeline graphicsPipeline)
 static void onVkResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
-	void* createData)
+	void* vkCreateData)
 {
 	assert(graphicsPipeline);
 	assert(newSize.x > 0);
 	assert(newSize.y > 0);
-	assert(createData);
+	assert(vkCreateData);
 
 	Handle handle = graphicsPipeline->vk.handle;
 
@@ -255,7 +255,7 @@ static void onVkResize(
 		graphicsPipeline->vk.state.scissor = size;
 	}
 
-	VkGraphicsPipelineCreateData _createData = {
+	VkGraphicsPipelineCreateData createData = {
 		1,
 		vertexInputBindingDescriptions,
 		2,
@@ -266,7 +266,7 @@ static void onVkResize(
 		pushConstantRanges,
 	};
 
-	*(VkGraphicsPipelineCreateData*)createData = _createData;
+	*(VkGraphicsPipelineCreateData*)vkCreateData = createData;
 }
 static void onVkDestroy(
 	Window window,
@@ -466,12 +466,12 @@ static void onGlUniformsSet(GraphicsPipeline graphicsPipeline)
 static void onGlResize(
 	GraphicsPipeline graphicsPipeline,
 	Vec2I newSize,
-	void* createData)
+	void* vkCreateData)
 {
 	assert(graphicsPipeline);
 	assert(newSize.x > 0);
 	assert(newSize.y > 0);
-	assert(!createData);
+	assert(!vkCreateData);
 
 	Vec4I size = vec4I(0, 0,
 		newSize.x, newSize.y);
@@ -570,10 +570,10 @@ inline static MpgxResult createGlPipeline(
 }
 #endif
 
-inline static int calcGaussianOffset(int radius)
+inline static int32_t calcGaussianOffset(int32_t radius)
 {
-	int offset = 0;
-	for (int i = 0; i < radius; i++)
+	int32_t offset = 0;
+	for (int32_t i = 0; i < radius; i++)
 		offset += i + 1;
 	return offset;
 }
@@ -718,7 +718,7 @@ Sampler getGaussianBlurPipelineSampler(
 	return handle->base.sampler;
 }
 
-int getGaussianBlurPipelineRadius(
+int32_t getGaussianBlurPipelineRadius(
 	GraphicsPipeline gaussianBlurPipeline)
 {
 	assert(gaussianBlurPipeline);
@@ -729,7 +729,7 @@ int getGaussianBlurPipelineRadius(
 }
 void setGaussianBlurPipelineRadius(
 	GraphicsPipeline gaussianBlurPipeline,
-	int radius)
+	int32_t radius)
 {
 	assert(gaussianBlurPipeline);
 	assert(radius >= 0);

@@ -32,6 +32,7 @@ GraphicsRenderer createSimpleShadowRenderer(
 	bool useCulling,
 	size_t capacity,
 	ThreadPool threadPool);
+
 /*
  * Create a new simple shadow render instance.
  * Returns simple shadow render instance on success, otherwise NULL.

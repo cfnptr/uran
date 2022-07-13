@@ -25,3 +25,5 @@
 	"@uran_VERSION_MAJOR@." \
 	"@uran_VERSION_MINOR@." \
 	"@uran_VERSION_PATCH@"
+
+#define URAN_NAME_STRING "Uran"

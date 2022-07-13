@@ -39,7 +39,7 @@ MpgxResult createColorPipeline(
  * Returns color pipeline model view projection matrix.
  * colorPipeline - color pipeline instance.
  */
-Mat4F getColorPipelineMvp(
+const mat4* getColorPipelineMvp(
 	GraphicsPipeline colorPipeline);
 /*
  * Sets color pipeline model view projection matrix.
@@ -49,13 +49,13 @@ Mat4F getColorPipelineMvp(
  */
 void setColorPipelineMvp(
 	GraphicsPipeline colorPipeline,
-	Mat4F mvp);
+	const Mat4F* mvp);
 
 /*
  * Returns color pipeline color.
  * colorPipeline - color pipeline instance.
  */
-LinearColor getColorPipelineColor(
+vec4 getColorPipelineColor(
 	GraphicsPipeline colorPipeline);
 /*
  * Sets color pipeline color.

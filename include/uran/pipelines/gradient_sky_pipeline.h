@@ -67,7 +67,7 @@ Sampler getGradientSkyPipelineSampler(
  * Returns gradient sky pipeline model view projection matrix.
  * gradientSkyPipeline - gradient sky pipeline instance.
  */
-Mat4F getGradientSkyPipelineMvp(
+const mat4* getGradientSkyPipelineMvp(
 	GraphicsPipeline gradientSkyPipeline);
 /*
  * Sets gradient sky pipeline model view projection matrix.
@@ -77,13 +77,13 @@ Mat4F getGradientSkyPipelineMvp(
  */
 void setGradientSkyPipelineMvp(
 	GraphicsPipeline gradientSkyPipeline,
-	Mat4F mvp);
+	const Mat4F* mvp);
 
 /*
  * Returns gradient sky pipeline sun direction vector.
  * gradientSkyPipeline - gradient sky pipeline instance.
  */
-Vec3F getGradientSkyPipelineSunDirection(
+vec4 getGradientSkyPipelineSunDirection(
 	GraphicsPipeline gradientSkyPipeline);
 /*
  * Sets gradient sky pipeline sun direction vector.
@@ -99,7 +99,7 @@ void setGradientSkyPipelineSunDirection(
  * Returns gradient sky pipeline sun size.
  * gradientSkyPipeline - gradient sky pipeline instance.
  */
-cmmt_float_t getGradientSkyPipelineSunSize(
+float getGradientSkyPipelineSunSize(
 	GraphicsPipeline gradientSkyPipeline);
 /*
  * Sets gradient sky pipeline sun size.
@@ -109,13 +109,13 @@ cmmt_float_t getGradientSkyPipelineSunSize(
  */
 void setGradientSkyPipelineSunSize(
 	GraphicsPipeline gradientSkyPipeline,
-	cmmt_float_t sunSize);
+	float sunSize);
 
 /*
  * Returns gradient sky pipeline sun color.
  * gradientSkyPipeline - gradient sky pipeline instance.
  */
-LinearColor getGradientSkyPipelineSunColor(
+vec4 getGradientSkyPipelineSunColor(
 	GraphicsPipeline gradientSkyPipeline);
 /*
  * Sets gradient sky pipeline sun color.

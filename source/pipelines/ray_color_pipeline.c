@@ -24,8 +24,8 @@
 
 typedef struct RayGenPushConstants
 {
-	Mat4F invView;
-	Mat4F invProj;
+	mat4 invView;
+	mat4 invProj;
 } RayGenPushConstants;
 typedef struct BaseHandle
 {
@@ -543,8 +543,6 @@ MpgxResult createRayColorPipeline(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
 	handle->base.scene = scene;
-	handle->base.rgpc.invProj = identMat4F;
-	handle->base.rgpc.invProj = identMat4F;
 
 #ifndef NDEBUG
 	const char* name = RAY_COLOR_PIPELINE_NAME;
@@ -615,42 +613,42 @@ RayTracingScene getRayColorPipelineScene(
 	return handle->base.scene;
 }
 
-Mat4F getRayColorPipelineInvView(
+const mat4* getRayColorPipelineInvView(
 	RayTracingPipeline rayColorPipeline)
 {
 	assert(rayColorPipeline);
 	assert(strcmp(rayColorPipeline->base.name,
 		RAY_COLOR_PIPELINE_NAME) == 0);
 	Handle handle = rayColorPipeline->base.handle;
-	return handle->base.rgpc.invView;
+	return &handle->base.rgpc.invView;
 }
 void setRayColorPipelineInvView(
 	RayTracingPipeline rayColorPipeline,
-	Mat4F invView)
+	const Mat4F* invView)
 {
 	assert(rayColorPipeline);
 	assert(strcmp(rayColorPipeline->base.name,
 		RAY_COLOR_PIPELINE_NAME) == 0);
 	Handle handle = rayColorPipeline->base.handle;
-	handle->base.rgpc.invView = invView;
+	handle->base.rgpc.invView = cmmtToMat4(*invView);
 }
 
-Mat4F getRayColorPipelineInvProj(
+const mat4* getRayColorPipelineInvProj(
 	RayTracingPipeline rayColorPipeline)
 {
 	assert(rayColorPipeline);
 	assert(strcmp(rayColorPipeline->base.name,
 		RAY_COLOR_PIPELINE_NAME) == 0);
 	Handle handle = rayColorPipeline->base.handle;
-	return handle->base.rgpc.invProj;
+	return &handle->base.rgpc.invProj;
 }
 void setRayColorPipelineInvProj(
 	RayTracingPipeline rayColorPipeline,
-	Mat4F invProj)
+	const Mat4F* invProj)
 {
 	assert(rayColorPipeline);
 	assert(strcmp(rayColorPipeline->base.name,
 		RAY_COLOR_PIPELINE_NAME) == 0);
 	Handle handle = rayColorPipeline->base.handle;
-	handle->base.rgpc.invProj = invProj;
+	handle->base.rgpc.invProj = cmmtToMat4(*invProj);
 }
