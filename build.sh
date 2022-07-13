@@ -1,5 +1,5 @@
 #!/bin/bash
-cd $(dirname "$BASH_SOURCE")
+cd "$(dirname "$BASH_SOURCE")"
 
 cmake --version > /dev/null
 status=$?
@@ -28,6 +28,19 @@ status=$?
 if [ $status -ne 0 ]; then
     echo "Failed to build CMake project."
     exit $status
+fi
+
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo ""
+    echo "Fixing up macOS bundle..."
+
+    cmake --install build/ --component FixupBundle
+    status=$?
+
+    if [ $status -ne 0 ]; then
+        echo "Failed to fix up macOS bundle."
+        exit $status
+    fi
 fi
 
 exit 0

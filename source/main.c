@@ -832,6 +832,9 @@ inline static Program createProgram(
 	program->logger = logger;
 	program->threadPool = threadPool;
 
+	Settings* settings = &program->settings;
+	loadSettings(logger, settings);
+
 	PackReader packReader;
 
 	PackResult packResult = createFilePackReader(
@@ -848,9 +851,6 @@ inline static Program createProgram(
 		destroyProgram(program);
 		return NULL;
 	}
-
-	Settings* settings = &program->settings;
-	loadSettings(logger, settings);
 
 	MpgxResult mpgxResult = initializeGraphics(
 		settings->graphicsAPI,

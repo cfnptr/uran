@@ -9,7 +9,7 @@
 	<key>CFBundleExecutable</key>
 	<string>uran-editor</string>
 	<key>CFBundleIconFile</key>
-	<string>uran.icns</string>
+	<string>uran-editor.icns</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>

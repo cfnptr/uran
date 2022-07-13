@@ -41,6 +41,8 @@ option(URAN_BUILD_SHARED "Build Uran shared library" ON)
 option(URAN_MACOS_BUNDLE "Build as macOS bundle." OFF)
 
 if (NOT DEFINED URAN_PROGRAM_NAME)
+	configure_file(resources/editor-resources.pack
+		editor-resources.pack COPYONLY)
 	set(URAN_PROGRAM_NAME uran-editor)
 endif ()
 if (NOT DEFINED URAN_PROGRAM_SOURCES)
@@ -173,6 +175,19 @@ if (URAN_MACOS_BUNDLE AND ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 		MACOSX_BUNDLE TRUE
 		MACOSX_BUNDLE_INFO_PLIST ${URAN_MACOS_INFO_PLIST}
 		RESOURCE "${URAN_MACOS_RESOURCES}")
+
+	install(CODE "set(PROJECT_SOURCE_DIR \"${PROJECT_SOURCE_DIR}\")" COMPONENT FixupBundle)
+	install(CODE "set(URAN_APP_PATH \"${PROJECT_BINARY_DIR}/${URAN_PROGRAM_NAME}.app\")" COMPONENT FixupBundle)
+
+	install(CODE [[
+		configure_file(/usr/local/lib/libMoltenVK.dylib
+			${URAN_APP_PATH}/Contents/Frameworks/libMoltenVK.dylib COPYONLY)
+		configure_file(${PROJECT_SOURCE_DIR}/resources/MoltenVK_icd.json
+			${URAN_APP_PATH}/Contents/Resources/vulkan/icd.d/MoltenVK_icd.json COPYONLY)
+
+		include(BundleUtilities)
+		fixup_bundle("${URAN_APP_PATH}" "" "")
+	]] COMPONENT FixupBundle)
 endif ()
 
 target_link_libraries(${URAN_PROGRAM_NAME} PRIVATE
@@ -189,6 +204,3 @@ if (${CMAKE_BUILD_TYPE} MATCHES "Release" AND
 		COMMAND strip "$<TARGET_FILE:${URAN_PROGRAM_NAME}>"
 		VERBATIM)
 endif ()
-
-configure_file(resources/editor-resources.pack
-	editor-resources.pack COPYONLY)
