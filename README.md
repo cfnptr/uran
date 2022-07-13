@@ -34,9 +34,10 @@ Work in Progress!
 
 ### CMake options
 
-| Name                   | Description                        | Default value   |
-|------------------------|------------------------------------|-----------------|
-| URAN_MACOS_BUNDLE      | Build as macOS bundle              | `OFF`           |
+| Name                   | Description               | Default value |
+|------------------------|---------------------------|---------------|
+| URAN_BUILD_SHARED      | Build Uran shared library | `ON`          |
+| URAN_MACOS_BUNDLE      | Build as macOS bundle     | `OFF`         |
 
 ### CMake variables
 | Name                   | Description                        | Default value   |

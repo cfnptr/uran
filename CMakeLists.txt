@@ -37,6 +37,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 	enable_language(OBJC)
 endif ()
 
+option(URAN_BUILD_SHARED "Build Uran shared library" ON)
 option(URAN_MACOS_BUNDLE "Build as macOS bundle." OFF)
 
 if (NOT DEFINED URAN_PROGRAM_NAME)
@@ -75,6 +76,7 @@ add_subdirectory(libraries/libwebp)
 set(LOGY_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 add_subdirectory(libraries/logy)
 
+set(MPGX_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 add_subdirectory(libraries/mpgx)
 
 set(PACK_BUILD_SHARED OFF CACHE BOOL "" FORCE)
@@ -115,7 +117,6 @@ set(URAN_SOURCES
 	source/text.c
 	source/transformer.c
 	source/user_interface.c)
-
 set(URAN_LINK_LIBRARIES
 	conf-static
 	freetype
@@ -137,6 +138,19 @@ target_link_libraries(uran-static PUBLIC
 target_include_directories(uran-static PUBLIC
 	${PROJECT_BINARY_DIR}/include
 	${PROJECT_SOURCE_DIR}/include)
+
+if (URAN_BUILD_SHARED)
+	add_library(uran-shared SHARED
+		${URAN_SOURCES})
+	set_target_properties(uran-shared PROPERTIES
+		OUTPUT_NAME "uran"
+		WINDOWS_EXPORT_ALL_SYMBOLS ON)
+	target_link_libraries(uran-shared PUBLIC
+		${URAN_LINK_LIBRARIES})
+	target_include_directories(uran-shared PUBLIC
+		${PROJECT_BINARY_DIR}/include
+		${PROJECT_SOURCE_DIR}/include)
+endif ()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows" AND
 	(${CMAKE_BUILD_TYPE} MATCHES "Release" OR

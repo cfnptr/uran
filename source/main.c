@@ -837,6 +837,7 @@ inline static Program createProgram(
 	PackResult packResult = createFilePackReader(
 		RESOURCES_FILE_PATH,
 		0,
+		false,
 		&packReader);
 
 	if (packResult != SUCCESS_PACK_RESULT)
@@ -1068,6 +1069,7 @@ URAN_MAIN_FUNCTION
 		logLevel,
 		logToStdout,
 		0.0,
+		false,
 		&logger);
 
 	if (logyResult != SUCCESS_LOGY_RESULT)
