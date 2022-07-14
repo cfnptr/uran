@@ -1,5 +1,5 @@
 #!/bin/bash
-cd $(dirname "$BASH_SOURCE")
+cd "$(dirname "$BASH_SOURCE")"
 shopt -s nullglob
 
 glslc --version > /dev/null
@@ -14,7 +14,7 @@ echo "Compiling shaders..."
 
 for f in *.vert *.tesc *.tese *.geom *.frag *.comp *.rgen *.rahit *.rchit *.rmiss *.rint *.rcall *.task *.mesh
 do
-    glslc --target-env=vulkan1.2 -c -O $f -o $f.spv
+    glslc --target-env=vulkan1.2 -c -O "$f" -o "$f.spv"
     status=$?
 
     if [ $status -eq 0 ]; then

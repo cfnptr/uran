@@ -42,6 +42,22 @@ MpgxResult createPanelPipeline(
 	GraphicsPipeline* panelPipeline);
 
 /*
+ * Create a new panel mesh instance.
+ * Returns operation MPGX result.
+ *
+ * window - window instance.
+ * panelMesh - pointer to the panel mesh.
+ */
+MpgxResult createPanelMesh(
+	Window window,
+	GraphicsMesh* panelMesh);
+/*
+ * Destroy panel mesh instance.
+ * panelMesh - panel mesh instance or NULL.
+ */
+void destroyPanelMesh(GraphicsMesh panelMesh);
+
+/*
  * Returns panel pipeline mesh.
  * panelPipeline - panel pipeline instance.
  */

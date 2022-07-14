@@ -95,14 +95,14 @@ static const uint32_t printableAscii32[] = {
 };
 
 /*
- * Initialize text subsystems.
+ * Initialize text subsystem.
  * Returns true on success.
  *
  * logger - logger instance or NULL.
  */
 bool initializeText(Logger logger);
 /*
- * Terminates text subsystems.
+ * Terminates text subsystem.
  * logger - logger instance or NULL.
  */
 void terminateText(Logger logger);
@@ -202,15 +202,15 @@ Font createFontFromFile(
  * Create a new font instance from the pack data.
  * Returns font instance on success, otherwise NULL.
  *
- * packReader - pack reader instance.
  * path - font data item path string.
  * index - font face index.
+ * packReader - pack reader instance.
  * logger - logger instance or NULL.
  */
 Font createFontFromPack(
-	PackReader packReader,
 	const char* path,
 	size_t index,
+	PackReader packReader,
 	Logger logger);
 /*
  * Destroys font instance.
@@ -802,6 +802,20 @@ inline static cmmt_float_t getPlatformScale(Framebuffer framebuffer)
 	return max(
 		(cmmt_float_t)framebufferSize.x / (cmmt_float_t)windowSize.x,
 		(cmmt_float_t)framebufferSize.y / (cmmt_float_t)windowSize.y);
+}
+/*
+ * Returns running platform font size.
+ *
+ * scale - platform scale.
+ * fontSize - font size in pixels.
+ */
+inline static uint32_t getPlatformFontSize(
+	cmmt_float_t platformScale,
+	uint32_t fontSize)
+{
+	fontSize = (uint32_t)((cmmt_float_t)fontSize * platformScale);
+	if (fontSize % 2 != 0) fontSize += 1;
+	return fontSize;
 }
 
 /*

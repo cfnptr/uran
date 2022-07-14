@@ -1,3 +1,8 @@
+resources/pack-linux
+resources/pack-macos
+resources/pack-windows
+resources/shaders/vulkan/*.spv
+build-macos/
 
 # Created by https://www.toptal.com/developers/gitignore/api/c,linux,cmake,macos,clion,eclipse,windows,clion+iml,clion+all,codeblocks,visualstudio,visualstudiocode,c++
 # Edit at https://www.toptal.com/developers/gitignore?templates=c,linux,cmake,macos,clion,eclipse,windows,clion+iml,clion+all,codeblocks,visualstudio,visualstudiocode,c++

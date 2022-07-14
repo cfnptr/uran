@@ -56,15 +56,15 @@ ImageData createImageDataFromFile(
  * Create a new image data instance from the pack WebP data.
  * Returns image data instance on success, otherwise NULL.
  *
- * packReader - pack reader instance.
  * path - WebP image data item path string.
  * format - image data format.
+ * packReader - pack reader instance.
  * logger - logger instance or NULL.
  */
 ImageData createImageDataFromPack(
-	PackReader packReader,
 	const char* path,
 	ImageFormat format,
+	PackReader packReader,
 	Logger logger);
 /*
  * Destroys image data instance.
@@ -94,55 +94,55 @@ ImageFormat getImageDataFormat(ImageData imageData);
  *
  * data - WebP image data.
  * size - WebP image data size in bytes.
- * window - window instance.
  * type - image type.
  * format - image data format.
  * isConstant - is image constant.
+ * window - window instance.
  * logger - logger instance or NULL.
  */
 Image createImageFromData(
 	const void* data,
 	size_t size,
-	Window window,
 	ImageType type,
 	ImageFormat format,
 	bool isConstant,
+	Window window,
 	Logger logger);
 /*
  * Create a new image instance from the WebP data file.
  * Returns image instance on success, otherwise NULL.
  *
  * path - WebP image file path string.
- * window - window instance.
  * type - image type.
  * format - image data format.
  * isConstant - is image constant.
+ * window - window instance.
  * logger - logger instance or NULL.
  */
 Image createImageFromFile(
 	const char* path,
-	Window window,
 	ImageType type,
 	ImageFormat format,
 	bool isConstant,
+	Window window,
 	Logger logger);
 /*
  * Create a new image instance from the pack WebP data.
  * Returns image instance on success, otherwise NULL.
  *
- * packReader - pack reader instance.
- * path - WebP imag item path string.
- * window - window instance.
+ * path - WebP image item path string.
  * type - image type.
  * format - image data format.
  * isConstant - is image constant.
+ * packReader - pack reader instance.
+ * window - window instance.
  * logger - logger instance or NULL.
  */
 Image createImageFromPack(
-	PackReader packReader,
 	const char* path,
-	Window window,
 	ImageType type,
 	ImageFormat format,
 	bool isConstant,
+	PackReader packReader,
+	Window window,
 	Logger logger);

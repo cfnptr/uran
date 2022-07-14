@@ -906,6 +906,7 @@ void setDiffusePipelineMvp(
 	const Mat4F* mvp)
 {
 	assert(diffusePipeline);
+	assert(mvp);
 	assert(strcmp(diffusePipeline->base.name,
 		DIFFUSE_PIPELINE_NAME) == 0);
 	Handle handle = diffusePipeline->base.handle;
@@ -926,6 +927,7 @@ void setDiffusePipelineNormal(
 	const Mat4F* normal)
 {
 	assert(diffusePipeline);
+	assert(normal);
 	assert(strcmp(diffusePipeline->base.name,
 		DIFFUSE_PIPELINE_NAME) == 0);
 	Handle handle = diffusePipeline->base.handle;
@@ -963,7 +965,7 @@ vec4 getDiffusePipelineAmbientColor(
 }
 void setDiffusePipelineAmbientColor(
 	GraphicsPipeline diffusePipeline,
-	struct LinearColor ambientColor)
+	LinearColor ambientColor)
 {
 	assert(diffusePipeline);
 	assert(strcmp(diffusePipeline->base.name,

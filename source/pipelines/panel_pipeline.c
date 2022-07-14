@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "uran/pipelines/panel_pipeline.h"
+#include "uran/primitives/square_primitive.h"
 
 #include "mpgx/_source/window.h"
 #include "mpgx/_source/graphics_mesh.h"
@@ -505,6 +506,72 @@ MpgxResult createPanelPipeline(
 	}
 }
 
+MpgxResult createPanelMesh(
+	Window window,
+	GraphicsMesh* panelMesh)
+{
+	assert(window);
+	assert(panelMesh);
+
+	Buffer vertexBuffer;
+
+	MpgxResult mpgxResult = createBuffer(window,
+		VERTEX_BUFFER_TYPE,
+		GPU_ONLY_BUFFER_USAGE,
+		oneSquareVertices2D,
+		sizeof(oneSquareVertices2D),
+		&vertexBuffer);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+		return mpgxResult;
+
+	Buffer indexBuffer;
+
+	mpgxResult = createBuffer(window,
+		INDEX_BUFFER_TYPE,
+		GPU_ONLY_BUFFER_USAGE,
+		triangleSquareIndices,
+		sizeof(triangleSquareIndices),
+		&indexBuffer);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		destroyBuffer(vertexBuffer);
+		return mpgxResult;
+	}
+
+	GraphicsMesh mesh;
+
+	mpgxResult = createGraphicsMesh(window,
+		UINT16_INDEX_TYPE,
+		sizeof(triangleSquareIndices) / sizeof(uint16_t),
+		0,
+		vertexBuffer,
+		indexBuffer,
+		&mesh);
+
+	if (mpgxResult != SUCCESS_MPGX_RESULT)
+	{
+		destroyBuffer(vertexBuffer);
+		destroyBuffer(indexBuffer);
+		return mpgxResult;
+	}
+
+	*panelMesh = mesh;
+	return SUCCESS_MPGX_RESULT;
+}
+void destroyPanelMesh(GraphicsMesh panelMesh)
+{
+	if (!panelMesh)
+		return;
+
+	Buffer vertexBuffer = getGraphicsMeshVertexBuffer(panelMesh);
+	Buffer indexBuffer = getGraphicsMeshIndexBuffer(panelMesh);
+	destroyGraphicsMesh(panelMesh);
+	destroyBuffer(indexBuffer);
+	destroyBuffer(vertexBuffer);
+}
+
 GraphicsMesh getPanelPipelineMesh(
 	GraphicsPipeline panelPipeline)
 {
@@ -539,9 +606,10 @@ const mat4* getPanelPipelineMvp(
 }
 void setPanelPipelineMvp(
 	GraphicsPipeline panelPipeline,
-	const Mat4F * mvp)
+	const Mat4F* mvp)
 {
 	assert(panelPipeline);
+	assert(mvp);
 	assert(strcmp(panelPipeline->base.name,
 		PANEL_PIPELINE_NAME) == 0);
 	Handle handle = panelPipeline->base.handle;

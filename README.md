@@ -37,7 +37,6 @@ Work in Progress!
 | Name                   | Description               | Default value |
 |------------------------|---------------------------|---------------|
 | URAN_BUILD_SHARED      | Build Uran shared library | `ON`          |
-| URAN_MACOS_BUNDLE      | Build as macOS bundle     | `OFF`         |
 
 ### CMake variables
 | Name                   | Description                        | Default value   |
@@ -58,13 +57,7 @@ git clone --recursive https://github.com/cfnptr/uran
 ## Pack creation
 
 Using a runtime-optimized [Pack](https://github.com/cfnptr/pack/) library, you can store all game resources in compressed archives.
-It produces a `resources.pack` file with locally zipped and sorted game resources. (shaders, images, models, etc.) You can easily clone and build **Pack** utilities using the `scripts/build-pack.sh` script.
-
-And then create archives with `packer` utility.
-
-```
-./packer resources.pack phong.vert skybox.png teapot.fbx...
-```
+It produces a `resources.pack` file with locally zipped and sorted game resources. (shaders, images, models, etc.) You can easily pack all resources using the `resources/pack-XXXX.sh` script.
 
 ## Third-party
 

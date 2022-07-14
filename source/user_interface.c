@@ -30,9 +30,9 @@
 struct UserInterface_T
 {
 	Window window;
-	Transformer transformer;
 	FontAtlas* fontAtlases;
 	size_t fontAtlasCount;
+	Transformer transformer;
 	Interface interface;
 	GraphicsRenderer panelRenderer;
 	GraphicsRenderer textRenderer;
@@ -195,16 +195,15 @@ inline static void destroyCursorRenderInstance(
 	destroyTransform(transform);
 }
 MpgxResult createUserInterface(
-	Transformer transformer,
 	GraphicsPipeline panelPipeline,
 	GraphicsPipeline textPipeline,
 	FontAtlas* fontAtlases,
 	size_t fontAtlasCount,
 	cmmt_float_t scale,
 	size_t capacity,
+	ThreadPool threadPool,
 	UserInterface* ui)
 {
-	assert(transformer);
 	assert(panelPipeline);
 	assert(textPipeline);
 	assert(fontAtlases);
@@ -221,8 +220,6 @@ MpgxResult createUserInterface(
 		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
 
 	userInterface->window = window;
-	userInterface->transformer = transformer;
-
 	userInterface->focusedInputField = NULL;
 	userInterface->blinkDelay = 0.0;
 	userInterface->buttonDelay = 0.0;
@@ -246,8 +243,15 @@ MpgxResult createUserInterface(
 	memcpy(fontAtlasArray, fontAtlases,
 		fontAtlasCount * sizeof(FontAtlas));
 
-	ThreadPool threadPool =
-		getTransformerThreadPool(transformer);
+	Transformer transformer = createTransformer(1, threadPool);
+
+	if (!transformer)
+	{
+		destroyUserInterface(userInterface);
+		return OUT_OF_HOST_MEMORY_MPGX_RESULT;
+	}
+
+	userInterface->transformer = transformer;
 
 	Interface interface = createInterface(
 		window,
@@ -317,15 +321,11 @@ void destroyUserInterface(UserInterface ui)
 	destroyGraphicsRenderer(ui->textRenderer);
 	destroyGraphicsRenderer(ui->panelRenderer);
 	destroyInterface(ui->interface);
+	destroyTransformer(ui->transformer);
 	free(ui->fontAtlases);
 	free(ui);
 }
 
-Transformer getUserInterfaceTransformer(UserInterface ui)
-{
-	assert(ui);
-	return ui->transformer;
-}
 GraphicsRenderer getUserInterfacePanelRenderer(UserInterface ui)
 {
 	assert(ui);
@@ -345,6 +345,11 @@ size_t getUserInterfaceFontAtlasCount(UserInterface ui)
 {
 	assert(ui);
 	return ui->fontAtlasCount;
+}
+Transformer getUserInterfaceTransformer(UserInterface ui)
+{
+	assert(ui);
+	return ui->transformer;
 }
 Interface getUserInterface(UserInterface ui)
 {
@@ -862,6 +867,7 @@ void updateUserInterface(UserInterface ui)
 	assert(ui);
 	updateInputFields(ui);
 	updateInterface(ui->interface);
+	updateTransformer(ui->transformer);
 }
 
 inline static Transform getUiElementTransform(InterfaceElement element)

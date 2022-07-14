@@ -1,5 +1,5 @@
 #!/bin/bash
-cd $(dirname "$BASH_SOURCE")
+cd "$(dirname "$BASH_SOURCE")"
 shopt -s nullglob
 
 spirv-cross --revision > /dev/null
@@ -22,7 +22,7 @@ echo "Decompiling shaders..."
 
 for f in *.spv
 do
-    spirv-cross --version 460 --no-es --vulkan-semantics $f --output _decompiled/$f.txt
+    spirv-cross --version 460 --no-es --vulkan-semantics "$f" --output "_decompiled/$f.txt"
     status=$?
 
     if [ $status -eq 0 ]; then

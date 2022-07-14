@@ -56,7 +56,12 @@ void setEditorRendererResult(
 	GraphicsRendererResult result);
 
 /*
- * Update Editor after all another code.
+ * Update editor.
+ * editor - editor instance.
+ */
+void updateEditor(Editor editor);
+/*
+ * Update editor after all another code.
  * editor - editor instance.
  */
 void postUpdateEditor(Editor editor);

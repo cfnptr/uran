@@ -426,6 +426,7 @@ void setSimpleShadowPipelineMvp(
 	const Mat4F* mvp)
 {
 	assert(simpleShadowPipeline);
+	assert(mvp);
 	assert(strcmp(simpleShadowPipeline->base.name,
 		SIMPLE_SHADOW_PIPELINE_NAME) == 0);
 	Handle handle = simpleShadowPipeline->base.handle;

@@ -775,6 +775,7 @@ void setSpritePipelineMvp(
 	const Mat4F* mvp)
 {
 	assert(spritePipeline);
+	assert(mvp);
 	assert(strcmp(spritePipeline->base.name,
 		SPRITE_PIPELINE_NAME) == 0);
 	Handle handle = spritePipeline->base.handle;

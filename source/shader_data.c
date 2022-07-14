@@ -179,12 +179,12 @@ ShaderData createShaderDataFromFile(
 	return shaderData;
 }
 ShaderData createShaderDataFromPack(
-	PackReader packReader,
 	const char* path,
+	PackReader packReader,
 	Logger logger)
 {
-	assert(packReader);
 	assert(path);
+	assert(packReader);
 
 	ShaderData shaderData = calloc(1,
 		sizeof(ShaderData_T));
@@ -272,13 +272,13 @@ size_t getShaderDataSize(ShaderData shaderData)
 
 Shader createShaderFromFile(
 	const char* path,
-	Window window,
 	ShaderType type,
+	Window window,
 	Logger logger)
 {
 	assert(path);
-	assert(window);
 	assert(type < SHADER_TYPE_COUNT);
+	assert(window);
 
 	uint8_t* code;
 	size_t size;
@@ -318,16 +318,16 @@ Shader createShaderFromFile(
 	return shader;
 }
 Shader createShaderFromPack(
-	PackReader packReader,
 	const char* path,
-	Window window,
 	ShaderType type,
+	PackReader packReader,
+	Window window,
 	Logger logger)
 {
-	assert(packReader);
 	assert(path);
-	assert(window);
 	assert(type < SHADER_TYPE_COUNT);
+	assert(packReader);
+	assert(window);
 
 	const uint8_t* data;
 	uint32_t size;

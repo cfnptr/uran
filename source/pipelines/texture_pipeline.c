@@ -776,6 +776,7 @@ void setTexturePipelineMvp(
 	const Mat4F* mvp)
 {
 	assert(texturePipeline);
+	assert(mvp);
 	assert(strcmp(texturePipeline->base.name,
 		TEXTURE_PIPELINE_NAME) == 0);
 	Handle handle = texturePipeline->base.handle;

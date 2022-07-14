@@ -627,6 +627,7 @@ void setRayColorPipelineInvView(
 	const Mat4F* invView)
 {
 	assert(rayColorPipeline);
+	assert(invView);
 	assert(strcmp(rayColorPipeline->base.name,
 		RAY_COLOR_PIPELINE_NAME) == 0);
 	Handle handle = rayColorPipeline->base.handle;
@@ -647,6 +648,7 @@ void setRayColorPipelineInvProj(
 	const Mat4F* invProj)
 {
 	assert(rayColorPipeline);
+	assert(invProj);
 	assert(strcmp(rayColorPipeline->base.name,
 		RAY_COLOR_PIPELINE_NAME) == 0);
 	Handle handle = rayColorPipeline->base.handle;

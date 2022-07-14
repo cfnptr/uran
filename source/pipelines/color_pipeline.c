@@ -466,6 +466,7 @@ void setColorPipelineMvp(
 	const Mat4F* mvp)
 {
 	assert(colorPipeline);
+	assert(mvp);
 	assert(strcmp(colorPipeline->base.name,
 		COLOR_PIPELINE_NAME) == 0);
 	Handle handle = colorPipeline->base.handle;

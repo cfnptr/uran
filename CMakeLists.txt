@@ -38,22 +38,18 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 endif ()
 
 option(URAN_BUILD_SHARED "Build Uran shared library" ON)
-option(URAN_MACOS_BUNDLE "Build as macOS bundle." OFF)
 
 if (NOT DEFINED URAN_PROGRAM_NAME)
-	configure_file(resources/editor-resources.pack
-		editor-resources.pack COPYONLY)
 	set(URAN_PROGRAM_NAME uran-editor)
 endif ()
 if (NOT DEFINED URAN_PROGRAM_SOURCES)
 	set(URAN_PROGRAM_SOURCES source/main.c)
 endif ()
-
-if (URAN_MACOS_BUNDLE AND NOT DEFINED URAN_MACOS_INFO_PLIST)
-	message(FATAL_ERROR "macOS bundle Info.plist is not defined!")
+if (NOT DEFINED URAN_MACOS_INFO_PLIST)
+	set(URAN_MACOS_INFO_PLIST ${PROJECT_SOURCE_DIR}/cmake/MacOSXBundleInfo.plist.in)
 endif ()
-if (URAN_MACOS_BUNDLE AND NOT DEFINED URAN_MACOS_RESOURCES)
-	message(FATAL_ERROR "macOS bundle resources are not defined!")
+if (NOT DEFINED URAN_MACOS_RESOURCES)
+	set(URAN_MACOS_RESOURCES ${PROJECT_SOURCE_DIR}/resources/resources.pack)
 endif ()
 
 if (URAN_BUILD_SHARED)
@@ -114,7 +110,7 @@ set(URAN_SOURCES
 	source/renderers/text_renderer.c
 	source/renderers/texture_renderer.c
 
-	source/editor.c
+	source/engine.c
 	source/free_camera.c
 	source/graphics_renderer.c
 	source/image_data.c
@@ -133,12 +129,13 @@ set(URAN_LINK_LIBRARIES
 	mpnw-static
 	${URAN_PROGRAM_LIBRARIES})
 
+if (NOT ${CMAKE_BUILD_TYPE} MATCHES "Release")
+	list(APPEND URAN_SOURCES source/editor.c)
+endif ()
+
 configure_file(cmake/defines.h.in include/uran/defines.h)
 
-add_library(uran-static STATIC
-	${URAN_SOURCES})
-set_target_properties(uran-static PROPERTIES
-	OUTPUT_NAME "uran")
+add_library(uran-static STATIC ${URAN_SOURCES})
 target_link_libraries(uran-static PUBLIC
 	${URAN_LINK_LIBRARIES})
 target_include_directories(uran-static PUBLIC
@@ -146,8 +143,7 @@ target_include_directories(uran-static PUBLIC
 	${PROJECT_SOURCE_DIR}/include)
 
 if (URAN_BUILD_SHARED)
-	add_library(uran-shared SHARED
-		${URAN_SOURCES})
+	add_library(uran-shared SHARED ${URAN_SOURCES})
 	set_target_properties(uran-shared PROPERTIES
 		OUTPUT_NAME "uran"
 		WINDOWS_EXPORT_ALL_SYMBOLS ON)
@@ -162,15 +158,15 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows" AND
 	(${CMAKE_BUILD_TYPE} MATCHES "Release" OR
 	${CMAKE_BUILD_TYPE} MATCHES "RelWithDebInfo" OR
 	${CMAKE_BUILD_TYPE} MATCHES "MinSizeRel"))
-	add_executable(${URAN_PROGRAM_NAME} WIN32
-		${URAN_PROGRAM_SOURCES})
-else ()
+	add_executable(${URAN_PROGRAM_NAME} WIN32 ${URAN_PROGRAM_SOURCES})
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 	add_executable(${URAN_PROGRAM_NAME}
-		${URAN_PROGRAM_SOURCES}
-		${URAN_MACOS_RESOURCES})
+		${URAN_PROGRAM_SOURCES} ${URAN_MACOS_RESOURCES})
+else ()
+	add_executable(${URAN_PROGRAM_NAME} ${URAN_PROGRAM_SOURCES})
 endif ()
 
-if (URAN_MACOS_BUNDLE AND ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 	set_target_properties(${URAN_PROGRAM_NAME} PROPERTIES
 		MACOSX_BUNDLE TRUE
 		MACOSX_BUNDLE_INFO_PLIST ${URAN_MACOS_INFO_PLIST}
@@ -188,10 +184,11 @@ if (URAN_MACOS_BUNDLE AND ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 		include(BundleUtilities)
 		fixup_bundle("${URAN_APP_PATH}" "" "")
 	]] COMPONENT FixupBundle)
+else ()
+	configure_file(resources/resources.pack resources.pack COPYONLY)
 endif ()
 
-target_link_libraries(${URAN_PROGRAM_NAME} PRIVATE
-	uran-static)
+target_link_libraries(${URAN_PROGRAM_NAME} PRIVATE uran-static)
 target_include_directories(${URAN_PROGRAM_NAME} PRIVATE
 	${PROJECT_BINARY_DIR}/include
 	${PROJECT_SOURCE_DIR}/include

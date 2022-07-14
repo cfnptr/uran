@@ -679,13 +679,14 @@ Font createFontFromFile(
 	return font;
 }
 Font createFontFromPack(
-	PackReader packReader,
 	const char* path,
 	size_t index,
+	PackReader packReader,
 	Logger logger)
 {
-	assert(packReader);
+
 	assert(path);
+	assert(packReader);
 
 	const uint8_t* data;
 	uint32_t size;
@@ -3600,7 +3601,7 @@ MpgxResult bakeText(Text text)
 
 	size_t vertexSize = vertexCount * sizeof(TextVertex);
 
-	if (vertexBufferInstance->base.size < vertexSize)
+	if (!vertexBufferInstance || vertexBufferInstance->base.size < vertexSize)
 	{
 		Buffer newVertexBuffer;
 

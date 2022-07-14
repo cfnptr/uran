@@ -773,6 +773,7 @@ void setGradientSkyPipelineMvp(
 	const Mat4F* mvp)
 {
 	assert(gradientSkyPipeline);
+	assert(mvp);
 	assert(strcmp(gradientSkyPipeline->base.name,
 		GRADIENT_SKY_PIPELINE_NAME) == 0);
 	Handle handle = gradientSkyPipeline->base.handle;

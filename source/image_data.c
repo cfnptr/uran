@@ -299,14 +299,14 @@ inline static bool getImageDataFromPack(
 		imageSize);
 }
 ImageData createImageDataFromPack(
-	PackReader packReader,
 	const char* path,
 	ImageFormat format,
+	PackReader packReader,
 	Logger logger)
 {
-	assert(packReader);
 	assert(path);
 	assert(format < IMAGE_FORMAT_COUNT);
+	assert(packReader);
 
 	ImageData imageData = calloc(1,
 		sizeof(ImageData_T));
@@ -365,17 +365,17 @@ ImageFormat getImageDataFormat(ImageData imageData)
 Image createImageFromData(
 	const void* data,
 	size_t size,
-	Window window,
 	ImageType type,
 	ImageFormat format,
 	bool isConstant,
+	Window window,
 	Logger logger)
 {
 	assert(data);
 	assert(size > 0);
 	assert(type > 0);
-	assert(window);
 	assert(format < IMAGE_FORMAT_COUNT);
+	assert(window);
 
 	uint8_t* pixels;
 	Vec2I imageSize;
@@ -421,16 +421,16 @@ Image createImageFromData(
 }
 Image createImageFromFile(
 	const char* path,
-	Window window,
 	ImageType type,
 	ImageFormat format,
 	bool isConstant,
+	Window window,
 	Logger logger)
 {
 	assert(path);
-	assert(window);
 	assert(type > 0);
 	assert(format < IMAGE_FORMAT_COUNT);
+	assert(window);
 
 	uint8_t* pixels;
 	Vec2I imageSize;
@@ -475,19 +475,19 @@ Image createImageFromFile(
 	return image;
 }
 Image createImageFromPack(
-	PackReader packReader,
 	const char* path,
-	Window window,
 	ImageType type,
 	ImageFormat format,
 	bool isConstant,
+	PackReader packReader,
+	Window window,
 	Logger logger)
 {
-	assert(packReader);
 	assert(path);
-	assert(window);
 	assert(type > 0);
 	assert(format < IMAGE_FORMAT_COUNT);
+	assert(packReader);
+	assert(window);
 
 	uint8_t* pixels;
 	Vec2I imageSize;

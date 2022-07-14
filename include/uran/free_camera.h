@@ -65,18 +65,20 @@ FreeCamera createFreeCamera(
 void destroyFreeCamera(FreeCamera freeCamera);
 
 /*
- * Returns free camera view direction.
- * freeCamera - free camera instance.
- */
-Vec3F getFreeCameraViewDirection(
-	FreeCamera freeCamera);
-
-/*
  * Returns free camera framebuffer.
  * freeCamera - free camera instance.
  */
-Framebuffer getFreeCameraFramebuffer(
-	FreeCamera freeCamera);
+Framebuffer getFreeCameraFramebuffer(FreeCamera freeCamera);
+/*
+ * Returns free camera transform.
+ * freeCamera - free camera instance.
+ */
+Transform getFreeCameraTransform(FreeCamera freeCamera);
+/*
+ * Returns free camera view direction.
+ * freeCamera - free camera instance.
+ */
+Vec3F getFreeCameraViewDirection(FreeCamera freeCamera);
 
 /*
  * Returns free camera position.

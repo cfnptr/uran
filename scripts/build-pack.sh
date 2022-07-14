@@ -1,5 +1,5 @@
 #!/bin/bash
-cd $(dirname "$BASH_SOURCE")
+cd "$(dirname "$BASH_SOURCE")"
 
 git --version > /dev/null
 status=$?

@@ -20,7 +20,9 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#define LERP_FACTOR (cmmt_float_t)20.0
+#define LERP_FACTOR (cmmt_float_t)20.0 // TODO: set
+
+// TODO: boost (shift key) and boost speed
 
 struct FreeCamera_T
 {
@@ -113,17 +115,19 @@ void destroyFreeCamera(FreeCamera freeCamera)
 	free(freeCamera);
 }
 
-Framebuffer getFreeCameraFramebuffer(
-	FreeCamera freeCamera)
+Framebuffer getFreeCameraFramebuffer(FreeCamera freeCamera)
 {
 	assert(freeCamera);
 	return freeCamera->framebuffer;
 }
-Vec3F getFreeCameraViewDirection(
-	FreeCamera freeCamera)
+Transform getFreeCameraTransform(FreeCamera freeCamera)
 {
 	assert(freeCamera);
-
+	return freeCamera->transform;
+}
+Vec3F getFreeCameraViewDirection(FreeCamera freeCamera)
+{
+	assert(freeCamera);
 	Quat rotation = getTransformRotation(
 		freeCamera->transform);
 	return normVec3F(dotVecQuat3F(
