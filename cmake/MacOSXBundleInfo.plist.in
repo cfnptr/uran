@@ -7,9 +7,9 @@
 	<key>CFBundleDisplayName</key>
 	<string>Uran</string>
 	<key>CFBundleExecutable</key>
-	<string>uran</string>
+	<string>uran-editor</string>
 	<key>CFBundleIconFile</key>
-	<string>uran.icns</string>
+	<string>uran-editor.icns</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>

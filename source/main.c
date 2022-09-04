@@ -41,7 +41,7 @@ URAN_MAIN_FUNCTION
 	Program program;
 
 	Engine engine = createEngine(
-		URAN_NAME_STRING,
+		URAN_NAME_STRING " Editor",
 		createVersion(
 			URAN_VERSION_MAJOR,
 			URAN_VERSION_MINOR,
